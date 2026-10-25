@@ -1,0 +1,19 @@
+{
+  "name": "loki",
+  "version": "3.0.3",
+  "description": "GPU-aware VOD preparation, evidence-linked reports and local review by the current Codex.",
+  "author": {"name": "CVA contributors"},
+  "license": "GPL-3.0-only",
+  "keywords": ["vod", "editorial", "evidence", "loki"],
+  "skills": "./skills/",
+  "requires_local_executor": true,
+  "interface": {
+    "displayName": "CVA-Loki",
+    "shortDescription": "Read VOD sources and author evidence-linked reports",
+    "longDescription": "The current Codex prepares public VOD sources, directly reads originals and selected frames, authors a local report, and opens the existing review UI. Includes GPU-aware local speech and multimodal setup, image extraction, runtime and skill. No separate author-model transport, live scheduler or external publisher.",
+    "developerName": "CVA contributors",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": ["Use Loki to read my prepared VOD sources and create an evidence-linked summary, timeline, Stories and Highlights."]
+  }
+}

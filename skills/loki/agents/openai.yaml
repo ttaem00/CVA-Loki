@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loki"
+  short_description: "Direct VOD editorial authoring from local source evidence"
+  default_prompt: "Use $loki to read my prepared VOD originals and directly author an evidence-linked report."
