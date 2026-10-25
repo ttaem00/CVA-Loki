@@ -17,8 +17,8 @@
     },
     {
       "path": ".dockerignore",
-      "sha256": "8b9c79314e0b489d43ee13c289ecdcca00a30b6cee96de091b7be492869a6f59",
-      "bytes": 370
+      "sha256": "b45973406fa0348a6b2b88d95698d7820adabb2e40d51bf8b773af985165216b",
+      "bytes": 420
     },
     {
       "path": ".gitattributes",
@@ -31,29 +31,9 @@
       "bytes": 355
     },
     {
-      "path": "compose.cpu.yaml",
-      "sha256": "4d5c6ebcc0dc42368ac47cf33576928f6ea5e5c2621d95db3425103820e8e70a",
-      "bytes": 90
-    },
-    {
-      "path": "compose.review.yaml",
-      "sha256": "d3008591182d1712083da4eec9c4a3c359d080fe13a24429f493573d1bd1a4b0",
-      "bytes": 474
-    },
-    {
-      "path": "compose.yaml",
-      "sha256": "adad1eea772629e0aa634d01338bae76c02a70ea93c5b5e57fa729529caf635a",
-      "bytes": 260
-    },
-    {
       "path": "Dockerfile",
       "sha256": "86a36732c77e19fff5be480095594f4448ae18153dea1e44395ae3f356ef3e67",
       "bytes": 619
-    },
-    {
-      "path": "install.py",
-      "sha256": "dfcb6e821566e00268b9f8991de159b25d06b6f8f25e7d00f698b273980e43a8",
-      "bytes": 20736
     },
     {
       "path": "LICENSE",
@@ -72,8 +52,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "1bba98fd9d721172876bf718335f6f6071b0ece9d1af75f84c982f8d339fc75e",
-      "bytes": 49301
+      "sha256": "ce06b0e4a68fe3d3d1f97bbb593fecea88e190ef003508a680b5a1f310ceb147",
+      "bytes": 57270
     },
     {
       "path": "SECURITY.md",
@@ -81,9 +61,34 @@
       "bytes": 3672
     },
     {
-      "path": "skills/loki/agents/openai.yaml",
-      "sha256": "e647f3bfd40ed9393a7cc9548aaee22f59d5ed96f0a94be34350ca5088940d6d",
-      "bytes": 226
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "daefa55e062cddd90c843e5141f484a005467e8523f2efe39f160702fe3cf1c1",
+      "bytes": 7244
+    },
+    {
+      "path": "compose.cpu.yaml",
+      "sha256": "4d5c6ebcc0dc42368ac47cf33576928f6ea5e5c2621d95db3425103820e8e70a",
+      "bytes": 90
+    },
+    {
+      "path": "compose.review.yaml",
+      "sha256": "d3008591182d1712083da4eec9c4a3c359d080fe13a24429f493573d1bd1a4b0",
+      "bytes": 474
+    },
+    {
+      "path": "compose.yaml",
+      "sha256": "adad1eea772629e0aa634d01338bae76c02a70ea93c5b5e57fa729529caf635a",
+      "bytes": 260
+    },
+    {
+      "path": "docs/assets/readme-hero.svg",
+      "sha256": "2b986e10b4a2b6e7151dbb15c6e6aeceedab808dbae249817f3d2bb10dd82a5d",
+      "bytes": 3949
+    },
+    {
+      "path": "install.py",
+      "sha256": "dfcb6e821566e00268b9f8991de159b25d06b6f8f25e7d00f698b273980e43a8",
+      "bytes": 20736
     },
     {
       "path": "skills/loki/LICENSE",
@@ -91,19 +96,19 @@
       "bytes": 35149
     },
     {
+      "path": "skills/loki/SKILL.md",
+      "sha256": "8dd5b019e1e57d80cecfb2b956c530cf052eb88ffbc898c83bdc2a4ae847e937",
+      "bytes": 6741
+    },
+    {
+      "path": "skills/loki/agents/openai.yaml",
+      "sha256": "e647f3bfd40ed9393a7cc9548aaee22f59d5ed96f0a94be34350ca5088940d6d",
+      "bytes": 226
+    },
+    {
       "path": "skills/loki/references/Chart.js.LICENSE.txt",
       "sha256": "5a0877ad6d818529be4f33009d0942cdf7e2ed7656156f4aba7308459a546030",
       "bytes": 1093
-    },
-    {
-      "path": "skills/loki/references/configuration.md",
-      "sha256": "953ae9fe543c0483ca1740df8693c90ed48ea1ee9bbe73103d25414e485a9d15",
-      "bytes": 8343
-    },
-    {
-      "path": "skills/loki/references/kurkle-color.LICENSE.txt",
-      "sha256": "2859c50313bad2ba77b081410c477beaf92b60ca13a77a248d89859a6dd6ac81",
-      "bytes": 1085
     },
     {
       "path": "skills/loki/references/POLICY.md",
@@ -126,9 +131,24 @@
       "bytes": 7162
     },
     {
+      "path": "skills/loki/references/configuration.md",
+      "sha256": "953ae9fe543c0483ca1740df8693c90ed48ea1ee9bbe73103d25414e485a9d15",
+      "bytes": 8343
+    },
+    {
+      "path": "skills/loki/references/kurkle-color.LICENSE.txt",
+      "sha256": "2859c50313bad2ba77b081410c477beaf92b60ca13a77a248d89859a6dd6ac81",
+      "bytes": 1085
+    },
+    {
       "path": "skills/loki/references/workflow.md",
       "sha256": "6e6f522611e4787237292b197b31e448151b943e2453a33c01fa2eb72893c8ce",
       "bytes": 13180
+    },
+    {
+      "path": "skills/loki/runtime/LICENSE",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149
     },
     {
       "path": "skills/loki/runtime/content/network.py",
@@ -149,11 +169,6 @@
       "path": "skills/loki/runtime/install.py",
       "sha256": "dfcb6e821566e00268b9f8991de159b25d06b6f8f25e7d00f698b273980e43a8",
       "bytes": 20736
-    },
-    {
-      "path": "skills/loki/runtime/LICENSE",
-      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
-      "bytes": 35149
     },
     {
       "path": "skills/loki/runtime/local_tools.py",
@@ -526,24 +541,24 @@
       "bytes": 75
     },
     {
-      "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/__init__.py",
-      "sha256": "1bcf202ee7eade5a94226c41bc7b198df34188cb76de170fd0300b4c2e7eb805",
-      "bytes": 71
-    },
-    {
       "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/LICENSE",
       "sha256": "bca9c3d401fdfd0965a2a2224f7dcf9945b512eaf5802b91d312ba739dbe9584",
       "bytes": 1067
     },
     {
-      "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/markdown.py",
-      "sha256": "4d7399dcc55628a4d155f396a6ea77da7d4027e061056a64698584741f5c7dc0",
-      "bytes": 2659
-    },
-    {
       "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/NOTICE.md",
       "sha256": "f1035b675665c6f98a926c5369341f13d3ca7f45322224a3bd4ba88e87bcb33f",
       "bytes": 1291
+    },
+    {
+      "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/__init__.py",
+      "sha256": "1bcf202ee7eade5a94226c41bc7b198df34188cb76de170fd0300b4c2e7eb805",
+      "bytes": 71
+    },
+    {
+      "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/markdown.py",
+      "sha256": "4d7399dcc55628a4d155f396a6ea77da7d4027e061056a64698584741f5c7dc0",
+      "bytes": 2659
     },
     {
       "path": "skills/loki/runtime/pipeline/evidence_world/_pageindex/upstream.json",
@@ -1289,16 +1304,6 @@
       "path": "skills/loki/runtime/transcribe_source.py",
       "sha256": "b3c2400b712117e2c85fca1f21310d5d379f5458a316289b8d349e2fb8db5770",
       "bytes": 13051
-    },
-    {
-      "path": "skills/loki/SKILL.md",
-      "sha256": "8dd5b019e1e57d80cecfb2b956c530cf052eb88ffbc898c83bdc2a4ae847e937",
-      "bytes": 6741
-    },
-    {
-      "path": "THIRD_PARTY_NOTICES.md",
-      "sha256": "daefa55e062cddd90c843e5141f484a005467e8523f2efe39f160702fe3cf1c1",
-      "bytes": 7244
     },
     {
       "path": "verify_release.py",

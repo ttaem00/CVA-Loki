@@ -11,6 +11,9 @@
 !release-manifest.json
 !LICENSE
 !README.md
+!docs/
+!docs/assets/
+!docs/assets/readme-hero.svg
 !POLICY.md
 !PRIVACY.md
 !SECURITY.md

@@ -1,43 +1,102 @@
-# CVA-Loki 3.0.3
+<p align="center">
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.3 — 원자료를 읽고, 장면을 이해하고, 보고서를 편집합니다." />
+</p>
 
-[![Version 3.0.3](https://img.shields.io/badge/version-3.0.3-3776AB)](.codex-plugin/plugin.json)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](#requirements)
-[![GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-green)](LICENSE)
-[![Author Current Codex](https://img.shields.io/badge/author-current%20Codex-20805D)](#authoring)
-[![Docker setup](https://img.shields.io/badge/Docker-one%20command-2496ED)](#docker-install)
-[![Highlight images supported](https://img.shields.io/badge/highlight%20images-supported-8A63D2)](#images)
+<h1 align="center">CVA-Loki 3.0.3</h1>
+<p align="center"><strong>현재 Codex가 방송 원문과 장면을 직접 읽고 작성하는 VOD 편집 모듈</strong></p>
 
-**현재 대화의 Codex가 원문과 장면 이미지를 직접 읽고 작성하는 VOD 편집 모듈입니다.**
+<p align="center">
+  <a href="https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3"><img alt="Version 3.0.3" src="https://img.shields.io/badge/version-3.0.3-8B5CF6?style=flat-square" /></a>
+  <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
+  <a href="#codex-integration"><img alt="Native Codex plugin and skill" src="https://img.shields.io/badge/Codex-plugin%20%2B%20skill-20805D?style=flat-square" /></a>
+  <a href="#docker-install"><img alt="Docker one command" src="https://img.shields.io/badge/Docker-one%20command-2496ED?style=flat-square" /></a>
+  <a href="#images"><img alt="Highlight images supported" src="https://img.shields.io/badge/highlight%20images-supported-8B5CF6?style=flat-square" /></a>
+  <a href="LICENSE"><img alt="GPL-3.0-only" src="https://img.shields.io/badge/license-GPL--3.0--only-64748B?style=flat-square" /></a>
+</p>
 
-공개 치지직 VOD를 내려받아 로컬 자막을 준비하거나 기존 자막·영상으로 시작합니다. 현재 Codex가 요약·D1/D2 타임라인·Point·Story·Highlight를 작성하면 Loki가 근거와 응답을 검사하고 Markdown/HTML 보고서를 만듭니다. 기존 Report Admin 화면에서 장면을 확인하고 내용을 편집·미리보기·저장·복원할 수 있습니다.
+<p align="center">
+  <a href="#quickstart"><strong>바로 설치</strong></a> ·
+  <a href="https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3">배포본 받기</a> ·
+  <a href="https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.3/installation-proof.md">실제 검증 결과</a> ·
+  <a href="#policy">정책 확인</a>
+</p>
 
-**3.0.3은 하이라이트용 이미지 추출을 지원합니다.** 같은 VOD의 로컬 영상에서 프레임을 추출하고, 현재 Codex가 실제 반환된 이미지를 확인해 선택하면 보고서에 연결합니다. 이미지 경로나 임베딩 검색 결과만으로 이미지를 봤다고 기록하지 않습니다.
+공개 치지직 VOD 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다.
 
-이 저장소는 [ttaem00/CVA-Loki](https://github.com/ttaem00/CVA-Loki)의 독립 배포본입니다. 플러그인과 스킬은 같은 런타임을 사용하며, 별도 AI 작성자를 실행하지 않습니다.
+| 원문에서 시작 | 장면을 근거로 선택 | 기존 UI로 마무리 |
+| :--- | :--- | :--- |
+| 공개 VOD 준비와 로컬 Whisper 전사 | 실제 프레임 추출과 EmbeddingGemma 2 탐색 | 보고서 읽기·편집·미리보기 |
+| 출처·시계·읽기 기록을 보존 | **현재 Codex가 반환 이미지를 직접 확인** | 명시적 저장·재열기·이력 복원 |
 
-## 목차
+> [!TIP]
+> **설치는 한 명령, 작성은 현재 Codex와 함께.** 기본 설치는 전체 기능과 GPU 자동 선택을 사용합니다. 플러그인과 스킬은 같은 런타임을 사용하며, 다른 모델에 보고서 작성을 넘기지 않습니다.
 
-- [빠른 시작](#quickstart)
-- [무엇을 하는가](#features)
-- [구조와 네트워크 경계](#architecture)
-- [준비 사항과 GPU 선택](#requirements)
-- [로컬 설치](#native-install)
-- [Codex 플러그인·스킬 사용](#codex-integration)
-- [Docker 설치](#docker-install)
-- [공개 VOD로 원자료 준비](#source-preparation)
-- [현재 Codex가 직접 작성](#authoring)
-- [이미지 추출과 멀티모달 검색](#images)
-- [기존 UI에서 검토·편집·복원](#review-ui)
-- [설정](#configuration)
-- [설치 결과와 검증 범위](#verification)
-- [작업공간과 결과 파일](#outputs)
-- [문제 해결](#troubleshooting)
-- [정책·개인정보·비용](#policy)
-- [FAQ](#faq)
-- [라이선스와 공식 참고 자료](#references)
+<details>
+<summary><strong>목차 펼치기 — 설치·사용·설정·문제 해결</strong></summary>
+
+| 시작·설치 | 작성·편집 | 설정·운영 |
+| :--- | :--- | :--- |
+| [빠른 시작](#quickstart) | [공개 VOD 준비](#source-preparation) | [설정](#configuration) |
+| [기능 범위](#features) | [현재 Codex가 직접 작성](#authoring) | [설치 검증](#verification) |
+| [구조와 네트워크](#architecture) | [이미지·멀티모달](#images) | [작업공간과 결과](#outputs) |
+| [준비 사항과 GPU](#requirements) | [검토·편집 UI](#review-ui) | [문제 해결](#troubleshooting) |
+| [로컬 설치](#native-install) | [플러그인·스킬](#codex-integration) | [정책·개인정보·비용](#policy) |
+| [Docker 설치](#docker-install) | [FAQ](#faq) | [라이선스·공식 자료](#references) |
+
+</details>
+
+---
 
 <a id="quickstart"></a>
 ## 빠른 시작
+
+### 1. 배포 폴더를 준비하세요
+
+[최신 릴리스 ZIP](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3)을 해제하거나 저장소를 clone하고, 해당 폴더에서 실행합니다.
+
+```sh
+git clone https://github.com/ttaem00/CVA-Loki.git
+cd CVA-Loki
+```
+
+### 2. 사용할 환경 하나를 선택하세요
+
+**Codex 플러그인** · 사용하는 호스트 Codex 환경에 설치
+
+```sh
+python install.py --workspace ../loki-plugin-workspace --mode plugin
+```
+
+**Codex 스킬** · 특정 작업공간에서 `$loki`로 사용
+
+```sh
+python install.py --workspace ../loki-workspace --mode skill
+```
+
+**Docker** · 분리된 환경에 전체 기능 설치
+
+```sh
+docker compose run --build --rm loki
+```
+
+| 직접 준비할 것 | 설치기가 자동 준비할 것 |
+| :--- | :--- |
+| 로컬: Python 3.11+와 venv/ensurepip | 전용 환경, Node/npm, FFmpeg, Python 라이브러리 |
+| Docker: 실행 중인 Docker와 Compose 2.30+ | 컨테이너 Python, 선택 모드의 Codex CLI·플러그인/스킬 |
+| GPU: 지원 드라이버, Docker 사용 시 GPU 노출 | GPU 감지·장치별 PyTorch·실제 실행 확인 |
+| 최초 다운로드를 위한 인터넷·저장공간 | EmbeddingGemma 2·Whisper·Silero VAD·F2 자산 |
+
+**기본값: 전체 기능(`multimodal`) · GPU 자동 선택(`auto`)**. 감지된 GPU의 실행 실패를 CPU 성공으로 숨기지 않습니다. GPU가 없는 Docker 호스트는 [CPU override](#docker-install)를 사용하세요. 호스트 드라이버는 설치기가 변경하지 않습니다.
+
+### 3. 설치 결과를 확인하고 현재 Codex에서 시작하세요
+
+작업공간의 `installation-result.json`에서 전체 결과와 실제 실행 장치를 확인합니다. 설치한 작업공간을 Codex에서 열고, 새 채팅에서 `$loki`와 VOD URL 또는 기존 자료를 전달하세요.
+
+> [!IMPORTANT]
+> **Docker 안의 설치와 호스트 Codex Desktop 설치는 별개입니다.** Docker 기본 명령은 컨테이너에 스킬을 설치합니다. 컨테이너 플러그인은 `--mode plugin`을 추가하고, 호스트 Codex에서 쓰려면 호스트 설치 경로를 선택하세요. 공개 플러그인 스토어 버튼 설치·자동 등재를 의미하지 않습니다.
+
+<details>
+<summary><strong>복사해서 지시하기 — 현재 Codex에게 설치부터 보고서 작성까지 한 번에 요청</strong></summary>
 
 ### 현재 Codex에게 한 번 지시하기
 
@@ -47,21 +106,7 @@
 
 VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함께 전달하세요. 기존 SRT로 시작하려면 URL 대신 해당 파일과 확인된 VOD 정보를 알려주면 됩니다.
 
-### Docker 한 명령으로 기본 설치
-
-Docker에 NVIDIA GPU가 노출되는 환경에서는 저장소 폴더에서 다음을 실행합니다.
-
-```sh
-docker compose run --build --rm loki
-```
-
-기본값은 **전체 멀티모달 프로필 + GPU 자동 선택 + skill 설치**입니다. GPU가 없는 Docker 호스트에서는 아래의 CPU override를 사용하세요.
-
-```sh
-docker compose -f compose.yaml -f compose.cpu.yaml run --build --rm loki
-```
-
-설치는 환경을 준비하는 단계입니다. 보고서 작성에는 실제 원자료와 현재 Codex의 읽기·판단이 필요합니다. Docker 안에 설치한 스킬이나 플러그인은 호스트 Codex Desktop에 자동 설치되지 않습니다. [설치 위치의 차이](#codex-integration)를 확인하세요.
+</details>
 
 <a id="features"></a>
 ## 무엇을 하는가
@@ -105,7 +150,16 @@ flowchart TD
     CHECK --> REPORT["Markdown · HTML · 메타데이터"]
     REPORT --> UI["기존 검토 UI"]
     UI --> REV["미리보기 · 명시적 저장 · 이력 복원"]
+    classDef source fill:#e6f8fb,stroke:#0891b2,color:#164e63
+    classDef author fill:#f0eaff,stroke:#8b5cf6,color:#4c1d95
+    classDef result fill:#e9f8ee,stroke:#16a34a,color:#14532d
+    class URL,LOCAL,AV,STT,PREP source
+    class READ,SEARCH,CODEX author
+    class CHECK,REPORT,UI,REV result
 ```
+
+<details>
+<summary><strong>단계별 네트워크·작성 책임 보기</strong></summary>
 
 | 단계 | 네트워크와 책임 |
 | --- | --- |
@@ -117,6 +171,8 @@ flowchart TD
 | 검토 UI | loopback의 로컬 서버에서 기존 보고서와 수정 이력을 다룹니다. 외부 게시를 실행하지 않습니다. |
 
 **오프라인 작성 도구라는 말이 Codex 서비스 자체까지 오프라인이라는 뜻은 아닙니다.** Loki의 로컬 모델은 전사와 탐색을 맡고, 현재 Codex가 의미 판단과 최종 작성을 맡습니다.
+
+</details>
 
 <a id="requirements"></a>
 ## 준비 사항과 GPU 선택
@@ -132,6 +188,9 @@ flowchart TD
 | CPU | 호환 GPU가 없거나 `--device cpu`를 명시한 경우 사용합니다. 긴 영상의 전사는 오래 걸릴 수 있습니다. |
 
 `gpus: all`을 사용하는 Compose 항목은 [Docker 공식 문서](https://docs.docker.com/reference/compose-file/services/#gpus)에 따라 Compose 2.30 이상이 필요합니다. [GPU 접근의 호스트 준비](https://docs.docker.com/compose/how-tos/gpu-support/)도 확인하세요.
+
+<details>
+<summary><strong>GPU 선택 기준·드라이버·모델 용량·메모리 자세히 보기</strong></summary>
 
 ### 장치 선택
 
@@ -151,6 +210,8 @@ AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지�
 모델 파일은 ZIP에 포함되지 않습니다. 첫 설치는 EmbeddingGemma 2 약 1.5GB, Whisper 가중치 약 1.62GB, F2 자산 약 47MB와 패키지를 내려받습니다. PyTorch·설치 캐시·원본 영상·추출 음성·벡터 캐시에도 추가 공간이 필요합니다.
 
 기존 임베딩 worker에는 최소 8GiB 가용 RAM 검사가 있습니다. 이 검사는 모든 방송 길이·동시 작업·GPU 메모리 요구를 보장하는 사양표가 아닙니다. 설치나 처리 중 메모리 부족이 나면 다른 작업의 사용량과 실제 실패 로그를 확인하세요.
+
+</details>
 
 <a id="native-install"></a>
 ## 로컬 설치
@@ -177,6 +238,9 @@ Windows에서는 실행 환경에 따라 `py -3`, macOS/Linux에서는 `python3`
 
 시스템 Python 패키지를 설치 대상으로 사용하지 않으며 호스트 인증 파일을 가져오지 않습니다. `plugin` 모드는 선택된 Codex 환경에 marketplace·plugin 등록을 수행합니다. 일반 의존성·추가 CLI는 작업공간 안에 준비합니다.
 
+<details>
+<summary><strong>설치 프로필·CPU·모델 경로 옵션 보기</strong></summary>
+
 ### 설치 프로필과 옵션
 
 | 옵션 | 의미 |
@@ -197,6 +261,8 @@ python install.py --workspace ../loki-media --mode skill --features media
 ```
 
 `features` 값을 설정 파일에서 바꾸는 것만으로 의존성이 추가되지는 않습니다. 처음 필요한 기능에 맞게 설치 프로필을 선택하세요.
+
+</details>
 
 <a id="codex-integration"></a>
 ## Codex 플러그인·스킬 사용
@@ -253,6 +319,9 @@ docker compose run --build --rm loki
 ```sh
 docker compose run --build --rm loki --mode plugin
 ```
+
+<details>
+<summary><strong>CPU 설치·볼륨·결과 확인·호스트 Codex 연결 자세히 보기</strong></summary>
 
 ### CPU 경로
 
@@ -314,8 +383,15 @@ docker compose -p my-loki run --build --rm loki
 
 기본 named volume을 유지한다면 현재 Codex가 선택한 원문·이미지 파일만 명시적으로 호스트 작업 폴더에 꺼내 확인해야 합니다. 인증 폴더를 연결하거나 컨테이너의 모든 파일을 가져올 필요는 없습니다. Linux bind mount는 해당 경로에 UID 10001의 쓰기 권한이 필요합니다.
 
+</details>
+
 <a id="source-preparation"></a>
 ## 공개 VOD로 원자료 준비
+
+공개 VOD 한 개를 영상·메타데이터·자막으로 준비한 뒤 현재 Codex의 작성 흐름에 연결합니다.
+
+<details>
+<summary><strong>공개 VOD 준비 명령·옵션·prepare spec 보기</strong></summary>
 
 기본 전체 설치 뒤 실제 반환된 Python과 runtime 경로로 실행합니다.
 
@@ -362,8 +438,15 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 
 영상은 `<work_dir>/<video_no>/` 아래에 있어야 하며 하위 source-attempt 폴더도 허용합니다. 출력은 입력 영상과 같은 폴더의 새로운 `.srt`여야 합니다. 기존 자막은 덮어쓰지 않습니다.
 
+</details>
+
 <a id="authoring"></a>
 ## 현재 Codex가 직접 작성
+
+**현재 대화의 Codex가 원문과 실제 반환 이미지를 직접 읽고 판단합니다.** Loki는 원자료·읽기 기록·응답을 검사하고 새 정상 보고서로 저장합니다.
+
+<details>
+<summary><strong>prepare → 원문 읽기 → 판단·작성 → submit 상세 명령 보기</strong></summary>
 
 기존 자료로 시작할 때는 같은 VOD의 SRT와 확인된 방송 정보를 `<workspace>/<work_dir>/<video_no>/` 아래에 준비합니다. 방송 시작 시각과 다시보기 업로드 시각을 바꾸어 쓰거나, 다른 방송의 자료를 섞지 않습니다.
 
@@ -397,8 +480,15 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 
 `submit`은 새 로컬 보고서군을 만듭니다. 기존 보고서와 사용자 수정본을 덮어쓰거나 공개하지 않습니다. 정확히 같은 완료 제출의 재조회는 가능하지만, 완료된 job에 다른 응답을 넣으면 충돌합니다. 기존 제출 상태를 확인하고 충돌을 숨기려고 중복 job을 만들지 마세요.
 
+</details>
+
 <a id="images"></a>
 ## 이미지 추출과 멀티모달 검색
+
+**3.0.3은 실제 하이라이트 프레임 추출을 지원합니다.** 로컬 EmbeddingGemma 2는 text/image/audio/video 근거 후보를 찾고, 최종 장면 선택과 보고서 작성은 현재 Codex가 맡습니다.
+
+<details>
+<summary><strong>이미지 추출·선택·멀티모달 탐색 명령과 역할 보기</strong></summary>
 
 ### 하이라이트용 이미지 추출
 
@@ -433,6 +523,8 @@ read_frames → 실제 반환 이미지 확인 → 필요한 다음 페이지 �
 `google/embeddinggemma-2`는 로컬 검색용 encoder입니다. **보고서 작성자나 승인자가 아닙니다.** text/image/audio/video 임베딩으로 관련 근거 후보를 찾고 캐시를 재사용합니다. `navigate_multimodal`의 결과도 실제 원문·이미지 확인으로 이어져야 합니다.
 
 미디어 탐색 window는 1–30초이며 한 요청에 최대 3개를 사용합니다. 질문과 구간은 이 job이 반환한 정확한 계약과 source duration에 맞춥니다. 검색 점수가 높다는 이유로 보지 않은 장면이나 듣지 않은 음성을 확인했다고 기록하지 않습니다.
+
+</details>
 
 <a id="review-ui"></a>
 ## 기존 UI에서 검토·편집·복원
@@ -469,6 +561,11 @@ docker compose -f compose.yaml -f compose.review.yaml up --build review
 <a id="configuration"></a>
 ## 설정
 
+설정 파일은 작업공간의 `loki.json`입니다. 언어·입력/미디어 크기·기능 프로필과 작업 경로를 확인할 수 있습니다. 작성자는 `current_codex`, 작성 도구 네트워크는 `deny`로 고정됩니다.
+
+<details>
+<summary><strong>9개 설정 키·초기값·타입·허용 범위 보기</strong></summary>
+
 설정은 workspace의 `loki.json`에 있습니다. 키는 정확히 9개이며 추가 키를 받지 않습니다. 다음은 수동 `init`의 core 초기값입니다. **기본 전체 설치가 만든 설정을 이 예시로 덮어쓰지 마세요.** 전체 설치는 실제 모델 runtime ref를 기록합니다.
 
 ```json
@@ -503,12 +600,25 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 
 상세 경로·설치 옵션은 [configuration.md](skills/loki/references/configuration.md)를 참고하세요.
 
+</details>
+
 <a id="verification"></a>
 ## 설치 결과와 검증 범위
 
 ### 공개 배포본의 검증 자료
 
-[3.0.3 릴리스](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3)에 **설치 검증 영수증과 체크섬**을 제공합니다. [기계가 읽는 설치 증거](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.3/installation-proof.json)와 [사람이 읽는 검증 설명](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.3/installation-proof.md)을 함께 확인하세요. 검증 자료의 `release_manifest_sha256`은 해당 배포본의 `release-manifest.json`과 일치해야 합니다.
+[3.0.3 릴리스](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3)에 **설치 검증 영수증과 체크섬**을 제공합니다. [기계가 읽는 설치 증거](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.3/installation-proof.json)와 [사람이 읽는 검증 설명](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.3/installation-proof.md)을 함께 확인하세요. **이 검증 자료는 `v3.0.3` 태그와 릴리스 ZIP에 고정됩니다.** 검증 자료의 `release_manifest_sha256`은 그 ZIP의 `release-manifest.json`과 일치해야 합니다. 이후 `main`의 문서가 갱신되면 manifest도 달라질 수 있으므로, 이전 전체 설치 증거를 새 manifest 전체의 설치 증거로 바꾸어 해석하지 마세요.
+
+| 실제 확인한 흐름 | 공개 검증 범위 |
+| :--- | :--- |
+| **전체 GPU 설치** | 새 Windows workspace의 skill 설치 + 새 Linux Docker 볼륨의 plugin 설치 |
+| **네이티브 플러그인** | Codex CLI 0.164.0에서 설치·검색·enabled 상태 확인 |
+| **미디어·모델 실행** | 네 모달리티 CUDA 벡터·캐시 + 합성 영상의 JPEG 9장·페이지 3개 |
+| **실제 VOD·현재 Codex** | 공개 테스트 VOD의 전사 3개 cue, 원문·반환 이미지 확인과 새 보고서 제출 |
+| **기존 검토 UI** | 편집 → 미리보기 → 저장 → 재열기에서 수정·선택 이미지 확인 |
+
+<details>
+<summary><strong>검증 항목별 근거·설치 결과 필드·한계 자세히 보기</strong></summary>
 
 | 확인 항목 | 증거에서 확인할 내용 |
 | --- | --- |
@@ -552,8 +662,15 @@ python verify_release.py .
 
 같은 배포본의 같은 owned workspace에서는 설치 명령을 재실행할 수 있습니다. 이전 시도는 로그에 남고 최신 `installation-result.json`은 해당 시도의 PASS/FAIL을 반영합니다. 다른 버전의 설치 파일을 기존 폴더에 덮어쓰는 업그레이드 절차로 해석하지 마세요.
 
+</details>
+
 <a id="outputs"></a>
 ## 작업공간과 결과 파일
+
+환경·모델·원자료·읽기 기록·보고서·수동 수정 이력은 작업공간에 보존합니다.
+
+<details>
+<summary><strong>작업공간 디렉터리 구조와 결과 파일 보기</strong></summary>
 
 기본 `work_dir=work`일 때의 구조입니다. 실제 job ID·보고서 이름·cache 이름은 반환된 결과가 정본입니다.
 
@@ -584,8 +701,15 @@ loki-workspace/
 
 plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용합니다. workspace와 설치 cache는 서로 다른 위치일 수 있습니다. 작업공간을 이동하면 준비 파일의 절대 경로가 그대로 유효한지 확인해야 하며 자동 relocation을 가정하지 마세요.
 
+</details>
+
 <a id="troubleshooting"></a>
 ## 문제 해결
+
+실패하면 `installation-result.json`의 **최초 실패 stage와 해당 로그**부터 확인하세요. 원자료나 모델 볼륨을 삭제하기 전에 아래 대응표를 확인합니다.
+
+<details>
+<summary><strong>GPU·의존성·플러그인·모델·저장 오류 해결표 펼치기</strong></summary>
 
 | 증상·오류 | 확인과 대응 |
 | --- | --- |
@@ -611,8 +735,26 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 
 실패 보고에는 버전·명령·최초 실패 stage·비밀을 제거한 메시지를 포함하세요. 전체 작업공간·원자료·인증·개인 경로가 든 로그를 공개 이슈에 그대로 올리지 않습니다. 자세한 보고 기준은 [SECURITY.md](SECURITY.md)에 있습니다.
 
+</details>
+
 <a id="policy"></a>
 ## 정책·개인정보·비용
+
+### 2.9.4.2와의 관계
+
+**현재 Codex 직접 작성·원문 근거라는 원칙은 계승했지만, 정책 전체가 동일한 배포본은 아닙니다.** 참고한 2.9.4.2의 이용허락이나 작성 단계를 그대로 복제한 것으로 해석하지 마세요.
+
+| 항목 | 2.9.4.2 참고판 | CVA-Loki 3.0.3 |
+| :--- | :--- | :--- |
+| 최종 작성자 | 해당 작업의 현재 Codex | 현재 대화의 Codex로 고정 |
+| 작성 절차 | 청크 관찰·지도·Point/Story·Highlight의 단계별 작성 | 전체 작성 계약으로 요약·D1/D2·Point·Story·Highlight 작성 |
+| Highlight 연결 | 승인 Story·Point 참조 필수 | 독립 Highlight의 빈 Story·Point 참조 허용 |
+| 이미지 근거 | 선택 시각 sidecar 중심 | 실제 프레임 추출·직접 확인·보고서 연결 |
+| 코드 이용허락 | TTaem CVA Source-Available License 1.0 | 동봉한 GPL-3.0-only |
+
+원본의 [이용허락](https://github.com/mizan0515/ttaem-CVA-loki-2.9.4.2/blob/0f94cc10e22d1e268fb6c2c7a4384672aab5017f/LICENSE)·[정책](https://github.com/mizan0515/ttaem-CVA-loki-2.9.4.2/blob/0f94cc10e22d1e268fb6c2c7a4384672aab5017f/docs/POLICY.md)과 이 배포본의 [LICENSE](LICENSE)·[POLICY.md](POLICY.md)를 각각 확인하세요. 원본에는 비상업·독립 배포·브랜드에 관한 별도 조건이 있으며, 이를 본 배포본의 조건과 혼동하지 않습니다.
+
+### 현재 배포본의 실행·자료 처리 원칙
 
 - 현재 Codex가 유일한 의미 작성자입니다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색, Python은 검사·렌더를 맡습니다.
 - 쿠키·토큰·브라우저 프로필·호스트 인증을 검색·복사하는 설정을 받지 않습니다.
@@ -627,6 +769,9 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 
 <a id="faq"></a>
 ## FAQ
+
+<details>
+<summary><strong>이미지·GPU·VOD·플러그인·자동 실행에 관한 자주 묻는 질문</strong></summary>
 
 **하이라이트 이미지 추출을 지원하나요?**  
 네. 3.0.3의 media/full 프로필에서 같은 VOD 로컬 영상으로 프레임을 추출하고, 현재 Codex가 실제 이미지를 확인해 선택하면 보고서에 연결합니다. Highlight 영상 컷 편집이나 UI에서 선택 이미지·캡션을 교체하는 기능과는 다릅니다.
@@ -652,10 +797,15 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 **설치 PASS가 방송 요약 품질까지 보장하나요?**  
 아닙니다. 설치·합성 계약·미디어·임베딩 실행, 자산 준비, 실제 STT, 실제 Codex 작성, UI 저장은 서로 다른 증거입니다. 각 결과와 한계를 확인해야 합니다.
 
+</details>
+
 <a id="references"></a>
 ## 라이선스와 공식 참고 자료
 
 소스는 동봉한 [GPL-3.0-only](LICENSE)를 따릅니다. 포함한 소스·Chart.js·hls.js·댓글 parser와 설치하는 모델/패키지는 각 원본 고지와 조건을 유지합니다. 모델 가중치는 배포 ZIP에 포함하지 않습니다. 재배포 전에 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 확인하세요.
+
+<details>
+<summary><strong>구성요소·고정 버전·라이선스·공식 문서 보기</strong></summary>
 
 기본 전체 설치의 주요 구성요소는 다음과 같습니다.
 
@@ -682,3 +832,5 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 - [PyTorch: 2.11.0 설치 조합](https://pytorch.org/get-started/previous-versions/)
 - [EmbeddingGemma 2 모델](https://huggingface.co/google/embeddinggemma-2)
 - [Whisper large-v3-turbo 모델](https://huggingface.co/openai/whisper-large-v3-turbo)
+
+</details>
