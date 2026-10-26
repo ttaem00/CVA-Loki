@@ -19,6 +19,7 @@ UI_ASSETS = (
     "scripts/admin/static/report_signal_timeline.js",
     "scripts/admin/static/report_manager_outline.js",
     "scripts/admin/static/report_scene_cockpit.js",
+    "scripts/admin/static/approval_state.js",
     "scripts/admin/static/report_review_panels.js",
     "scripts/admin/static/report_distribution.js",
     "scripts/admin/static/report_timeline_candidate.js",

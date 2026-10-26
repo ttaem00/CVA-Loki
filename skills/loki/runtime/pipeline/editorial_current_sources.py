@@ -109,7 +109,12 @@ def prepare_sources(*, service, source_dir, vod, base_path, chunks):
             if key in prior_map or key in meta:
                 retained[key] = deepcopy(prior_map[key] if key in prior_map else meta[key])
         if 'collaboration_periods' in retained:
-            from .chatgpt_export.contract.collaboration_periods import validate_collaboration_periods
+            from .chatgpt_export.contract.collaboration_periods import (
+                recover_collaboration_periods, validate_collaboration_periods)
+            projection = recover_collaboration_periods(retained['collaboration_periods'], vod.duration)
+            retained['collaboration_periods'] = projection['periods']
+            if projection['diagnostics']:
+                retained['collaboration_diagnostics'] = projection['diagnostics']
             validate_collaboration_periods(retained['collaboration_periods'], vod.duration)
         frozen.append(dict(family='base_metadata', path=str(meta_path), sha256=sha))
     return dict(packet=packet, report=report, retained_collaboration=retained,

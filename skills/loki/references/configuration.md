@@ -61,7 +61,11 @@ backend/index, 감지 이유와 실제 실행 장치를 확인한다. 미디어 
 
 ## 3. 자동 준비되는 의존성
 
-설치기는 Node/npm(`nodejs-wheel` 24.19.0), PATH 또는 전용 환경의 FFmpeg/ffprobe
+설치기는 공식 Node/npm 24.22.1의 플랫폼별 고정 SHA-256 archive를 작업공간 `.tools`에 준비합니다.
+Windows·macOS의 x64/arm64, Linux glibc의 x64/arm64와 Linux musl x64를 지원하며
+검증된 공식 archive가 없는 플랫폼은 이전 wheel로 대체하지 않고 거절합니다.
+실제 Node 버전·Brotli 패치 상수(-17)·압축 왕복을 npm 실행 전에 확인하고,
+로컬 parser는 같은 Node 경로와 binary hash를 사용합니다. PATH 또는 전용 환경의 FFmpeg/ffprobe
 (`static-ffmpeg` 3.0), torch 2.11.0·torchvision 0.26.0, transformers 5.19.0,
 sentence-transformers 6.1.0, LanceDB 0.40.0·PyArrow 21.0.0, 음성 처리 의존성,
 accelerate 1.15.0·Silero VAD 6.2.3·sherpa-onnx 1.13.7과 공개 자료 수집 의존성을 준비한다.

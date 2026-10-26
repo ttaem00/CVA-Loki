@@ -4,14 +4,29 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+from html.parser import HTMLParser
 import json
 from pathlib import Path, PurePosixPath
 import re
+from urllib.parse import urlsplit
 
 DENIED_PARTS = {".git", ".env", ".claude", ".runtime", "work", "output", "site", "data", "logs", "secrets", "credentials"}
 DENIED_MODULES = {"codex_cli.py", "cookie_refresh.py", "openai_responses_free.py", "chzzk_browser_login.py", "daemon.py", "dashboard.py"}
 REJECTED_UI = {"skills/loki/runtime/ui/" + name for name in ("index.html", "review.js", "review.css")}
 SECRET = re.compile(r"(?:sk-(?:proj-)?[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{24,}|-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----)")
+
+
+class _LocalAssetReferences(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.paths = set()
+
+    def handle_starttag(self, tag, attrs):
+        for name, value in attrs:
+            if name in {"src", "href"} and value:
+                url = urlsplit(value)
+                if not url.scheme and not url.netloc and url.path.startswith("/static/"):
+                    self.paths.add(url.path)
 
 
 def validate(root):
@@ -78,7 +93,7 @@ def validate(root):
         if not (root / required).is_file():
             raise ValueError("release_installer_incomplete: " + required)
     for required in ("SKILL.md", "runtime/loki.py", "runtime/source-manifest.json", "runtime/install.py", "runtime/branding.html",
-                     "runtime/selftest.py", "runtime/requirements.txt", "runtime/local_tools.py",
+                     "runtime/selftest.py", "runtime/requirements.txt", "runtime/local_tools.py", "runtime/node_runtime.py",
                      "runtime/device_setup.py", "runtime/multimodal_setup.py", "runtime/multimodal_worker.py",
                      "runtime/media_selftest.py", "runtime/review.py", "runtime/review_store.py",
                      "runtime/public_ui.py", "runtime/speech_setup.py", "runtime/transcribe_source.py", "runtime/source_acquire.py",
@@ -92,10 +107,22 @@ def validate(root):
     names = ast.literal_eval(assignment.value) if assignment else ()
     canonical_paths = {name.removeprefix("skills/loki/runtime/") for name in expected
                        if name.startswith("skills/loki/runtime/")}
-    if (not isinstance(names, tuple) or len(names) != 28
+    pages = {"scripts/admin/templates/" + page + ".html" for page in ("home", "report_workspace", "report")}
+    if (not isinstance(names, tuple) or not names
             or any(not isinstance(name, str) or name not in canonical_paths for name in names)
-            or len(set(names)) != len(names)):
+            or len(set(names)) != len(names) or not pages.issubset(names)):
         raise ValueError("release_canonical_ui_incomplete")
+    routes = {"/static/admin/" + name.removeprefix("scripts/admin/static/"): name
+              for name in names if name.startswith("scripts/admin/static/")}
+    routes.update({"/static/shared-viewer/viewer.css": "pipeline/summary/viewer.css",
+                   "/static/shared-viewer/viewer.js": "pipeline/summary/viewer.js"})
+    for name in names:
+        if name.endswith(".html"):
+            references = _LocalAssetReferences()
+            references.feed((skill / "runtime" / name).read_text(encoding="utf-8-sig"))
+            for path in sorted(references.paths):
+                if routes.get(path) not in names:
+                    raise ValueError("release_canonical_ui_asset_missing: " + path)
     return manifest
 
 

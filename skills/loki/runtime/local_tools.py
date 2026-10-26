@@ -69,6 +69,28 @@ def _owned(root, path, *, media=False, exists=False):
     return path
 
 
+def _node_runtime():
+    spec = importlib.util.spec_from_file_location("loki_node_runtime", Path(__file__).with_name("node_runtime.py"))
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    return helper
+
+
+def _node_tool(root, preferred=None):
+    helper = _node_runtime()
+    managed = helper.load(root)
+    if managed:
+        return dict(path=managed["node"], sha256=managed["node_sha256"])
+    node = preferred["path"] if preferred else shutil.which("node")
+    if node:
+        node = Path(node).resolve(strict=True)
+        if preferred and _sha(node) != preferred["sha256"]:
+            raise PermissionError("loki_local_node_binary_changed")
+        helper.probe(node)
+        return dict(path=str(node), sha256=_sha(node))
+    return None
+
+
 def setup(workspace):
     root = Path(workspace).resolve(strict=True)
     receipt = _plain(root, root / ".loki-tools.json")
@@ -90,20 +112,9 @@ def setup(workspace):
         if not path.is_file():
             raise ValueError("loki_local_tool_binary_missing")
         tools[name] = dict(path=str(path), sha256=_sha(path))
-    node = None
-    spec = importlib.util.find_spec("nodejs_wheel")
-    if spec and spec.origin:
-        folder = Path(spec.origin).resolve().parent
-        if sys.prefix == sys.base_prefix or not folder.is_relative_to(Path(sys.prefix).resolve()):
-            raise ValueError("loki_node_wheel_requires_running_venv")
-        node = next((path for path in (folder / "node.exe", folder / "bin/node") if path.is_file()), None)
-        if node is None:
-            raise ValueError("loki_node_wheel_binary_missing")
-    else:
-        node = shutil.which("node")
+    node = _node_tool(root)
     if node:
-        node = Path(node).resolve(strict=True)
-        tools["node"] = dict(path=str(node), sha256=_sha(node))
+        tools["node"] = node
     result = dict(schema_version=SCHEMA, status="ready", source=source, tools=tools)
     temporary = _plain(root, root / ".loki-tools.json.tmp")
     with temporary.open("w", encoding="utf-8", newline="\n") as stream:
@@ -158,14 +169,16 @@ def validate_command(workspace, executable, argv, tools=None, *, runtime=None):
     known_node = tools.get("node")
     if binary and (binary.name.lower() in {"node", "node.exe"}
                    or known_node and binary == Path(known_node["path"]).resolve()):
-        if tools and (not known_node or binary != Path(known_node["path"]).resolve()
+        if any(key.upper() in {"NODE_OPTIONS", "NODE_PATH"} for key in os.environ):
+            raise PermissionError("loki_local_node_process_override")
+        if (not known_node or binary != Path(known_node["path"]).resolve()
                       or _sha(binary) != known_node["sha256"]):
             raise PermissionError("loki_local_node_binary_changed")
         allowed = {runtime / "tools/parse_editor_comments.js", runtime / "tools/project_comment_collaboration.js"}
         if len(argv) == 2 and Path(argv[1]).resolve() in allowed:
             return "node"
         raise PermissionError("loki_unadmitted_node_helper")
-    if tools and binary == Path(sys.executable).resolve():
+    if {"ffmpeg", "ffprobe"} <= tools.keys() and binary == Path(sys.executable).resolve():
         if (len(argv) == 7 and argv[1:3] == ["-B", str(runtime / "multimodal_worker.py")]
                 and argv[3] == "--workspace" and Path(argv[4]).resolve() == root and argv[5] == "--spec"):
             spec = _owned(root, argv[6], exists=True)
@@ -227,6 +240,16 @@ def validate_command(workspace, executable, argv, tools=None, *, runtime=None):
 def install(workspace, *, runtime=None):
     root = Path(workspace).resolve(strict=True)
     tools = _tools(root)
+
+
+    for key in list(os.environ):
+        if key.upper() in {"NODE_OPTIONS", "NODE_PATH"}:
+            os.environ.pop(key)
+    node = _node_tool(root, tools.get("node"))
+    if node:
+        if tools.get("node") is not None and tools["node"] != node:
+            raise PermissionError("loki_local_node_binary_changed")
+        tools["node"] = node
     directories = []
     for name in ("node", "ffmpeg", "ffprobe"):
         if name not in tools:

@@ -305,7 +305,21 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
         points.append({**{k:row[k] for k in ("id", "title", "content")}, "timestamp":timestamp})
         point_inputs[row["id"]] = row
     outline = dict(ranges=ranges, points=points, candidates=[])
-    validate_structured_manager_outline(outline, duration_sec=duration_sec)
+    try:
+        validate_structured_manager_outline(outline, duration_sec=duration_sec)
+    except ValueError as error:
+        related = getattr(error, "range_ids", ())
+        if related:
+            indexes = {str(row["id"]): index for index, row in enumerate(payload["ranges"])}
+            error.range_findings = [dict(path=["ranges", indexes[range_id]], error=str(error),
+                related_range_ids=list(related),
+                instruction="Recheck these related ranges together against exact delivered originals and native boundaries. "
+                    "Preserve each ID, level and parent; all unrelated items are frozen. "
+                    "Do not sort, clip, merge or move parents to make the geometry pass. "
+                    "Request needed originals, or leave an unsupported relationship unresolved.")
+                for range_id in related]
+            error.item_path = error.range_findings[0]["path"]
+        raise
     if not ranges or not any(r["level"] == "D1" for r in ranges):
         raise ValueError("full_author_broadcast_map_missing")
     story_rows = payload["stories"]

@@ -71,7 +71,8 @@ def same_payload(source, installed):
 
 def npm_environment(cache, user_config, global_config, node):
     environment = {key: value for key, value in os.environ.items()
-        if not key.lower().startswith("npm_config_") and key.upper() not in {"NPM_TOKEN", "NODE_AUTH_TOKEN"}}
+        if not key.lower().startswith("npm_config_") and key.upper() not in
+        {"NPM_TOKEN", "NODE_AUTH_TOKEN", "NODE_OPTIONS", "NODE_PATH"}}
     environment.update(npm_config_cache=str(cache), npm_config_userconfig=str(user_config),
         npm_config_globalconfig=str(global_config),
         PATH=str(Path(node).parent) + os.pathsep + os.environ.get("PATH", ""))
@@ -119,7 +120,7 @@ class Installer:
         else:
             if mode != "setup":
                 raise ValueError("plugin_or_skill_install_requires_the_complete_release_bundle")
-            release = {"version": "3.0.3"}
+            release = {"version": "3.0.4"}
             source_identity = digest(runtime / "source-manifest.json")
         module(runtime / "loki.py", "loki_installer_runtime").verify_release()
         if self.workspace == here or self.workspace.is_relative_to(here):
@@ -161,12 +162,15 @@ class Installer:
             "--cache-dir", pip_cache, "install", "-r", runtime / "requirements.txt"])
         node_info, node = None, None
         if features != "core" or mode == "plugin":
-            self.command("install_node", [python, "-m", "pip", "--isolated", "--disable-pip-version-check",
-                "--cache-dir", pip_cache, "install", "--only-binary=:all:", "nodejs-wheel==24.19.0"])
-            node_info = self.command("node_paths", [python, "-c",
-                "import json,os,nodejs_wheel;from pathlib import Path;r=Path(nodejs_wheel.__file__).resolve().parent;print(json.dumps({'node':str(r/('node.exe' if os.name=='nt' else 'bin/node')),'npm':str(r/'lib/node_modules/npm/bin/npm-cli.js')}))"], json_output=True)
+            node_info = self.command("install_node", [python, "-B", runtime / "node_runtime.py",
+                "--workspace", self.workspace], json_output=True)
             node = plain_path(node_info["node"])
-            self.command("node_version", [node, "--version"])
+            if (not node.is_relative_to(self.workspace) or not plain_path(node_info["npm"]).is_relative_to(self.workspace)
+                    or node_info.get("version") != "24.22.1"
+                    or node_info.get("verification", {}).get("node") != "v24.22.1"
+                    or node_info["verification"].get("blockSwitchError") != -17
+                    or node_info["verification"].get("roundtrip") is not True):
+                raise ValueError("node_security_runtime_not_verified")
         if features in {"media", "multimodal"}:
             self.command("install_media_dependencies", [python, "-m", "pip", "--isolated", "--disable-pip-version-check",
                 "--cache-dir", pip_cache, "install", "static-ffmpeg==3.0"])
@@ -299,6 +303,7 @@ class Installer:
                   "installed_runtime": str(runtime), "skill": str(runtime.parent / "SKILL.md"),
                   "doctor": doctor, "selftest": check, "native_plugin": native,
                   "features": features, "local_tools": tools, "multimodal": model,
+                  "node_runtime": node_info,
                   "speech": speech,
                   "device_selection": self.device_selection,
                   "media_selftest": media_check,

@@ -1588,6 +1588,26 @@
       gap: 6px;
       align-items: center;
     }
+    #approvalInboxSection .approval-card > strong {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    #approvalInboxSection .approval-meta {
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    #approvalInboxSection .approval-decision {
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 3px;
+    }
+    #approvalInboxSection .approval-application { font-weight: 600; }
+    #approvalInboxSection .application-success { color: var(--accent); }
+    #approvalInboxSection .application-warn { color: var(--warn); }
+    #approvalInboxSection .application-error { color: var(--danger); }
+    #approvalInboxSection .approval-actions button { min-height: 42px; max-width: 100%; white-space: normal; }
+    #approvalInboxSection .approval-card:focus-visible { outline: 2px solid var(--tc); outline-offset: 3px; }
     .admin-tool .field-label {
       display: grid;
       gap: 4px;
