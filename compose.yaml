@@ -1,0 +1,14 @@
+services:
+  loki:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["--mode", "skill"]
+    gpus: all
+    volumes:
+      - "${LOKI_WORKSPACE:-loki_workspace}:/workspace"
+      - loki_home:/home/loki
+
+volumes:
+  loki_workspace:
+  loki_home:

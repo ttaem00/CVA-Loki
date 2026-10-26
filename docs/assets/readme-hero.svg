@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">CVA-Loki 3.0.3 — 치지직 방송을 읽고, 장면을 찾다.</title>
+  <desc id="desc">현재 코덱스가 치지직 다시보기 원문과 장면을 직접 읽어 보고서를 작성합니다. GPU 자동 감지, 코덱스 플러그인, 하이라이트 이미지 추출을 지원하는 비공식 프로젝트입니다.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#111a31"/><stop offset="1" stop-color="#211d3a"/></linearGradient>
+    <linearGradient id="accent"><stop stop-color="#67e8f9"/><stop offset="1" stop-color="#b6a0ff"/></linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#bac8f7" stroke-opacity=".045"/></pattern>
+  </defs>
+  <rect width="1200" height="340" rx="22" fill="url(#bg)"/>
+  <rect width="1200" height="340" rx="22" fill="url(#grid)"/>
+  <path d="M0 337H1200" stroke="url(#accent)" stroke-width="6"/>
+  <g font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif">
+    <text x="48" y="64" fill="#e5e9fa" font-size="26" font-weight="700">CVA-Loki</text>
+    <rect x="251" y="42" width="67" height="27" rx="13.5" fill="#343653"/>
+    <text x="284.5" y="60" text-anchor="middle" fill="#c7c7f3" font-size="13" font-weight="600">3.0.3</text>
+    <text x="48" y="137" fill="#ffffff" font-size="43" font-weight="750" letter-spacing="-1.7">방송을 읽고, 장면을 찾다.</text>
+    <text x="50" y="174" fill="#b6c1d8" font-size="19">치지직 다시보기의 원문과 장면을 근거로 정리합니다.</text>
+    <g font-size="13" font-weight="600" fill="#d8e4f8">
+      <rect x="48" y="208" width="159" height="33" rx="16.5" fill="#25334b"/><circle cx="66" cy="224.5" r="4" fill="#67e8f9"/><text x="79" y="229">GPU 자동 감지</text>
+      <rect x="218" y="208" width="175" height="33" rx="16.5" fill="#30304d"/><circle cx="236" cy="224.5" r="4" fill="#b6a0ff"/><text x="249" y="229">코덱스 플러그인</text>
+      <rect x="404" y="208" width="181" height="33" rx="16.5" fill="#30304d"/><circle cx="422" cy="224.5" r="4" fill="#b6a0ff"/><text x="435" y="229">하이라이트 이미지</text>
+    </g>
+    <text x="50" y="281" fill="#b6c1d8" font-size="15" font-weight="600">치지직 대상 비공식 프로젝트</text>
+    <text x="50" y="307" fill="#8f9bb5" font-size="13">네이버·치지직과 제휴·후원·보증 관계가 없습니다.</text>
+    <g transform="translate(766 53)">
+      <rect x="0" y="0" width="382" height="233" rx="16" fill="#141c30" stroke="#47516a"/>
+      <path d="M0 36H382" stroke="#47516a"/>
+      <circle cx="19" cy="18" r="4" fill="#65718a"/><circle cx="34" cy="18" r="4" fill="#65718a"/><circle cx="49" cy="18" r="4" fill="#65718a"/>
+      <text x="363" y="23" text-anchor="end" fill="#a4afc5" font-size="12">방송 원문 → 편집 보고서</text>
+      <rect x="20" y="55" width="119" height="76" rx="7" fill="#26354f"/>
+      <path d="M71 77L91 93L71 109Z" fill="#89dfed"/>
+      <rect x="157" y="58" width="178" height="7" rx="3.5" fill="#a8b8d2"/><rect x="157" y="76" width="196" height="6" rx="3" fill="#4c5b75"/><rect x="157" y="91" width="166" height="6" rx="3" fill="#4c5b75"/>
+      <rect x="157" y="115" width="78" height="20" rx="10" fill="#343355"/><text x="196" y="129" text-anchor="middle" fill="#c8bdf9" font-size="10">D1 / D2</text>
+      <path d="M25 171H356" stroke="#43506b" stroke-width="2"/>
+      <path d="M44 171H320" stroke="url(#accent)" stroke-width="3"/>
+      <g fill="#141c30" stroke="#89dfed" stroke-width="3"><circle cx="44" cy="171" r="6"/><circle cx="141" cy="171" r="6"/><circle cx="235" cy="171" r="6"/><circle cx="330" cy="171" r="6"/></g>
+      <g fill="#c0cbe0" font-size="12" text-anchor="middle"><text x="44" y="202">원문 읽기</text><text x="141" y="202">장면 판단</text><text x="235" y="202">직접 작성</text><text x="330" y="202">검토·편집</text></g>
+    </g>
+  </g>
+</svg>
