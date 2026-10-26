@@ -247,7 +247,7 @@ def main(argv=None):
                 speech_error = str(error)
         ready = not missing and (policy["features"] == "core" or tools_ready) and (
             policy["features"] != "multimodal" or model_ready and speech_ready)
-        result = {"status": "ready" if ready else "setup_required", "version": "3.0.3", "source_commit": manifest["source_commit"],
+        result = {"status": "ready" if ready else "setup_required", "version": "3.0.4", "source_commit": manifest["source_commit"],
                   "workspace": str(root), "network": "deny", "author": "current_codex",
                   "model_transport": "disabled", "publish": "unavailable", "writer_language": policy["language"],
                   "missing_dependencies": missing, "features": policy["features"],

@@ -143,6 +143,12 @@ def validate_manager_outline(text: str, *, duration_sec: int | None = None) -> N
     if "retry: 0" not in model_section or "fallback: 0" not in model_section:
         raise ValueError("retry/fallback must be explicitly zero")
 
+def _range_geometry_error(message: str, *rows: dict[str, Any] | None) -> ValueError:
+    """Keep strict rejection while naming the existing geometry participants."""
+    error = ValueError(message)
+    error.range_ids = tuple(str(row["id"]) for row in rows if row is not None)
+    return error
+
 def validate_structured_manager_outline(outline: dict[str, Any], *, duration_sec: int | None = None) -> None:
     """Validate editable structure and relationships before any revision is written."""
     if not isinstance(outline, dict):
@@ -174,25 +180,29 @@ def validate_structured_manager_outline(outline: dict[str, Any], *, duration_sec
 
     range_by_id = {str(item["id"]): item for item in ranges}
     previous_d1_end = -1
+    previous_parent = None
     for parent in d1_rows:
         start_sec, end_sec = seconds(parent.get("start")), seconds(parent.get("end"))
         if end_sec <= start_sec:
-            raise ValueError("outline range end must be after start")
+            raise _range_geometry_error("outline range end must be after start", parent)
         if start_sec < previous_d1_end:
-            raise ValueError("D1 ranges must be ordered and non-overlapping")
+            raise _range_geometry_error("D1 ranges must be ordered and non-overlapping", previous_parent, parent)
         if duration_sec is not None and end_sec > duration_sec:
-            raise ValueError("outline timestamp exceeds VOD duration")
+            raise _range_geometry_error("outline timestamp exceeds VOD duration", parent)
         previous_d1_end = end_sec
+        previous_parent = parent
         previous_d2_end = None
+        previous_child = None
         for child in (row for row in d2_rows if str(row.get("parent_id") or "") == str(parent["id"])):
             child_start, child_end = seconds(child.get("start")), seconds(child.get("end"))
             if child_end <= child_start:
-                raise ValueError("outline range end must be after start")
+                raise _range_geometry_error("outline range end must be after start", child)
             if child_start < start_sec or child_end > end_sec:
-                raise ValueError("D2 range must be contained by its D1")
+                raise _range_geometry_error("D2 range must be contained by its D1", parent, child)
             if previous_d2_end is not None and child_start < previous_d2_end:
-                raise ValueError("sibling D2 ranges must be ordered and non-overlapping")
+                raise _range_geometry_error("sibling D2 ranges must be ordered and non-overlapping", previous_child, child)
             previous_d2_end = child_end
+            previous_child = child
     for point in points:
         if duration_sec is not None and seconds(point.get("timestamp")) > duration_sec:
             raise ValueError("Point timestamp exceeds VOD duration")

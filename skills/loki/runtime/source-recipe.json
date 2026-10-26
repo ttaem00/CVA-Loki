@@ -1524,7 +1524,7 @@
     {
       "module": "pipeline.editorial_author_source",
       "source_path": "pipeline/editorial_author_source.py",
-      "source_sha256": "0eebc498ca1577e49a4f776bf7f7685a5cf097eec66c47fa21cb5572cc67a9d7",
+      "source_sha256": "a78f833426763718f1a153de30ee5ee5e52ea3fb3901f9e55e49a379d89414e8",
       "symbols": [
         "NATIVE_RANGE_CONTRACT"
       ],
@@ -1673,7 +1673,7 @@
     {
       "module": "pipeline.editorial_current_sources",
       "source_path": "pipeline/editorial_current_sources.py",
-      "source_sha256": "3b307653b3e9b5a80a80c347b64d5d58d5138a4dfa0efd522078c200558767e1",
+      "source_sha256": "1b53e318c73f9d02641ec994081929a8809239c5c26218c91f5534075d7e3f06",
       "symbols": [
         "prepare_sources",
         "report_kwargs"
@@ -1687,7 +1687,7 @@
         "prepare_sources",
         "report_kwargs"
       ],
-      "export_sha256": "8ece080c8359c30aa3e6ab23853888019cee030f5585fb22caa143559345046d",
+      "export_sha256": "3eeb26f6a0d8421e0080c6ce7cad9173eb97ba9152c8a404ad936f697406369a",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -1752,7 +1752,7 @@
     {
       "module": "pipeline.editorial_full_author",
       "source_path": "pipeline/editorial_full_author.py",
-      "source_sha256": "00fc42bbef20082af5b7edee1f468237b2eadd44619f611c5e88ecb722428985",
+      "source_sha256": "26e7bced1d7140175a531a2f46b4d9c30db5e12fd9338efbdbbc0c696771424e",
       "symbols": [
         "RESPONSE_FIELDS",
         "build_broadcast_flow_context",
@@ -1786,7 +1786,7 @@
         "validate_current_conversation_response",
         "validate_response"
       ],
-      "export_sha256": "4a2261e9372d655cfe0eb84a11a4e9b6e568c373d1768f7974f326a3096111df",
+      "export_sha256": "47462980571f8bd58202fbae3443c624b9d66b3d0013e3cbbfa0240df2f88cdb",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -2132,7 +2132,7 @@
     {
       "module": "pipeline.editorial_production_job",
       "source_path": "pipeline/editorial_production_job.py",
-      "source_sha256": "20622e61753f0bf3bea5ec5f05ce655d2255c33b5969de6b04ed0a577e10fe11",
+      "source_sha256": "b30a9a903315652d6abbc852b491a1b2c6749b67de455b09d6790057d258e05d",
       "symbols": [
         "CURRENT_CONVERSATION_MODE",
         "bind_current_conversation_job",
@@ -3654,7 +3654,7 @@
     {
       "module": "pipeline.outline.check",
       "source_path": "pipeline/outline/check.py",
-      "source_sha256": "baeb4c7b3d71155cdf0b66c2aaf63b8870c6b07a4cab3bf684bf6810d1b975f8",
+      "source_sha256": "ab2ad6166bcfab72942b060e972d08dfa1b33250c89cd6eadd71186811edfd4d",
       "symbols": [
         "_section",
         "validate_manager_outline",
@@ -3670,6 +3670,7 @@
         "_REQUIRED_FINAL",
         "_hms_to_seconds",
         "_point_review_heading",
+        "_range_geometry_error",
         "_section",
         "_short_summary_has_structure",
         "annotations",
@@ -3677,7 +3678,7 @@
         "validate_manager_outline",
         "validate_structured_manager_outline"
       ],
-      "export_sha256": "ca2fcadd6af8253b8e8ac513bed3723d2c0a6e4b6046986711255a9e252ff92f",
+      "export_sha256": "3445c40ede6ab0005116d7eaf2d1eaac058779642cdde50168776b85a3448ef8",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -6132,7 +6133,7 @@
       "export_sha256": "9c4c0a65c364056bfe9c333f92228691c26efcf9dcd0fa915b81e769d1de2ae6",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "8d1127662cc556f059c2fa1c5546cbaf160c80c414ea3a602b88a244cefaac6c"
+      "upstream_sha256": "cec4639561883a1591eb9c0ee850a490abf124cd5114335278979385e4162fee"
     },
     {
       "module": "pipeline.vod_retention_observation",
@@ -6485,6 +6486,10 @@
       "source_sha256": "393ab4fec9d21bbdeea44abb4f566e0173f57e3ef854fb99efcf2ab1c7da9e3d"
     },
     {
+      "source_path": "scripts/admin/static/approval_state.js",
+      "source_sha256": "ecfeaebee8969deb9cfd594ba72e43ce43e795a01fbb962ba50221d8b75989da"
+    },
+    {
       "source_path": "scripts/admin/static/home.css",
       "source_sha256": "3fc5abb24f11af87821e7e7ea681a8c36625961e7b8d13fbac5f7a5fa597e8f0"
     },
@@ -6494,7 +6499,7 @@
     },
     {
       "source_path": "scripts/admin/static/report.css",
-      "source_sha256": "7716e952c75dd6eba468057883e5f66928f4084afc19b80dff5cc601d3a1cde2"
+      "source_sha256": "c680a85fc2aa7cb109a0aa7964e393ec01811ef7a8e60f616416474768ff9efc"
     },
     {
       "source_path": "scripts/admin/static/report.js",
@@ -6522,7 +6527,7 @@
     },
     {
       "source_path": "scripts/admin/static/report_review_panels.js",
-      "source_sha256": "3eede74e8e57ef64d6fe11ddd2fff390a5816974611e1fec16ac0391267adb7c"
+      "source_sha256": "c224b6e4ef17b9bb1ef0b0914c241482f3fce2be7705e8217732822a297b2834"
     },
     {
       "source_path": "scripts/admin/static/report_scene_cockpit.js",
@@ -6578,7 +6583,7 @@
     },
     {
       "source_path": "scripts/admin/templates/report.html",
-      "source_sha256": "d0087348fae4e014f3fbf8cb27391e84b9a83476c68f49de543d37d50ac4863f"
+      "source_sha256": "4809c2334d4131cd4e6e1f25a89b8784443c20dc61eb15cfc4a0b56fdcf86126"
     },
     {
       "source_path": "scripts/admin/templates/report_workspace.html",
@@ -6672,7 +6677,7 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "4f7b70678e73e02c98d3b7fc49e68cf29ef110cb",
+  "source_commit": "a433aee981284eb6099413eb063aa8ec6913e656",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",

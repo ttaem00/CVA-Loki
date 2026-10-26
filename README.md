@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.3 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.4 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.3</h1>
+<h1 align="center">CVA-Loki 3.0.4</h1>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.3" src="https://img.shields.io/badge/버전-3.0.3-8B5CF6?style=flat-square" /></a>
+  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.4" src="https://img.shields.io/badge/버전-3.0.4-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
   <a href="#codex-integration"><img alt="코덱스 플러그인과 스킬" src="https://img.shields.io/badge/코덱스-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
   <a href="#docker-install"><img alt="도커 한 명령 설치" src="https://img.shields.io/badge/도커-한%20명령%20설치-2496ED?style=flat-square" /></a>
@@ -64,7 +64,9 @@
 
 ### 1. 배포 폴더를 준비하세요
 
-CVA-Loki 3.0.3은 이 저장소의 첫 공개 버전입니다. [첫 공개 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3)의 `CVA-Loki-3.0.3.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+CVA-Loki 3.0.4는 첫 공개 버전 3.0.3의 보안·복구 수정 배포본입니다. [3.0.4 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.4)의 `CVA-Loki-3.0.4.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+
+배포·플러그인 버전은 **3.0.4**이며, 요약 메커니즘과 `latest`가 선택하는 방식은 **Loki 3.0.3**을 유지합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 바뀌지 않습니다.
 
 ```sh
 git clone https://github.com/ttaem00/CVA-Loki.git
@@ -123,7 +125,7 @@ VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함�
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 3.0.3 동작 |
+| 기능 | 요약 메커니즘 3.0.3 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
@@ -319,7 +321,8 @@ python install.py --workspace ../loki-plugin-workspace --mode plugin
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.3` |
+| 배포 버전 | `3.0.4` |
+| 요약 메커니즘 | `3.0.3` · `latest`는 `loki_3_0_3` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
 | skill | `loki` / 명시 호출 `$loki` |
@@ -641,7 +644,9 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 
 ### 첫 공개 버전에서 확인한 범위
 
-첫 공개 버전과 동일한 실행 파일을 사용해 새 Windows 작업공간의 **스킬 설치**와 깨끗한 Docker 환경의 **Codex 플러그인 설치·활성화**를 `core` 범위로 확인했습니다. 원문 읽기·제출·보고서 렌더링을 검사하는 합성 테스트와 정책·기여 문서, TTaem CVA 로고·사이트·원본 저장소 표시도 확인했습니다. 배포 파일의 해시와 이 검증의 구체적인 범위는 [3.0.3 배포 안내](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3)에 함께 제공합니다.
+첫 공개 3.0.3에서는 새 Windows 작업공간의 **스킬 설치**와 깨끗한 Docker 환경의 **Codex 플러그인 설치·활성화**를 `core` 범위로 확인했습니다. 당시의 원문 읽기·제출·보고서 렌더링 합성 검사와 배포 파일 해시는 [3.0.3 배포 안내](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.3)에 보존합니다.
+
+3.0.4는 설치기와 런타임을 수정한 별도 배포본입니다. 이 버전의 해시와 검증 범위는 [3.0.4 배포 안내](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.4)를 따르며, 3.0.3 설치 기록을 수정본 전체의 검증으로 대신하지 않습니다.
 
 **기본 설치는 전체 기능과 GPU 자동 선택입니다.** `core` 검사 성공을 전체 모델 준비·GPU 추론·실제 VOD 전사 성공으로 해석하지 않습니다. 사용 중인 환경의 실제 결과는 설치 후 생성되는 `installation-result.json`에서 확인하세요.
 
@@ -850,7 +855,7 @@ CVA가 권리를 가진 이 배포본의 자료는 동봉한 [TTaem CVA Source-A
 
 | 구성요소 | 역할과 고정 범위 |
 | --- | --- |
-| Node/npm `nodejs-wheel` 24.19.0 | 로컬 parser와 필요 시 Codex CLI 준비. Node의 비공식 PyPI wheel 배포이며 원본 Node 고지도 적용됩니다. |
+| 공식 Node/npm 24.22.1 | 고정 SHA-256 archive를 작업공간 `.tools`에 준비하고 실제 Node 버전·Brotli 패치 상수(-17)·압축 왕복을 npm 실행 전에 확인합니다. 로컬 parser도 같은 경로와 binary hash를 사용하며 원본 LICENSE를 보존합니다. |
 | FFmpeg/ffprobe | Docker OS 패키지 또는 기존 도구/venv의 `static-ffmpeg` 3.0. 실행 파일 경로·해시를 기록합니다. |
 | PyTorch 2.11.0 / torchvision 0.26.0 | 선택 장치에 맞는 추론 라이브러리. Linux/Windows의 CUDA 12.8 또는 CPU wheel을 사용합니다. |
 | Transformers 5.19.0 / sentence-transformers 6.1.0 | 고정 로컬 모델 실행. |

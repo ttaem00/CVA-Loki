@@ -332,6 +332,11 @@
           method: 'POST',
           body: JSON.stringify(approvalPayload),
         });
+        if (data?.ok !== true) throw new Error('승인함 저장 응답을 확인하지 못했습니다.');
+        const [staged] = window.ReportAdminApprovalState.checkedList({approvals: [data.approval]});
+        reportApprovalRead++;
+        reportApprovalItems = [staged, ...reportApprovalItems.filter((item) => item.approval_id !== staged.approval_id)];
+        renderApprovalInbox({approvals: reportApprovalItems});
         contextVocabState.approval_states[term] = { state: 'saved', message: '승인함에 저장됨. 승인하면 단어 사전에 반영됩니다.' };
         renderContextVocabSuggestions({
           channel_id: contextVocabState.channel_id,
@@ -394,6 +399,12 @@
       }
     }
 
+    let reportApprovalItems = [];
+    let reportApprovalRead = 0;
+    let reportApprovalReadError = '';
+    const reportApprovalBusy = new Set();
+    const reportApprovalUnknown = new Set();
+
     function approvalActionLabel(item) {
       const action = item && item.proposed_action || {};
       const payload = action.payload || {};
@@ -405,31 +416,49 @@
 
     function renderApprovalInbox(payload) {
       if (!approvalInboxSectionEl || !approvalInboxBodyEl) return;
+      const focused = document.activeElement;
+      const focusKeys = ['approvalId', 'approvalCheck', 'approvalApply', 'approvalResult'];
+      const focusKey = focusKeys.find((key) => focused && focused.dataset && focused.dataset[key]);
+      const focusId = focusKey ? focused.dataset[focusKey] : '';
+      const focusedDecision = focused && focused.dataset && focused.dataset.approvalDecision;
       const approvals = Array.isArray(payload && payload.approvals) ? payload.approvals : [];
+      reportApprovalItems = approvals;
       const pending = approvals.filter((item) => item.status === 'pending');
-      approvalInboxSectionEl.style.display = approvals.length ? '' : '';
+      approvalInboxSectionEl.style.display = '';
       if (!approvals.length) {
-        approvalInboxBodyEl.innerHTML = '<div class="meta-note">지금 승인할 요청이 없습니다.</div>';
+        approvalInboxBodyEl.innerHTML = `<div class="meta-note">${escapeHtml(reportApprovalReadError || '지금 승인할 요청이 없습니다.')}</div>`;
         return;
       }
       const rows = approvals.slice(0, 5).map((item) => {
         const status = item.status || 'pending';
+        const busy = reportApprovalBusy.has(item.approval_id);
+        const unknown = reportApprovalUnknown.has(item.approval_id);
+        const application = window.ReportAdminApprovalState.applicationView(item);
         const decided = item.decision && item.decision.decided_at ? ` · 결정 ${escapeHtml(item.decision.decided_at)}` : '';
         const actionLabel = approvalActionLabel(item);
         const buttons = status === 'pending' ? `
           <div class="approval-actions">
-            <button type="button" class="primary" data-approval-decision="approved" data-approval-id="${escapeHtml(item.approval_id)}">승인</button>
-            <button type="button" class="ghost" data-approval-decision="rejected" data-approval-id="${escapeHtml(item.approval_id)}">거절</button>
+            <button type="button" class="primary" data-approval-decision="approved" data-approval-id="${escapeHtml(item.approval_id)}" ${busy || unknown ? 'disabled' : ''}>승인</button>
+            <button type="button" class="ghost" data-approval-decision="rejected" data-approval-id="${escapeHtml(item.approval_id)}" ${busy || unknown ? 'disabled' : ''}>거절</button>
           </div>
         ` : '';
+        const recovery = unknown || application.canApply ? `
+          <div class="approval-actions">
+            <button type="button" class="ghost" data-approval-check="${escapeHtml(item.approval_id)}" ${busy ? 'disabled' : ''}>현재 결정·적용 결과 확인</button>
+            ${application.canApply && !unknown ? `<button type="button" class="primary" data-approval-apply="${escapeHtml(item.approval_id)}" ${busy ? 'disabled' : ''}>이 승인 항목의 적용 다시 시도</button>` : ''}
+          </div>` : '';
         return `
-          <div class="approval-card ${escapeHtml(status)}">
+          <div class="approval-card ${escapeHtml(status)}" aria-busy="${busy}" data-approval-result="${escapeHtml(item.approval_id)}" tabindex="-1">
             <strong>${escapeHtml(item.request_text || actionLabel)}</strong>
-            <div class="approval-meta">상태 ${escapeHtml(status)} · ${escapeHtml(actionLabel)}${decided}</div>
+            <div class="approval-meta">${escapeHtml(actionLabel)}${decided}</div>
             <div class="approval-meta">위험: ${escapeHtml(item.risk || '기록 없음')}</div>
             <div class="approval-meta">효과: ${escapeHtml(item.expected_effect || '기록 없음')}</div>
             <div class="approval-meta">출처: ${escapeHtml(item.source_artifact || 'admin')}</div>
-            ${buttons}
+            <div class="approval-meta approval-decision">결정: ${unknown ? '현재 결과 확인 필요 · 마지막 확인: ' : busy ? '처리 결과 확인 중 · 마지막 확인: ' : ''}${escapeHtml(window.ReportAdminApprovalState.decisionLabel(item))}</div>
+            <div class="approval-meta approval-application application-${escapeHtml(unknown || busy?'warn':application.tone)}" role="status" aria-live="polite">사전 적용: ${escapeHtml(unknown?'현재 결과 확인 필요':busy?'처리 결과를 확인하고 있습니다.':application.text)}</div>
+            ${busy ? '<div class="approval-meta" role="status">처리 중입니다. 같은 요청을 다시 보내지 않습니다.</div>' : ''}
+            ${unknown ? '<div class="approval-meta" role="status">처리 응답을 확인하지 못했습니다. 결정은 저장됐을 수 있습니다. 현재 결과를 읽은 뒤 판단하세요.</div>' : ''}
+            ${buttons}${recovery}
           </div>
         `;
       }).join('');
@@ -440,37 +469,89 @@
           <div class="tool-stat"><span class="tool-label">전체</span><span class="tool-value">${approvals.length}</span></div>
           <div class="tool-stat"><span class="tool-label">저장 방식</span><span class="tool-value">로컬</span></div>
         </div>
+        ${reportApprovalReadError ? `<div class="meta-note" role="status">${escapeHtml(reportApprovalReadError)} 확인한 카드와 편집 본문은 유지했습니다.</div>` : ''}
         <div class="approval-card-list">${rows}</div>
         ${more}
       `;
       approvalInboxBodyEl.querySelectorAll('[data-approval-decision]').forEach((btn) => {
         btn.addEventListener('click', () => decideApproval(btn.dataset.approvalId || '', btn.dataset.approvalDecision || ''));
       });
+      approvalInboxBodyEl.querySelectorAll('[data-approval-check]').forEach((btn) => {
+        btn.addEventListener('click', () => refreshApprovalInbox(btn.dataset.approvalCheck || ''));
+      });
+      approvalInboxBodyEl.querySelectorAll('[data-approval-apply]').forEach((btn) => {
+        btn.addEventListener('click', () => applyApproval(btn.dataset.approvalApply || ''));
+      });
+      if (focusId) {
+        const controls = Array.from(approvalInboxBodyEl.querySelectorAll('[data-approval-id], [data-approval-check], [data-approval-apply], [data-approval-result]'));
+        const sameControl = controls.find((node) => node.dataset[focusKey] === focusId && !node.disabled
+          && (!focusedDecision || node.dataset.approvalDecision === focusedDecision));
+        const result = controls.find((node) => node.dataset.approvalResult === focusId);
+        (sameControl || result)?.focus({preventScroll: true});
+      }
     }
 
-    async function refreshApprovalInbox() {
+    async function refreshApprovalInbox(approvalId = '') {
       if (!approvalInboxBodyEl) return;
+      const request = ++reportApprovalRead;
       try {
         const data = await api('/api/manager-approvals');
-        renderApprovalInbox(data);
+        if (request !== reportApprovalRead) return;
+        const approvals = window.ReportAdminApprovalState.checkedList(data);
+        if (approvalId && !approvals.some((item) => item.approval_id === approvalId)) throw new Error('현재 승인 항목을 찾지 못했습니다.');
+        if (approvalId) reportApprovalUnknown.delete(approvalId);
+        reportApprovalReadError = '';
+        const retained = new Set([...reportApprovalBusy, ...reportApprovalUnknown]);
+        renderApprovalInbox({approvals: window.ReportAdminApprovalState.mergeList(reportApprovalItems, approvals, retained)});
+        if (approvalId) setStatus('현재 서버의 결정·적용 결과를 확인했습니다. 이전 응답 단절의 원인을 단정하지 않으며 자동으로 재전송하지 않았습니다.', 'ok');
       } catch (err) {
-        approvalInboxBodyEl.innerHTML = `<div class="meta-note">승인 요청을 불러오지 못했습니다: ${escapeHtml(err.message)}</div>`;
+        if (request !== reportApprovalRead) return;
+        reportApprovalReadError = `승인함 조회 실패: ${err.message}`;
+        renderApprovalInbox({approvals: reportApprovalItems});
       }
     }
 
     async function decideApproval(approvalId, decision) {
-      if (!approvalId || !decision) return;
+      const item = reportApprovalItems.find((row) => row.approval_id === approvalId);
+      if (!item || item.status !== 'pending' || !['approved', 'rejected'].includes(decision)) return;
+      return mutateApproval(approvalId, decision);
+    }
+
+    async function applyApproval(approvalId) {
+      const item = reportApprovalItems.find((row) => row.approval_id === approvalId);
+      if (!item || !window.ReportAdminApprovalState.applicationView(item).canApply) return;
+      return mutateApproval(approvalId, 'apply');
+    }
+
+    async function mutateApproval(approvalId, operation) {
+      if (reportApprovalBusy.has(approvalId) || reportApprovalUnknown.has(approvalId)) return;
+      reportApprovalBusy.add(approvalId);
+      reportApprovalRead++;
+      renderApprovalInbox({approvals: reportApprovalItems});
+      let item;
       try {
-        await api('/api/manager-approvals/decide', {
+        const data = await api(operation === 'apply' ? '/api/manager-approvals/apply' : '/api/manager-approvals/decide', {
           method: 'POST',
-          body: JSON.stringify({ approval_id: approvalId, decision }),
+          body: JSON.stringify(operation === 'apply' ? {approval_id: approvalId} : {approval_id: approvalId, decision: operation}),
         });
-        setStatus(decision === 'approved' ? '승인했습니다. 필요한 로컬 저장도 처리했습니다.' : '거절했습니다.', 'ok');
-        await refreshApprovalInbox();
-        await loadReport();
-      } catch (err) {
-        setStatus('승인함 처리 실패: ' + err.message, 'err');
+        item = window.ReportAdminApprovalState.checkedReply(data, approvalId, operation === 'apply' ? 'approved' : operation);
+      } catch {
+        reportApprovalBusy.delete(approvalId);
+        reportApprovalUnknown.add(approvalId);
+        renderApprovalInbox({approvals: reportApprovalItems});
+        setStatus('승인함 처리 응답을 확인하지 못했습니다. 현재 결정·적용 결과 확인을 누르세요. 편집 본문은 유지했고 같은 요청을 다시 보내지 않았습니다.', 'err');
+        return;
       }
+      reportApprovalRead++;
+      reportApprovalBusy.delete(approvalId);
+      reportApprovalUnknown.delete(approvalId);
+      reportApprovalItems = reportApprovalItems.map((row) => row.approval_id === approvalId ? item : row);
+      renderApprovalInbox({approvals: reportApprovalItems});
+      const application = window.ReportAdminApprovalState.applicationView(item);
+      setStatus(`결정: ${window.ReportAdminApprovalState.decisionLabel(item)} · 사전 적용: ${application.text}`, item.application_result.status === 'failed' ? 'err' : 'ok');
+      // Refresh only this independent projection. The report's unsaved Markdown,
+      // selection, preview and dirty state belong to the editor lifecycle.
+      await refreshApprovalInbox();
     }
 
     function renderManagerNoteActions(payload) {
