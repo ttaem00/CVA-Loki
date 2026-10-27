@@ -14,6 +14,7 @@ DENIED_PARTS = {".git", ".env", ".claude", ".runtime", "work", "output", "site",
 DENIED_MODULES = {"codex_cli.py", "cookie_refresh.py", "openai_responses_free.py", "chzzk_browser_login.py", "daemon.py", "dashboard.py"}
 REJECTED_UI = {"skills/loki/runtime/ui/" + name for name in ("index.html", "review.js", "review.css")}
 SECRET = re.compile(r"(?:sk-(?:proj-)?[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{24,}|-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----)")
+VERSION_POLICY_ASSET = "vendor/chat-analyze-engine/config/loki_versions.json"
 
 
 class _LocalAssetReferences(HTMLParser):
@@ -27,6 +28,34 @@ class _LocalAssetReferences(HTMLParser):
                 url = urlsplit(value)
                 if not url.scheme and not url.netloc and url.path.startswith("/static/"):
                     self.paths.add(url.path)
+
+
+def _version_contract(root, manifest, plugin):
+    runtime = root / "skills/loki/runtime"
+    policy = json.loads((runtime / VERSION_POLICY_ASSET).read_text(encoding="utf-8"))
+    try:
+        selected = policy["current_pipeline"]
+        version = policy["pipelines"][selected]["version"]
+    except (KeyError, TypeError) as error:
+        raise ValueError("release_version_policy_contract") from error
+    if (policy.get("schema_version") != "loki.version-policy.v1"
+            or not isinstance(version, str) or not version):
+        raise ValueError("release_version_policy_contract")
+    source = json.loads((runtime / "source-manifest.json").read_text(encoding="utf-8"))
+    if any(value != version for value in (manifest.get("version"), plugin.get("version"), source.get("version"))):
+        raise ValueError("release_version_contract_changed")
+    declarations = {
+        "README.md": [f'alt="CVA-Loki {version}', f'alt="버전 {version}"', f'<h1 align="center">CVA-Loki {version}</h1>',
+            f"정식 요약 메커니즘 Loki {version}", f"| 기능 | 요약 메커니즘 {version} 동작 |",
+            f"| 배포 버전 | `{version}` |",
+            f"| 요약 메커니즘 | `{version}` · `latest`는 `{selected}` 선택 |"],
+        "skills/loki/SKILL.md": [f"배포·플러그인·스킬·요약 메커니즘은 {version}이며 `latest`도 Loki {version}이다."],
+        "docs/assets/readme-hero.svg": [f'<title id="title">CVA-Loki {version}'],
+    }
+    for name, expected in declarations.items():
+        text = (root / name).read_text(encoding="utf-8")
+        if any(value not in text for value in expected):
+            raise ValueError("release_version_documentation_mismatch: " + name)
 
 
 def validate(root):
@@ -123,6 +152,7 @@ def validate(root):
             for path in sorted(references.paths):
                 if routes.get(path) not in names:
                     raise ValueError("release_canonical_ui_asset_missing: " + path)
+    _version_contract(root, manifest, plugin)
     return manifest
 
 

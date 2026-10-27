@@ -187,8 +187,10 @@ def _flow_outcome_findings(payload, catalog, flow_context):
             if not (flow_refs and is_pending and row.get("evidence_refs") == []):
                 _refs(row.get("evidence_refs"), catalog)
             if state == "represented":
+                if not flow_refs:
+                    raise ValueError("full_author_flow_reference_invalid")
                 targets = row.get("range_refs")
-                if (not flow_refs or not isinstance(targets, list) or not targets
+                if (not isinstance(targets, list) or not targets
                         or any(not isinstance(ref, str) or ref not in final_ranges for ref in targets)):
                     raise ValueError("full_author_flow_target_invalid")
             elif state in {"source_corrected", "no_broadcast_activity"} and not flow_refs:
@@ -196,6 +198,8 @@ def _flow_outcome_findings(payload, catalog, flow_context):
         except ValueError as error:
             findings.append(dict(path=["group_outcomes", index], error=str(error),
                 instruction="Recheck this judgment against exact delivered originals and the final repaired ranges. "
+                    "Use only input addresses from broadcast_flow_context; represented requires nonempty flow_refs "
+                    "and range_refs naming actual final ranges. "
                     "Preserve its flow addresses; do not union refs or remove a judgment merely to pass validation. "
                     "Leave unsupported relations unresolved. Unrelated items are frozen."))
     return findings

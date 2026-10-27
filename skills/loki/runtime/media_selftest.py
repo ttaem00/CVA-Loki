@@ -11,6 +11,11 @@ import subprocess
 import sys
 import uuid
 
+if __package__:
+    from .selftest import original_records
+else:
+    from selftest import original_records
+
 KIND = "synthetic_media_contract_selftest"
 SEMANTIC_AUTHOR = "synthetic_fixture_not_a_model"
 
@@ -161,8 +166,20 @@ def run(runtime, workspace):
                     question_id="synthetic-media-originals")
     action = dict(envelope, action="read_evidence", args=dict(intervals_sec=[[0, 20]], families=["stt"], context_cues=0, max_bytes=16000))
     originals = call("read", *identity, "--action", write("original-action.json", action))
-    require(originals.get("status") == "complete" and len(originals["records"]) == 3
-            and all(row["fragment_complete"] for row in originals["records"]), "media_selftest_originals_incomplete")
+    require(isinstance(originals, dict), "media_selftest_originals_incomplete")
+    records = original_records(originals)
+    require(originals.get("original_loaded") is True and originals.get("status") == "complete"
+            and originals.get("next_cursor") is None and len(records) == 3
+            and all(row.get("fragment_complete") is True for row in records), "media_selftest_originals_incomplete")
+    require(originals.get("source_id") == prepared["source_id"]
+            and originals.get("world_revision") == prepared["world_revision"]
+            and isinstance(originals.get("read_id"), str) and bool(originals["read_id"]),
+            "media_selftest_original_identity_mismatch")
+    require([row.get("raw_text") for row in records] == ["initial claim", "unrelated schedule", "quiet rebuttal"],
+            "media_selftest_original_text_mismatch")
+    require(all(isinstance(row.get("record_id"), str) and len(row["record_id"]) == 64
+                and all(char in "0123456789abcdef" for char in row["record_id"]) for row in records),
+            "media_selftest_original_record_identity_invalid")
     original_path = write("originals.json", originals)
     action = dict(envelope, action="read_frames", args=dict(start_sec=10, duration_sec=2, inspection_mode="scene"))
     pages, frames = [], []
@@ -205,7 +222,7 @@ def run(runtime, workspace):
         frame_count=len(frames), frame_page_count=len(pages),
         frame_read_pages=[str(proof / ("frame-page-" + str(i) + ".json")) for i in range(3)],
         original_read=dict(path=original_path, read_id=originals["read_id"], source_id=originals["source_id"],
-                           world_revision=originals["world_revision"], complete_record_count=len(originals["records"])),
+                           world_revision=originals["world_revision"], complete_record_count=len(records)),
         source_hashes=preserved, checks=["real synthetic MP4 with audio", "nine JPEGs in three pages", "original STT read",
         "selected report data URL bytes/hash/clock", "normal HTML Markdown metadata", "source base config preserved"])
     write("media-selftest-result.json", result)

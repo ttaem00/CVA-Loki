@@ -208,14 +208,22 @@
       );
     }
 
-    function combinedRevisionForPublish(revisionId, outlineSignature) {
-      const candidates = (managerOutlineContext.revisions || []).filter(version => (
+    function combinedRevisionForPublish(revisionId, outlineSignature, selectedMarkdown = null) {
+      let candidates = (managerOutlineContext.revisions || []).filter(version => (
         outlineSignature
         && outlineSignatureFromRevision(version) === outlineSignature
       ));
       if (!candidates.length) return null;
       const exact = candidates.find(row => String(row.revision_id) === String(revisionId));
       if (exact) return exact;
+      if (typeof selectedMarkdown === 'string') {
+        const exact = candidates.filter(version => version.md === selectedMarkdown);
+        if (exact.length) candidates = exact;
+        const contents = new Set(candidates.map(version => JSON.stringify({
+          md: version.md, outline: version.outline, packet: version.qg1_review_packet || null,
+        })));
+        if (contents.size > 1) return null;
+      }
       const publishRecord = publishRevisionRecords.find(record => (
         String(record && record.revision_id || '') === String(revisionId || '')
       ));
@@ -252,11 +260,12 @@
       const matchingCombinedRevision = combinedRevisionForPublish(
         revisionId,
         draftOutlineSignature,
+        draft.md,
       );
       if (!matchingCombinedRevision || !matchingCombinedRevision.revision_id) {
-        throw new Error('이 저장 이력과 정확히 일치하는 방송 구조 버전을 찾지 못했습니다.');
+        throw new Error('목차 제목·시각만으로 이 본문에 맞는 구조·Highlight 이력을 하나로 정할 수 없습니다. 목차 저장본 이력에서 비교한 뒤 복원할 버전을 직접 선택하세요. 현재 초안은 그대로입니다.');
       }
-      await restoreManagerOutline(matchingCombinedRevision.revision_id, draft.md);
+      if (!await restoreManagerOutline(matchingCombinedRevision.revision_id, draft.md)) return;
       await refreshPublishRevisions();
       setStatus('이전 버전을 새 로컬 수정본으로 복원했습니다. 공개 사이트는 바뀌지 않았습니다.', 'ok');
     }
@@ -360,6 +369,7 @@
       }
 
       mdEditor.value = data.md;
+      reportLastConfirmed = data;
       savedMd = data.md;
       normalReportMarkdown = typeof data.md === 'string' ? data.md : '';
       setDirty(false);
@@ -534,6 +544,7 @@
     }
 
     async function publishCurrent() {
+      assertReportSaveReady();
       if (editorialReviewReadError) { setStatus(editorialReviewReadError.message, 'warn'); return; }
       if (!base || publishPreparing || activePublishOperationId) return;
       const confirmed = window.confirm(
@@ -550,7 +561,7 @@
         if (managerOutlineContext && managerOutlineContext.normalReport) {
           // Commit the BroadcastMap first, then publish the complete report body.
           // The visible editor contains only the wiki-style structure projection.
-          await saveManagerOutline();
+          if (!await saveManagerOutline()) return;
           const currentReport = await api(`/api/report?base=${encodeURIComponent(base)}`);
           normalReportMarkdown = typeof currentReport.md === 'string' ? currentReport.md : normalReportMarkdown;
           return await saveOrPublish(true, normalReportMarkdown);
@@ -805,12 +816,17 @@
 
     async function saveOrPublish(willPublish, markdownOverride = null) {
       if (!base) return;
+      assertReportSaveReady();
       if (activePublishOperationId) {
         setStatus('공개 반영 중입니다. 완료 후 내용을 편집하거나 저장할 수 있습니다.', 'warn');
         return;
       }
       let transactionMd = typeof markdownOverride === 'string' ? markdownOverride : mdEditor.value;
       if (willPublish) return startAsyncPublish(transactionMd, markdownOverride);
+      const report = reportLastConfirmed || {};
+      const attempt = {kind: 'save', structured: false, base, reportKind: report.kind,
+        videoNo: String(report.video_no || ''), bundleId: String(report.bundle_id || ''), md: transactionMd,
+        beforeMd: String(report.md || '')};
       const saveBtnEl = document.getElementById('saveBtn');
       const previewBtnEl = document.getElementById('previewBtn');
       const reloadBtnEl = document.getElementById('reloadBtn');
@@ -819,9 +835,12 @@
         message: willPublish
           ? '수정본을 이 PC에 저장하고 공개 사이트까지 갱신합니다. 완료될 때까지 다른 편집 버튼을 누르지 말고 기다려 주세요.'
           : '수정한 리포트를 이 PC에 저장하고 미리보기를 갱신합니다. 완료될 때까지 기다려 주세요.',
-        controls: [saveBtnEl, previewBtnEl, reloadBtnEl, publishBtn, ctEnabledCheckbox, naverCafePostBtn, naverCafeFillDraftBtn, naverCafeCopyBtn, naverCafePreviewBtn, chzzkCommentFillBtn, chzzkCommentCopyBtn, chzzkCommentPreviewBtn],
+        controls: [saveBtnEl, previewBtnEl, reloadBtnEl, mdEditor, publishBtn, ctEnabledCheckbox, naverCafePostBtn, naverCafeFillDraftBtn, naverCafeCopyBtn, naverCafePreviewBtn, chzzkCommentFillBtn, chzzkCommentCopyBtn, chzzkCommentPreviewBtn],
         returnFocusEl: saveBtnEl,
       }, async () => {
+        reportSavePending = true;
+        let committed = false;
+        try {
         setStatus(willPublish ? '저장 및 공개 반영 중...' : '저장 중...');
         let approval = null;
         if (willPublish) {
@@ -889,14 +908,14 @@
           const publishWarning = willPublish
             ? '\n\n확인하면 공개 사이트에도 이 축소된 본문이 반영됩니다.'
             : '\n\n확인하면 이 PC의 저장본이 축소됩니다. 공개 사이트는 아직 바뀌지 않습니다.';
-          const confirmed = window.confirm(
+          const confirmed = await confirmReportSaveAction('본문 축소 변경 확인',
             '본문 대부분이 사라집니다.\n\n'
             + '현재 ' + Number(change.before_chars || 0).toLocaleString() + '자 → 저장 후 '
             + Number(change.after_chars || 0).toLocaleString() + '자\n'
             + Number(change.removed_chars || 0).toLocaleString() + '자 삭제 · '
             + Number(change.remaining_percent || 0).toLocaleString() + '% 남음'
             + publishWarning
-            + '\n\n정말 계속하려면 확인을 누르세요. 취소하면 원본을 유지하고 되돌리기 기록을 엽니다.'
+            + '\n\n취소하면 원본을 유지하고 되돌리기 기록을 엽니다.', '검토한 로컬 변경 저장'
           );
           if (!confirmed) {
             setStatus('저장을 취소했습니다. 원본은 그대로입니다. 되돌리기 기록에서 이전 버전도 확인할 수 있습니다.', 'warn');
@@ -921,6 +940,8 @@
           setStatus('🚫 저장 차단: ' + (data.message || (data.marker_warnings || []).join('; ')), 'err');
           return;
         }
+        committed = validReportSaveAck(data, attempt);
+        if (!committed) throw Error('save_revision_ack_missing');
         previewFrame.srcdoc = data.html;
         previewTitleEl.textContent = data.title || titleTextEl.textContent;
         if (typeof data.md === 'string') {
@@ -928,6 +949,7 @@
           else mdEditor.value = data.md;
         }
         savedMd = mdEditor.value;
+        reportLastConfirmed = {...reportLastConfirmed, md: data.md};
         setDirty(false);
         if (!naverCafePost || !naverCafePost.article_url) {
           setNaverCafeStatus('저장된 본문 기준으로 네이버 카페에 자동 게시할 수 있습니다.', 'info');
@@ -940,5 +962,16 @@
         }
         renderAdminOnlyPanel(data);
         renderPublishRevisions(data.publish_revisions || {});
-      });
+        return true;
+        } catch (error) {
+          if (committed) {
+            reportSaveOutcome = {...attempt, checked: null, confirmed: true};
+            setStatus('로컬 수정본은 저장됐습니다. 화면 갱신을 마치지 못했으며 저장을 반복하지 않습니다. 저장 결과 확인으로 현재 저장본을 읽으세요.', 'warn');
+          } else holdReportSaveOutcome(attempt, error);
+          throw error;
+        } finally {
+          reportSavePending = false;
+          syncReportSaveRecovery();
+        }
+      }).finally(syncReportSaveRecovery);
     }

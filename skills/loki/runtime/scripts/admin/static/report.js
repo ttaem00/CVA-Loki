@@ -238,7 +238,16 @@
       const text = await res.text();
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-      if (!res.ok) throw new Error(data.error || data.raw || `HTTP ${res.status}`);
+      if (!res.ok) {
+        const error = new Error(data.error || data.raw || `HTTP ${res.status}`);
+        error.status = res.status;
+        error.serverDeclined = res.status === 409 && data.error_code === 'manager_edit_conflict'
+          && data.mayHaveRun === false && typeof data.error === 'string';
+        error.saveCanceled = res.status === 400 && data.error_code === 'manager_edit_validation_rejected'
+          && data.mayHaveRun === false && typeof data.error === 'string' && !!data.error.trim();
+        if (error.saveCanceled) error.message = '저장되지 않았습니다. 입력을 고친 뒤 다시 저장하세요.';
+        throw error;
+      }
       return data;
     }
 
@@ -276,7 +285,8 @@
     });
 
     document.getElementById('reloadBtn').addEventListener('click', () => {
-      if (dirty && !confirm('저장하지 않은 변경 사항이 있습니다.\n원본을 다시 불러오면 변경 내용이 사라집니다. 계속할까요?')) {
+      if (reportSaveOutcome) { checkReportSaveOutcome(); return; }
+      if (dirty && !confirm('저장하지 않은 변경 사항이 있습니다.\n현재 초안 대신 저장본을 다시 열면 변경 내용과 편집 되돌리기 기록이 사라집니다. 계속할까요?')) {
         return;
       }
       loadReport().catch((err) => setStatus(err.message, 'err'));
@@ -293,6 +303,10 @@
     });
     document.getElementById('saveBtn').addEventListener('click', () => {
       saveCurrent().catch((err) => setStatus(err.message, 'err'));
+    });
+    document.getElementById('reportSaveCheckBtn').addEventListener('click', checkReportSaveOutcome);
+    document.getElementById('reportSaveAdoptBtn').addEventListener('click', () => {
+      adoptReportSaveOutcome().catch(error => setStatus(error.message, 'err'));
     });
     publishBtn.addEventListener('click', () => {
       publishCurrent().catch((err) => setStatus(err.message, 'err'));
@@ -866,7 +880,7 @@
 
     // 닫기/이동 시 변경분 손실 가드.
     window.addEventListener('beforeunload', (e) => {
-      if (dirty) { e.preventDefault(); e.returnValue = ''; }
+      if (dirty || reportSaveOutcome || reportSavePending) { e.preventDefault(); e.returnValue = ''; }
     });
 
     function setupColumnResizer(options) {

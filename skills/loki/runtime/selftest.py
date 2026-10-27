@@ -71,6 +71,12 @@ def run(runtime, workspace):
     doctor = call("doctor")
     require(isinstance(doctor, dict) and doctor.get("status") == "ready" and doctor.get("missing_dependencies") == [],
             "selftest_dependencies_not_ready: " + json.dumps(doctor, ensure_ascii=False))
+    manifest = json.loads((runtime / "source-manifest.json").read_text(encoding="utf-8"))
+    policy = json.loads((runtime / "vendor/chat-analyze-engine/config/loki_versions.json").read_text(encoding="utf-8"))
+    selected = policy["current_pipeline"]
+    version = policy["pipelines"][selected]["version"]
+    require(manifest["version"] == version, "selftest_source_version_mismatch")
+    require(doctor.get("version") == version, "selftest_runtime_version_mismatch")
     source = workspace / "work/1/sources"
     source.mkdir(parents=True)
     srt = source / "source.srt"
@@ -96,6 +102,8 @@ def run(runtime, workspace):
     prepared = call("prepare", "--spec", spec_path)
     require(call("prepare", "--spec", spec_path) == prepared, "selftest_prepare_replay_changed")
     job = prepared["job_root"]
+    saved_preparation = json.loads((Path(job) / "prepared.json").read_text(encoding="utf-8"))
+    require(saved_preparation["identity"]["selected_pipeline"] == selected, "selftest_selected_pipeline_mismatch")
     revision = prepared["prepared_revision"]
     identity = ["--job-root", job, "--expected-revision", revision]
     payload = {"base_revision": prepared["base_revision"],
@@ -158,11 +166,15 @@ def run(runtime, workspace):
             "selftest_report_file_missing")
     html = Path(paths["html"]).read_text(encoding="utf-8")
     require("Quiet reply" in html and "A later quiet reply" in html, "selftest_rendered_content_missing")
-    require(isinstance(json.loads(Path(paths["metadata"]).read_text(encoding="utf-8-sig")), dict),
-            "selftest_report_metadata_invalid")
+    metadata = json.loads(Path(paths["metadata"]).read_text(encoding="utf-8-sig"))
+    require(isinstance(metadata, dict), "selftest_report_metadata_invalid")
+    report_pipeline = metadata.get("summary_pipeline", {})
+    require(report_pipeline.get("actual_version") == selected
+            and report_pipeline.get("mechanism_version") == version, "selftest_report_version_mismatch")
     result = {"status": "PASS", "kind": KIND, "semantic_author": SEMANTIC_AUTHOR,
               "editorial_quality": "not_evaluated", "doctor": doctor, "source_hash": source_hash,
               "runtime": str(runtime), "workspace": str(workspace), "report_paths": paths,
+              "version": version, "selected_pipeline": selected, "report_pipeline": report_pipeline,
               "original_read": {"path": original_path, "read_id": originals["read_id"],
                   "source_id": originals["source_id"], "world_revision": originals["world_revision"],
                   "record_count": len(records), "complete_record_count": len(records),

@@ -116,7 +116,10 @@
       const direction = event.key === 'ArrowRight' ? 1 : -1;
       const amount = direction * (event.shiftKey ? 10 : 1);
       const result = this.options.preview(this.options.getValue() + amount);
-      if (result.ok) this.options.commit(snapshot);
+      if (result.ok) {
+        this.sync(result.value);
+        this.options.commit(snapshot);
+      }
       else this.options.cancel(snapshot, false);
     }
 

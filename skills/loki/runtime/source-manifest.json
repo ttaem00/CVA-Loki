@@ -897,7 +897,7 @@
     {
       "module": "pipeline.config",
       "source_path": "pipeline/config.py",
-      "source_sha256": "4d74fa2b802c75a9083ec938916c4f694cec5342f458695a27f240f3ed861a96",
+      "source_sha256": "1fd372fdaca8943609e64a97ef410725374f71f16529a0b0830571e978ce7908",
       "symbols": [
         "EDITORIAL_PRODUCTION_PIPELINES",
         "FULL_AUTHOR_PIPELINES",
@@ -914,38 +914,38 @@
         "summary_pipeline_release_identity"
       ],
       "selected_symbols": [
-        "AEMETH_SUMMARY_MECHANISM_VERSION",
         "EDITORIAL_PRODUCTION_PIPELINES",
         "FULL_AUTHOR_PIPELINES",
         "LOKI_LABEL",
-        "LOKI_NAME",
-        "LOKI_VERSION",
         "STRUCTURED_SUMMARY_PIPELINES",
         "SUMMARY_PIPELINE_2_5",
-        "SUMMARY_PIPELINE_AEMETH_302",
-        "SUMMARY_PIPELINE_LATEST",
         "SUMMARY_PIPELINE_LEGACY",
-        "SUMMARY_PIPELINE_LOKI_301",
-        "SUMMARY_PIPELINE_LOKI_303",
         "SUMMARY_PIPELINE_METADATA_SCHEMA_VERSION",
         "SUMMARY_PIPELINE_VERSIONS",
-        "_LEGACY_SUMMARY_PIPELINE_AEMETH_2_5",
+        "_loki_identity",
+        "_loki_label",
+        "_loki_pipelines",
+        "_normalize_loki_pipeline",
         "load_config",
         "normalize_summary_pipeline_version",
         "runtime_data_root",
         "summary_pipeline_manager_label",
         "summary_pipeline_release_identity"
       ],
-      "export_sha256": "4dbdbeaccc1caa8fca4fbbeb75e1015bafa0cfdbd0e3779157e7027e993f986e",
+      "export_sha256": "8b3cfab83dd2896f72202e9ab36ee9cd5814aa976ea5e59dc2aafdde553fe4eb",
       "overlay": true,
       "trimmed_imports": [
         {
           "line": 2,
           "exported": "from .runtime_root import runtime_data_root"
+        },
+        {
+          "line": 3,
+          "exported": "from pipeline.loki_version_policy import normalize_pipeline as _normalize_loki_pipeline, pipeline_identity as _loki_identity, pipeline_label as _loki_label, pipelines_for as _loki_pipelines"
         }
       ],
-      "upstream_sha256": "947d46c40a52a00060bd0bbf155f693695d0957bcbbd2fa9fac0e2dc12cf0376",
-      "extracted_sha256": "4dbdbeaccc1caa8fca4fbbeb75e1015bafa0cfdbd0e3779157e7027e993f986e",
+      "upstream_sha256": "512dcea4da28e4d392c9c9782618e651b6d440d24800818766bbab16a32d7239",
+      "extracted_sha256": "8b3cfab83dd2896f72202e9ab36ee9cd5814aa976ea5e59dc2aafdde553fe4eb",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -1544,7 +1544,7 @@
     {
       "module": "pipeline.editorial_author_source",
       "source_path": "pipeline/editorial_author_source.py",
-      "source_sha256": "a78f833426763718f1a153de30ee5ee5e52ea3fb3901f9e55e49a379d89414e8",
+      "source_sha256": "f6590fd2b321199f8c879e984f67731ecaac8251fdff254ea5a59cce98678ae1",
       "symbols": [
         "NATIVE_RANGE_CONTRACT"
       ],
@@ -1638,7 +1638,7 @@
     {
       "module": "pipeline.editorial_current_conversation",
       "source_path": "pipeline/editorial_current_conversation.py",
-      "source_sha256": "303aa5d33eaf1d378fa2c71f83672e77c220853bd48567690ccccdf47c129f7d",
+      "source_sha256": "32283ae98a9c6da949e85b507f7ad36c0921f4cf554d6eab2cac9c0d1117e62e",
       "symbols": [
         "cli_result_json",
         "memory",
@@ -1694,10 +1694,10 @@
         "shutil",
         "submit"
       ],
-      "export_sha256": "ca183177d6a0d2ebb2f2a8de9760ae29839661dc25d685f2e5b182a68c8beec4",
+      "export_sha256": "af94edb4b5338401145a7cb42e8b55d36dc33af35f9afa13fac34881dd215e39",
       "overlay": false,
       "trimmed_imports": [],
-      "extracted_sha256": "ee309c3a85519f605145cbc3cf7aede6266126596854282aeabe4d072f4ecc9b",
+      "extracted_sha256": "60fbf6f858f236b5b34aa85e442fdc5799209c4b2d669162c7c34841de830861",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -1788,7 +1788,7 @@
     {
       "module": "pipeline.editorial_full_author",
       "source_path": "pipeline/editorial_full_author.py",
-      "source_sha256": "26e7bced1d7140175a531a2f46b4d9c30db5e12fd9338efbdbbc0c696771424e",
+      "source_sha256": "b227c2353466e7234adf4e4928bda35dabbdaa4b17e32ca835cbfe15374e69a3",
       "symbols": [
         "RESPONSE_FIELDS",
         "build_broadcast_flow_context",
@@ -1822,7 +1822,7 @@
         "validate_current_conversation_response",
         "validate_response"
       ],
-      "export_sha256": "456789baa4585b87c0d78a2f685e870ef277770a980fe1a70deba05dc234181e",
+      "export_sha256": "f33da1297141f13b53b75542ba1927d981b2b622150fd42fe36f6fb89482ae3d",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -1830,7 +1830,7 @@
           "exported": "from .evidence_world.contracts import AssetBinding, digest"
         }
       ],
-      "extracted_sha256": "47462980571f8bd58202fbae3443c624b9d66b3d0013e3cbbfa0240df2f88cdb",
+      "extracted_sha256": "241d3118c4673da5f6b46babdf9ae50ce123079b566c0fc858b2edfda0e37732",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -2145,7 +2145,7 @@
       "export_sha256": "34ca85d1b2579c667ed8788a7c52d62b22f28a7c93e8f15f12fe767ff40acbda",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "23b227b341a5fc6c1910b1ceda524833f2dad959ef37658df139653d41999d5a",
+      "upstream_sha256": "bbbd17e0bcd17c0981e49c3b106f5e02c23e5cbf9f9b6c6ea786f1fab4fff390",
       "extracted_sha256": "3bffd5ea51cedead20aa6b6496f4b889abf318b012e73ea269c2690315fdf57b",
       "export_policy": "public-commentary-v1"
     },
@@ -3381,7 +3381,7 @@
     {
       "module": "pipeline.live_vod_finalize",
       "source_path": "pipeline/live_vod_finalize.py",
-      "source_sha256": "e1390b065ac0b9325089e409e15902afda0ecb91ed52e72b29d17b5cc883520e",
+      "source_sha256": "24e85b120ae83a24a58d5c72134af940c9b8d6cbe7806105dc0bad36ef2d5fa3",
       "symbols": [
         "verified_live_transcript"
       ],
@@ -3474,6 +3474,35 @@
       ],
       "upstream_sha256": "0d0bb300e315ba8b57025ad8179ccd8a0c4e8eb044fbcd973024ffda2401132b",
       "extracted_sha256": "cc4ae4254c608121e7a8f74b5c0a8eab1d557ae4f94437056da27f361cc3dcbd",
+      "export_policy": "public-commentary-v1"
+    },
+    {
+      "module": "pipeline.loki_version_policy",
+      "source_path": "pipeline/loki_version_policy.py",
+      "source_sha256": "2be0caf70f20bd11edd945106aff2f8b89d789a703e3b552006b6fbe78dba269",
+      "symbols": [
+        "normalize_pipeline",
+        "pipeline_identity",
+        "pipeline_label",
+        "pipelines_for",
+        "select_new_pipeline"
+      ],
+      "selected_symbols": [
+        "POLICY_PATH",
+        "Path",
+        "json",
+        "load_loki_version_policy",
+        "lru_cache",
+        "normalize_pipeline",
+        "pipeline_identity",
+        "pipeline_label",
+        "pipelines_for",
+        "select_new_pipeline"
+      ],
+      "export_sha256": "541e4a7c3d6cea7cbbf88dc38326f96c1ca0d1fbba2e255be4a654c4c2293d0f",
+      "overlay": false,
+      "trimmed_imports": [],
+      "extracted_sha256": "541e4a7c3d6cea7cbbf88dc38326f96c1ca0d1fbba2e255be4a654c4c2293d0f",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -6522,8 +6551,9 @@
     {
       "module": "scripts.admin.manager_outline",
       "source_path": "scripts/admin/manager_outline.py",
-      "source_sha256": "b000e6d2b1a68a19b417cfc244b84ec45d1ee74f8a314b725e54cdccd572660a",
+      "source_sha256": "322b7256df2df3d1ae2343efa5e6d1f1e05a15e822bc4048fb5a657da6608137",
       "symbols": [
+        "ManagerEditValidationRejected",
         "_editable_broadcast_map_markdown",
         "_merge_broadcast_map_sections_into_report_markdown",
         "_merge_virtual_markdown",
@@ -6532,6 +6562,7 @@
         "manager_outline_edit_revision"
       ],
       "selected_symbols": [
+        "ManagerEditValidationRejected",
         "_editable_broadcast_map_markdown",
         "_merge_broadcast_map_sections_into_report_markdown",
         "_merge_virtual_markdown",
@@ -6549,7 +6580,7 @@
         "re",
         "validate_structured_manager_outline"
       ],
-      "export_sha256": "6fceafb7ffc8d09caa419ccaec839f3f8ac1b90f7db1a74318d77aee4e94b79a",
+      "export_sha256": "a200c754e2b62d79bb6ae7061ed7c861ddad7ab5ab1ae6a5deaa0950c0e97763",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -6565,7 +6596,7 @@
           "exported": "from pipeline.summary.render import _strip_editorial_review_markdown, _validate_editorial_review_projection"
         }
       ],
-      "extracted_sha256": "7b0e12824679a6b5650e7f172ba6df7f6460c3906824674ac55254af40835b12",
+      "extracted_sha256": "3a41dedf34621d108b1837ea50b3d2eccbd01e6ece3067238e94afb17424a861",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -6801,13 +6832,13 @@
     },
     {
       "source_path": "scripts/admin/static/report.css",
-      "source_sha256": "c680a85fc2aa7cb109a0aa7964e393ec01811ef7a8e60f616416474768ff9efc",
-      "export_sha256": "c680a85fc2aa7cb109a0aa7964e393ec01811ef7a8e60f616416474768ff9efc"
+      "source_sha256": "75acb7bb27f0f70dc6b1637140ea9fc8e96da5d94b3637d7d00bd7dbd4789743",
+      "export_sha256": "75acb7bb27f0f70dc6b1637140ea9fc8e96da5d94b3637d7d00bd7dbd4789743"
     },
     {
       "source_path": "scripts/admin/static/report.js",
-      "source_sha256": "cdfffc2770237ffd5489f9cdaf6e8b15336f3d9f77cb1860d17613735a3940c9",
-      "export_sha256": "cdfffc2770237ffd5489f9cdaf6e8b15336f3d9f77cb1860d17613735a3940c9"
+      "source_sha256": "43df367293d8db226b4506864dc08934f01101bf2efa5b1e8d74a833ec5a15d3",
+      "export_sha256": "43df367293d8db226b4506864dc08934f01101bf2efa5b1e8d74a833ec5a15d3"
     },
     {
       "source_path": "scripts/admin/static/report_adaptive_context.js",
@@ -6821,17 +6852,17 @@
     },
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",
-      "source_sha256": "1e9e10cd548b09c60d883b5d5f0d946c340ac6ef4a40d0c07090a1d9ae8459f6",
-      "export_sha256": "c5d03442f226138be1ebd13aef7d5991b4895a91c7f392f4c2cba8fbb2c190ba",
+      "source_sha256": "6202cb310638b2b90fd190cc82a7b1355481c44eb54ad218e7a998e517e2b870",
+      "export_sha256": "a91b9823d6381a971b6300bae84fcc6a7cd48ebcc3578c97902c29a8ade362db",
       "asset_overlay": true,
-      "raw_source_sha256": "1e9e10cd548b09c60d883b5d5f0d946c340ac6ef4a40d0c07090a1d9ae8459f6",
-      "overlay_sha256": "c5d03442f226138be1ebd13aef7d5991b4895a91c7f392f4c2cba8fbb2c190ba",
-      "extracted_sha256": "1e9e10cd548b09c60d883b5d5f0d946c340ac6ef4a40d0c07090a1d9ae8459f6"
+      "raw_source_sha256": "6202cb310638b2b90fd190cc82a7b1355481c44eb54ad218e7a998e517e2b870",
+      "overlay_sha256": "a91b9823d6381a971b6300bae84fcc6a7cd48ebcc3578c97902c29a8ade362db",
+      "extracted_sha256": "6202cb310638b2b90fd190cc82a7b1355481c44eb54ad218e7a998e517e2b870"
     },
     {
       "source_path": "scripts/admin/static/report_manager_outline.js",
-      "source_sha256": "337d87925e54589aade3f4eccedea3359023af5f2f134d47f84ee36ef5d1d319",
-      "export_sha256": "337d87925e54589aade3f4eccedea3359023af5f2f134d47f84ee36ef5d1d319"
+      "source_sha256": "6b4eda24035b00f52ece6cf64a8a23d39b2d973bb56c7c02f462526be58e64c0",
+      "export_sha256": "6b4eda24035b00f52ece6cf64a8a23d39b2d973bb56c7c02f462526be58e64c0"
     },
     {
       "source_path": "scripts/admin/static/report_player.js",
@@ -6869,17 +6900,17 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace.css",
-      "source_sha256": "db0a7bb9d12430bb5c42113ea2c3b8118e2a783d88a9128d007e2df83c79f156",
-      "export_sha256": "db0a7bb9d12430bb5c42113ea2c3b8118e2a783d88a9128d007e2df83c79f156"
+      "source_sha256": "7b8f450e148fcb231eda8e73a8211980c5b38f2a2db65d89d8a2de4726b00c3f",
+      "export_sha256": "7b8f450e148fcb231eda8e73a8211980c5b38f2a2db65d89d8a2de4726b00c3f"
     },
     {
       "source_path": "scripts/admin/static/report_workspace.js",
-      "source_sha256": "cbeb5d1b0d088189858ef129fd21c80602e1e24d1af5f59b376f37294c06fa13",
-      "export_sha256": "a206c493cf72882de0f851964cd332f2401e3f6b372c91d6f70a84224c0f3913",
+      "source_sha256": "5345aa59e38d4bb502589e868a3bb3bd1380fae0559283c36ecbfdef05b8db94",
+      "export_sha256": "a3e02dedd7a34adb2986a72f620ac628cf0a084ad3a65165824ac51737de6ea0",
       "asset_overlay": true,
-      "raw_source_sha256": "cbeb5d1b0d088189858ef129fd21c80602e1e24d1af5f59b376f37294c06fa13",
-      "overlay_sha256": "a206c493cf72882de0f851964cd332f2401e3f6b372c91d6f70a84224c0f3913",
-      "extracted_sha256": "cbeb5d1b0d088189858ef129fd21c80602e1e24d1af5f59b376f37294c06fa13"
+      "raw_source_sha256": "5345aa59e38d4bb502589e868a3bb3bd1380fae0559283c36ecbfdef05b8db94",
+      "overlay_sha256": "a3e02dedd7a34adb2986a72f620ac628cf0a084ad3a65165824ac51737de6ea0",
+      "extracted_sha256": "5345aa59e38d4bb502589e868a3bb3bd1380fae0559283c36ecbfdef05b8db94"
     },
     {
       "source_path": "scripts/admin/static/report_workspace_history.js",
@@ -6888,13 +6919,13 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace_state.js",
-      "source_sha256": "7169a7d3980bebaa3b8f125418552e56d405b49c11d25fbfdcfb2262df864024",
-      "export_sha256": "7169a7d3980bebaa3b8f125418552e56d405b49c11d25fbfdcfb2262df864024"
+      "source_sha256": "ca88d8843a6337e4701d8ac70e9301546acceb660a06ee350b6dd2ba1d9aaeaf",
+      "export_sha256": "ca88d8843a6337e4701d8ac70e9301546acceb660a06ee350b6dd2ba1d9aaeaf"
     },
     {
       "source_path": "scripts/admin/static/report_workspace_time_scrubber.js",
-      "source_sha256": "b0c511f8e2a109dcfdf493cb7f514938b61b9f532cd9d917143f3791f740201e",
-      "export_sha256": "b0c511f8e2a109dcfdf493cb7f514938b61b9f532cd9d917143f3791f740201e"
+      "source_sha256": "01591cfe8367a18c8d56e6356eaf345d58b2d07bf2143e79d2420128a9afe62f",
+      "export_sha256": "01591cfe8367a18c8d56e6356eaf345d58b2d07bf2143e79d2420128a9afe62f"
     },
     {
       "source_path": "scripts/admin/static/report_workspace_timeline.js",
@@ -6918,13 +6949,13 @@
     },
     {
       "source_path": "scripts/admin/templates/report.html",
-      "source_sha256": "4809c2334d4131cd4e6e1f25a89b8784443c20dc61eb15cfc4a0b56fdcf86126",
-      "export_sha256": "4809c2334d4131cd4e6e1f25a89b8784443c20dc61eb15cfc4a0b56fdcf86126"
+      "source_sha256": "7b49347add432beec4b3c1049120d677144fec53199996409abe12c8d2376cdc",
+      "export_sha256": "7b49347add432beec4b3c1049120d677144fec53199996409abe12c8d2376cdc"
     },
     {
       "source_path": "scripts/admin/templates/report_workspace.html",
-      "source_sha256": "8ce2d82b3fa7d16a16df2f28b45d90e05fbd2f1b6f39afa2183ab9cd435b66e7",
-      "export_sha256": "8ce2d82b3fa7d16a16df2f28b45d90e05fbd2f1b6f39afa2183ab9cd435b66e7"
+      "source_sha256": "43e33595bae47334a69581cf9c1b8b9a16109452f9ddddc328461989ee0c0ca2",
+      "export_sha256": "43e33595bae47334a69581cf9c1b8b9a16109452f9ddddc328461989ee0c0ca2"
     },
     {
       "source_path": "tools/parse_editor_comments.js",
@@ -6941,11 +6972,16 @@
       "export_policy": "public-commentary-v1"
     },
     {
+      "source_path": "vendor/chat-analyze-engine/config/loki_versions.json",
+      "source_sha256": "aa259edf01ffad6290a8e06d362655ba5d37228d5dca50de46129fef05bde3c9",
+      "export_sha256": "aa259edf01ffad6290a8e06d362655ba5d37228d5dca50de46129fef05bde3c9"
+    },
+    {
       "source_path": "loki.py",
-      "source_sha256": "3053ec60dac3b037d5f7281f31956649fb256abf422e47f3f86b54bc8b2ef2af",
-      "export_sha256": "01cbdc51786818ca1388b5c7f6c750b45a7058ea93bf4302d2fcd551ad537242",
+      "source_sha256": "4526d1d201b0f97d7b3a3ab9170cd2a86131fd78d7f6bed6df45b7b672d213aa",
+      "export_sha256": "f8ee483359c2682a4ea02eb9768561039595eedb7cbca6c9094cffa9f0c3547c",
       "origin": "release_support",
-      "extracted_sha256": "3053ec60dac3b037d5f7281f31956649fb256abf422e47f3f86b54bc8b2ef2af",
+      "extracted_sha256": "4526d1d201b0f97d7b3a3ab9170cd2a86131fd78d7f6bed6df45b7b672d213aa",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -6956,18 +6992,18 @@
     },
     {
       "source_path": "selftest.py",
-      "source_sha256": "02c90ff776a0d06965c19e21da960fe7018c1d0b0c7e9b71529f8b3d5ab983fb",
-      "export_sha256": "02c90ff776a0d06965c19e21da960fe7018c1d0b0c7e9b71529f8b3d5ab983fb",
+      "source_sha256": "0b41b00d15c4b5fb8dfc3252fb38d86f319613d501e7ec520f8e9adb8340cee1",
+      "export_sha256": "0b41b00d15c4b5fb8dfc3252fb38d86f319613d501e7ec520f8e9adb8340cee1",
       "origin": "release_support",
-      "extracted_sha256": "02c90ff776a0d06965c19e21da960fe7018c1d0b0c7e9b71529f8b3d5ab983fb",
+      "extracted_sha256": "0b41b00d15c4b5fb8dfc3252fb38d86f319613d501e7ec520f8e9adb8340cee1",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "install.py",
-      "source_sha256": "a25be70c0665f1dd150e216b180f5127e69ba952274cb9c3643d4ed4d54b70a5",
-      "export_sha256": "0b4ab397556966b6b3b8d492563a342361f10db57933ffda3f7a45e5e7221547",
+      "source_sha256": "95bd981ba6718bc2cb2c7fdd1c99795e38a340b2d2147e377037b83f0319f5d4",
+      "export_sha256": "6d470f8cd56361d68e755aea2fe2de79535f47ed804d04cfe7af90d30e925005",
       "origin": "release_support",
-      "extracted_sha256": "a25be70c0665f1dd150e216b180f5127e69ba952274cb9c3643d4ed4d54b70a5",
+      "extracted_sha256": "95bd981ba6718bc2cb2c7fdd1c99795e38a340b2d2147e377037b83f0319f5d4",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7012,26 +7048,26 @@
     },
     {
       "source_path": "media_selftest.py",
-      "source_sha256": "818415d073b978db9929141051c0712ecc321067feffacdf56db64085070abe7",
-      "export_sha256": "60f77edb549cc6bd595195b0a118b934c536975cc38fc98e1c3bbbaee0f74cb3",
+      "source_sha256": "ca21e4229077de61667f542c1d3fe3391c2dd311cedd3193901e10698a771c41",
+      "export_sha256": "a00bea100c5164bd0151d2694217a96146728c5d73eb84439ed1ad1fb66ede44",
       "origin": "release_support",
-      "extracted_sha256": "818415d073b978db9929141051c0712ecc321067feffacdf56db64085070abe7",
+      "extracted_sha256": "ca21e4229077de61667f542c1d3fe3391c2dd311cedd3193901e10698a771c41",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "review.py",
-      "source_sha256": "7a52067e6ee613d5010870bfd0af5f07233c82348f07c18f9e3404722f87fbea",
-      "export_sha256": "7a52067e6ee613d5010870bfd0af5f07233c82348f07c18f9e3404722f87fbea",
+      "source_sha256": "2d1515b45632bee40abdc695901f59029bccb709c8fe95a0ea094d7289cc5c1c",
+      "export_sha256": "2d1515b45632bee40abdc695901f59029bccb709c8fe95a0ea094d7289cc5c1c",
       "origin": "release_support",
-      "extracted_sha256": "7a52067e6ee613d5010870bfd0af5f07233c82348f07c18f9e3404722f87fbea",
+      "extracted_sha256": "2d1515b45632bee40abdc695901f59029bccb709c8fe95a0ea094d7289cc5c1c",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "review_store.py",
-      "source_sha256": "d7f75df80a7eadde41e8b11842506fdf056778540e9cb14040171e0387cfb6ff",
-      "export_sha256": "d7f75df80a7eadde41e8b11842506fdf056778540e9cb14040171e0387cfb6ff",
+      "source_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
+      "export_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
       "origin": "release_support",
-      "extracted_sha256": "d7f75df80a7eadde41e8b11842506fdf056778540e9cb14040171e0387cfb6ff",
+      "extracted_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7170,6 +7206,6 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "a433aee981284eb6099413eb063aa8ec6913e656",
-  "version": "3.0.4"
+  "source_commit": "c882ffa2292d516fdcd69a5975533bd31b21a149",
+  "version": "3.0.5"
 }

@@ -14,7 +14,7 @@ import tempfile
 import uuid
 
 from pipeline.evidence_world.index import build_lock
-from pipeline.evidence_world.contracts import digest
+from pipeline.evidence_world.contracts import digest, native_path
 from pipeline.manager_outline import validate_structured_manager_outline
 from pipeline.models import VODInfo
 from pipeline.outline.schema import hms_to_seconds
@@ -23,6 +23,7 @@ from pipeline.editorial_visual_input import validate_frame_references
 from pipeline.summary.report_html import ReportHtmlRenderRequest, render_summary_report_html
 from pipeline.summary.render import _merge_editorial_review_markdown
 from scripts.admin.manager_outline import (
+    ManagerEditValidationRejected,
     _editable_broadcast_map_markdown, _merge_virtual_markdown,
     _merge_broadcast_map_sections_into_report_markdown, _rebind_editorial_packet_broadcast_map,
     _validate_editorial_packet_edit, manager_outline_edit_revision,
@@ -103,7 +104,7 @@ class ReviewStore:
         return contained(self.root, lexical)
 
     def _bytes(self, path):
-        path = self._path(path)
+        path = native_path(self._path(path))
         if path.stat().st_size > MAX_BYTES:
             raise ValueError("review_artifact_too_large")
         return path.read_bytes()
@@ -112,7 +113,7 @@ class ReviewStore:
         return json.loads(self._bytes(path).decode("utf-8-sig"))
 
     def _write(self, path, value, *, replace=False):
-        path = self._path(path)
+        path = native_path(self._path(path))
         path.parent.mkdir(parents=True, exist_ok=True)
         raw = _json_bytes(value)
         if not replace:
@@ -132,17 +133,17 @@ class ReviewStore:
                 temporary.unlink(missing_ok=True)
 
     def _jobs(self):
-        for vod in sorted(self.work.iterdir()):
+        for vod in sorted(native_path(self.work).iterdir()):
             vod = self._path(vod)
-            if not vod.is_dir():
+            if not native_path(vod).is_dir():
                 continue
             folder = self._path(vod / "current-conversation")
-            if not folder.is_dir():
+            if not native_path(folder).is_dir():
                 continue
-            for job in sorted(folder.iterdir()):
+            for job in sorted(native_path(folder).iterdir()):
                 job = self._path(job)
-                if (job.is_dir() and self._path(job / "submission.json").is_file()
-                        and self._path(job / "submission-result.json").is_file()):
+                if (native_path(job).is_dir() and native_path(self._path(job / "submission.json")).is_file()
+                        and native_path(self._path(job / "submission-result.json")).is_file()):
                     yield _hash(job.relative_to(self.root).as_posix().encode())[:20], job
 
     def _job(self, report_id):
@@ -161,15 +162,15 @@ class ReviewStore:
         if any(path.parent != job / "report" for path in paths):
             raise ValueError("review_source_report_outside_job")
         raws = [self._bytes(path) for path in paths]
-        meta = validate_report_artifact_family(*paths)["metadata"]
+        meta = validate_report_artifact_family(*map(native_path, paths))["metadata"]
         return dict(md=raws[0].decode("utf-8"), html=raws[1].decode("utf-8"), meta=meta,
-            created_at=datetime.fromtimestamp(paths[0].stat().st_mtime, timezone.utc).isoformat(),
+            created_at=datetime.fromtimestamp(native_path(paths[0]).stat().st_mtime, timezone.utc).isoformat(),
             base=paths[0].stem, source_sha=_hash(b"\0".join(raws)), revision_id="original", parent=None)
 
     def _context(self, job):
         source = self._source(job)
         pointer = self._path(job / "review/current.json")
-        if not pointer.exists():
+        if not native_path(pointer).exists():
             return source
         saved = self._read(pointer)
         revision = saved.get("revision_id")
@@ -182,7 +183,7 @@ class ReviewStore:
         paths = [folder / (source["base"] + suffix) for suffix in (".md", ".html", "_metadata.json")]
         for path in paths:
             self._bytes(path)
-        meta = _original_identity_defaults(validate_report_artifact_family(*paths)["metadata"], source["meta"])
+        meta = _original_identity_defaults(validate_report_artifact_family(*map(native_path, paths))["metadata"], source["meta"])
         return dict(state, md=self._bytes(paths[0]).decode(), html=self._bytes(paths[1]).decode(), meta=meta)
 
     def _view(self, report_id, context):
@@ -194,6 +195,11 @@ class ReviewStore:
             source_clock=deepcopy(meta.get("source_clock")),
             manager_outline_authority=dict(revision_id=context["revision_id"]),
             summary_pipeline_integrity=dict(generation_id=meta["report_artifact_family"]["generation_id"]))
+        story_refs = {point["id"]: point["story_ref"]
+            for point in view["qg1_review_packet"]["broadcast_map"]["points"]}
+        for point in view["structured_outline"]["points"]:
+            if not point.get("story_ref") and point["id"] in story_refs:
+                point["story_ref"] = story_refs[point["id"]]
         view["manager_edit_revision"] = manager_outline_edit_revision(view)
         return view
 
@@ -237,7 +243,12 @@ class ReviewStore:
     def _draft(self, context, payload):
         current = context["meta"]
         duration = int(current["duration"])
-        markdown, outline, packet = self._draft_content(context, payload)
+        try:
+            markdown, outline, packet = self._draft_content(context, payload)
+        except ReviewConflict:
+            raise
+        except ValueError as error:
+            raise ManagerEditValidationRejected(str(error)) from error
         vod = VODInfo(video_no=str(current["video_no"]), title=str(current.get("title", "")),
             channel_id=str(current.get("channel_id", "")), channel_name=str(current.get("channel", "")),
             duration=duration, publish_date=str(current.get("publish_date", "")),
@@ -261,7 +272,7 @@ class ReviewStore:
         job = self._job(report_id)
         review = self._path(job / "review")
         self._path(review / "build.lock")
-        with build_lock(review):
+        with build_lock(native_path(review)):
             context = self._context(job)
             self._expect(report_id, context, payload.get("expected_edit_revision"))
             draft = self._draft(context, payload)
@@ -291,7 +302,7 @@ class ReviewStore:
         job = self._job(report_id)
         review = self._path(job / "review")
         self._path(review / "build.lock")
-        with build_lock(review):
+        with build_lock(native_path(review)):
             context = self._context(job)
             self._expect(report_id, context, payload["expected_edit_revision"])
             draft = self._preview(job, payload["preview_id"])
@@ -303,7 +314,8 @@ class ReviewStore:
             for path in paths:
                 self._path(path)
             old = context["meta"]["report_artifact_family"]
-            commit_report_artifact_family(markdown_path=paths[0], html_path=paths[1], metadata_path=paths[2],
+            commit_report_artifact_family(markdown_path=native_path(paths[0]), html_path=native_path(paths[1]),
+                metadata_path=native_path(paths[2]),
                 markdown_text=draft["md"], html_text=draft["html"], metadata=deepcopy(draft["meta"]),
                 generation_sequence=old["generation_sequence"] + 1, parent_generation_id=old["generation_id"],
                 authority_revision_id=revision)
@@ -338,7 +350,7 @@ class ReviewStore:
             paths = [folder / (state["base"] + suffix) for suffix in (".md", ".html", "_metadata.json")]
             for path in paths:
                 self._bytes(path)
-            meta = validate_report_artifact_family(*paths)["metadata"]
+            meta = validate_report_artifact_family(*map(native_path, paths))["metadata"]
             context = dict(state, md=self._bytes(folder / (state["base"] + ".md")).decode(),
                            meta=meta)
         else:
@@ -380,7 +392,7 @@ class ReviewStore:
         paths = [self._path(folder / (source["base"] + suffix)) for suffix in (".md", ".html", "_metadata.json")]
         for path in paths:
             self._bytes(path)
-        meta = _original_identity_defaults(validate_report_artifact_family(*paths)["metadata"], source["meta"])
+        meta = _original_identity_defaults(validate_report_artifact_family(*map(native_path, paths))["metadata"], source["meta"])
         return dict(state, md=self._bytes(paths[0]).decode(), html=self._bytes(paths[1]).decode(), meta=meta)
 
     def workspace_report(self, base, *, revision_only=False):
@@ -392,7 +404,7 @@ class ReviewStore:
         history = []
         for row in self.revisions(identity)["revisions"]:
             previous = self._history_context(job, row["revision_id"])
-            history.append(dict(row, outline=deepcopy(previous["meta"]["structured_outline"]),
+            history.append(dict(row, outline=self._view(identity, previous)["structured_outline"],
                 qg1_review_packet=deepcopy(previous["meta"]["editorial_review_packet"]), md=previous["md"]))
         context = self._context(job)
         meta = context["meta"]
@@ -435,11 +447,12 @@ class ReviewStore:
 
     def workspace_restore(self, payload):
         identity = self._workspace_identity(payload)
-        preview = self.preview_revision(identity, dict(revision_id=payload.get("revision_id"),
+        revision_id = payload.get("revision_id")
+        preview = self.preview_revision(identity, dict(revision_id=revision_id,
             expected_edit_revision=payload.get("expected_edit_revision")))
         self.save(identity, dict(preview_id=preview["preview_id"],
             expected_edit_revision=payload.get("expected_edit_revision")))
-        return self.workspace_report(payload["base"])
+        return dict(self.workspace_report(payload["base"]), restored_from_revision_id=revision_id)
 
     def workspace_sync(self, payload):
         identity = self._workspace_identity(payload)
@@ -459,7 +472,8 @@ class ReviewStore:
             manager_markdown=payload.get("md"), outline=current["structured_outline"],
             editorial_review_packet=current["qg1_review_packet"],
             expected_edit_revision=payload.get("expected_edit_revision")))
-        return dict(saved, html=self.report_html(identity), saved=True, published=False, marker_warnings=[])
+        return dict(saved, html=self.report_html(identity), saved=True, published=False,
+                    publish_status="not_requested", marker_warnings=[])
 
     def workspace_revisions(self, base):
         identity = self.workspace_id(base)
@@ -531,7 +545,7 @@ class ReviewStore:
             raise ValueError("review_media_binding_invalid")
         video = str(context["meta"]["video_no"])
         path = self._path(media["path"])
-        if not path.is_relative_to(self.work / video) or not path.is_file() or path.suffix.lower() != ".mp4":
+        if not path.is_relative_to(self.work / video) or not native_path(path).is_file() or path.suffix.lower() != ".mp4":
             raise ValueError("review_media_source_invalid")
         return dict(id=identity, path=path, sha256=media["sha256"],
             original_url="https://chzzk.naver.com/video/" + video)

@@ -10,6 +10,8 @@ description: 공개 치지직 다시보기 한 편이나 같은 방송의 로컬
 보고서에 의미 작성을 맡기지 않는다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색,
 스크립트는 준비·기록·검사·렌더를 맡는다.
 
+[출시 버전 정책](https://github.com/ttaem00/CVA-Loki#release-version-policy)에 따라 정식 공개 전 오류·재빌드는 현재 후보 버전 안에서 해결하며, 공개한 태그·ZIP은 보존한다.
+
 ## 경로와 읽을 문서
 
 이 `SKILL.md`를 기준으로 `runtime/loki.py`의 실제 경로를 구한다. 플러그인·스킬의
@@ -23,7 +25,7 @@ description: 공개 치지직 다시보기 한 편이나 같은 방송의 로컬
 | 보안 문제 보고·재배포 | [보안 안내](references/SECURITY.md), [제3자 고지](references/THIRD_PARTY_NOTICES.md), [이용허락](LICENSE) |
 | 외부 코드·문서 기여 | [기여 안내와 동의 문안](CONTRIBUTING.md) |
 
-설치된 `latest`는 현재 Loki 3.0.3이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
+배포·플러그인·스킬·요약 메커니즘은 3.0.5이며 `latest`도 Loki 3.0.5이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
 작업의 버전·원자료·응답·예산은 별칭 변경을 이유로 다시 쓰지 않는다.
 
 ## 1. 설치와 자료 준비
