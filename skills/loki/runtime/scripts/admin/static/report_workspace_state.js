@@ -300,7 +300,8 @@
   function serialize(state) {
     const outline = clone(state.outline);
     delete outline.highlights;
-    outline.candidates = [];
+    outline.candidates = String(state.report.base || '').startsWith('manager-outline:')
+      ? clone((state.report.structured_outline || {}).candidates || []) : [];
     (outline.points || []).forEach(point => { delete point.story_why_notable; });
     if (!state.packet) return {outline, editorial_review_packet: null};
     const packet = clone(state.packet);

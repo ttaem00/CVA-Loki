@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
-  <title id="title">CVA-Loki 3.0.4 — 치지직 방송을 읽고, 장면을 찾다.</title>
+  <title id="title">CVA-Loki 3.0.5 — 치지직 방송을 읽고, 장면을 찾다.</title>
   <desc id="desc">현재 코덱스가 치지직 다시보기 원문과 장면을 직접 읽어 보고서를 작성합니다. GPU 자동 감지, 코덱스 플러그인, 하이라이트 이미지 추출을 지원하는 비공식 프로젝트입니다.</desc>
   <defs>
     <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#111a31"/><stop offset="1" stop-color="#211d3a"/></linearGradient>
@@ -12,7 +12,7 @@
   <g font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif">
     <text x="48" y="64" fill="#e5e9fa" font-size="26" font-weight="700">CVA-Loki</text>
     <rect x="251" y="42" width="67" height="27" rx="13.5" fill="#343653"/>
-    <text x="284.5" y="60" text-anchor="middle" fill="#c7c7f3" font-size="13" font-weight="600">3.0.4</text>
+    <text x="284.5" y="60" text-anchor="middle" fill="#c7c7f3" font-size="13" font-weight="600">3.0.5</text>
     <text x="48" y="137" fill="#ffffff" font-size="43" font-weight="750" letter-spacing="-1.7">방송을 읽고, 장면을 찾다.</text>
     <text x="50" y="174" fill="#b6c1d8" font-size="19">치지직 다시보기의 원문과 장면을 근거로 정리합니다.</text>
     <g font-size="13" font-weight="600" fill="#d8e4f8">

@@ -34,27 +34,34 @@
     let data;
     try { data=await response.json(); } catch(cause) {
       const error=new Error('서버 응답을 끝까지 확인하지 못했습니다. 입력은 화면에 남아 있습니다.',{cause});
-      error.outcomeUnknown=response.ok || response.status>=500;throw error;
+      error.outcomeUnknown=true;throw error;
     }
     if (!response.ok) {
       const error = new Error(data.error || `요청 실패 (${response.status})`);
       error.code = data.code || '';
       error.status=response.status;
-      error.outcomeUnknown=response.status>=500;
+      error.outcomeUnknown=true;
+      error.prewriteConflict=response.status===409 && data.error_code==='manager_edit_conflict'
+        && data.mayHaveRun===false && typeof data.error==='string' && !!data.error.trim();
       throw error;
     }
     return data;
   }
 
   function setStatus(message, kind = '') {
-    el('status').textContent = message;
-    el('status').dataset.kind = kind;
+    const unresolved=saveOutcome && kind!=='saving' && kind!=='error';
+    el('status').textContent = message + (unresolved
+      ? ' 이전 요청의 결과 확인이 남아 있습니다. 저장 요청은 다시 보내지 않습니다.' : '');
+    el('status').dataset.kind = unresolved ? 'error' : kind;
     if(kind==='dirty') invalidatePreview('편집 내용이 바뀌었습니다. 현재 편집안을 다시 확인하세요.');
   }
 
   function draftPayload() {
     const payload=S.serialize(state);
-    return {base:state.report.base,md:state.report.md || state.report.manager_markdown || '',
+    const markdown=state.report.base.startsWith('manager-outline:')
+      ? state.report.manager_markdown || state.report.md || ''
+      : state.report.md || state.report.manager_markdown || '';
+    return {base:state.report.base,md:markdown,
       structured_outline:payload.outline,editorial_review_packet:payload.editorial_review_packet};
   }
 
@@ -323,7 +330,7 @@
         } else {
           S.update(state, {[control.name]: control.value});
         }
-        el('saveButton').disabled = false;
+        el('saveButton').disabled = !!saveOutcome || savePending;
         setStatus('수정 중입니다. 아직 저장되지 않았습니다.', 'dirty');
         renderList();
         if (control.validity.valid) timeline.render();
@@ -422,7 +429,7 @@
       return result;
     }
     const value = target.edge === 'end' ? result.end : result.start;
-    el('saveButton').disabled = false;
+    el('saveButton').disabled = !!saveOutcome || savePending;
     setStatus(`${type} ${target.edge === 'end' ? '끝' : '시작'} 시각을 조정 중입니다. 아직 저장되지 않았습니다.`, 'dirty');
     scheduleTimePreview(value);
     return {...result, value};
@@ -505,7 +512,7 @@
       return row.item==='요약 전체 본문' ? `<details class="revision-change"><summary>${title}</summary>${values}</details>`
         : `<section class="revision-change"><h3>${title}</h3>${values}</section>`;
     }).join('') || '<p>제목·본문·시간에 차이가 없습니다.</p>';
-    el('restoreComparedButton').disabled=!differences.length;
+    el('restoreComparedButton').disabled=!!saveOutcome || !differences.length;
     el('revisionCompareDialog').showModal();
   }
 
@@ -601,37 +608,140 @@
     state=S.create(data);S.restoreSelection(state,S.selectionParams(selection));history.clear();renderAll();
   }
 
+  function editableSignature(model) {
+    // Legacy outline serialization trims only the outside of editable text.
+    return JSON.stringify(JSON.parse(S.editSignature(model)).map(row=>({...row,
+      title:row.title.trim(),body:row.body.trim(),why:row.why.trim()})));
+  }
+
+  function checkedReportResult(data, attempt, mutation=false) {
+    const object=value=>!!value && typeof value==='object' && !Array.isArray(value);
+    const time=value=>(typeof value==='number' && value>=0 || typeof value==='string' && !!value.trim()) && Number.isFinite(S.seconds(value));
+    const outline=data?.structured_outline,packet=data?.qg1_review_packet;
+    if(!object(data) || data.base!==attempt.base || String(data.video_no)!==attempt.videoNo
+      || typeof data.manager_edit_revision!=='string' || !data.manager_edit_revision.trim()
+      || mutation && attempt.changed && data.manager_edit_revision===attempt.revision
+      || typeof data.md!=='string' || typeof data.manager_markdown!=='string'
+      || !object(outline) || !Array.isArray(outline.ranges) || !Array.isArray(outline.points)
+      || outline.ranges.some(row=>!object(row) || typeof row.id!=='string' || !row.id || typeof row.title!=='string'
+        || !['D1','D2'].includes(row.level) || !time(row.start) || !time(row.end))
+      || outline.points.some(row=>!object(row) || typeof row.id!=='string' || !row.id || typeof row.title!=='string' || !time(row.timestamp))
+      || attempt.model.packet && !object(packet)) throw Error('같은 방송·버전의 전체 편집 결과를 확인하지 못했습니다.');
+    if(packet!=null && (!object(packet) || !Array.isArray(packet.stories) || !Array.isArray(packet.editorial_highlights)
+      || packet.stories.some(row=>!object(row) || typeof row.story_ref!=='string' || row.why_notable!==undefined && typeof row.why_notable!=='string')
+      || packet.editorial_highlights.some(row=>!object(row) || typeof row.highlight_id!=='string' || !row.highlight_id
+        || typeof row.title!=='string' || !Array.isArray(row.source_spans)
+        || row.source_spans.some(span=>!object(span) || !Number.isFinite(span.start_sec) || !Number.isFinite(span.end_sec)))))
+      throw Error('편집 구간과 근거가 포함된 전체 결과를 확인하지 못했습니다.');
+    if(String(attempt.base).startsWith('manager-outline:')) {
+      if(!Array.isArray(outline.candidates) || outline.candidates.some(row=>!object(row)
+        || typeof row.id!=='string' || !row.id || typeof row.title!=='string' || typeof row.content!=='string'
+        || !time(row.start) || !time(row.end) || S.seconds(row.end)<=S.seconds(row.start)))
+        throw Error('읽기 전용 검토 범위를 포함한 전체 저장본을 확인하지 못했습니다.');
+      if(mutation && Array.isArray(attempt.candidates)) {
+        // These rows are carried through serialization without workspace edits.
+        // A restore uses its selected history, while a GET may show newer rows.
+        const key=rows=>JSON.stringify(rows.map(row=>JSON.stringify([row.id,S.seconds(row.start),S.seconds(row.end),
+          row.title.trim(),row.content.trim()])).sort());
+        if(key(outline.candidates)!==key(attempt.candidates))
+          throw Error('응답의 읽기 전용 검토 범위가 요청한 저장·복원 대상과 일치하지 않습니다.');
+      }
+    }
+    const model=S.create(data);
+    if(mutation) {
+      const authority=data.manager_outline_authority || {};
+      const selected=authority.saved_revision?.revision_id || authority.revision_id;
+      if(typeof data.revision_id!=='string' || !data.revision_id || selected && selected!==data.revision_id)
+        throw Error('기록된 수정본의 식별 정보를 확인하지 못했습니다.');
+    }
+    if(mutation && (attempt.kind==='restore' && data.restored_from_revision_id!==attempt.targetId
+      || attempt.signature && editableSignature(model)!==attempt.signature)) throw Error('응답의 편집 내용이 요청한 저장·복원 대상과 일치하지 않습니다.');
+    return model;
+  }
+
+  function updateSaveOutcomeControls() {
+    el('saveButton').disabled=savePending || !!saveOutcome || !state?.dirty;
+    el('checkSaveButton').hidden=!saveOutcome;el('checkSaveButton').disabled=savePending;
+    el('checkSaveButton').textContent=saveOutcome?.kind==='restore'?'복원 결과 다시 확인':'저장 결과 다시 확인';
+    el('adoptCurrentSaveButton').hidden=!saveOutcome?.observed;
+    el('adoptCurrentSaveButton').disabled=savePending;
+    el('previewButton').disabled=savePending;
+  }
+
+  function confirmedShrink(data) {
+    const change=data?.destructive_change;
+    return data?.error_code==='report_save_confirmation_required' && data.mayHaveRun===false
+      && data.requires_destructive_confirmation===true && typeof data.confirmation_token==='string' && !!data.confirmation_token
+      && change && ['before_chars','after_chars','removed_chars','remaining_percent'].every(key=>Number.isFinite(change[key]) && change[key]>=0);
+  }
+
+  async function confirmWorkspaceChange(title,description,acceptLabel) {
+    const dialog=el('workspaceConfirmDialog');
+    if(dialog.open)return false;
+    const opener=document.activeElement;
+    el('workspaceConfirmTitle').textContent=title;
+    el('workspaceConfirmDescription').textContent=description;
+    el('workspaceConfirmAccept').textContent=acceptLabel;
+    dialog.returnValue='';
+    return new Promise((resolve,reject)=>{
+      const closed=()=>{
+        if(opener?.isConnected)opener.focus({preventScroll:true});
+        resolve(dialog.returnValue==='confirm');
+      };
+      dialog.addEventListener('close',closed,{once:true});
+      try { dialog.showModal();el('workspaceConfirmCancel').focus({preventScroll:true}); }
+      catch(error) { dialog.removeEventListener('close',closed);reject(Object.assign(error,{definiteRefusal:true})); }
+    });
+  }
+
+  async function requestReportWrite(path,payload) {
+    let data=await api(path,{method:'POST',body:JSON.stringify(payload)});
+    if(!confirmedShrink(data))return data;
+    const change=data.destructive_change;
+    if(!await confirmWorkspaceChange('본문이 크게 줄어듭니다',`대상: 이 방송의 로컬 수정본\n현재 ${change.before_chars.toLocaleString()}자 → 처리 후 ${change.after_chars.toLocaleString()}자\n${change.removed_chars.toLocaleString()}자 삭제 · ${change.remaining_percent}% 남음\n\n편집 유지를 선택하면 입력과 저장본은 그대로입니다. 확인한 변경만 로컬 수정본에 기록하며 공개 사이트는 바뀌지 않습니다.`,path.endsWith('/restore')?'축소한 내용으로 복원':'축소한 수정본 저장'))
+      throw Object.assign(Error('본문 축소 확인을 취소했습니다. 입력과 저장본은 그대로입니다.'),{definiteRefusal:true});
+    data=await api(path,{method:'POST',body:JSON.stringify({...payload,destructive_confirmation_token:data.confirmation_token})});
+    if(confirmedShrink(data))throw Object.assign(Error('확인 조건이 바뀌어 기록하지 않았습니다. 입력을 유지했습니다. 다시 저장·복원을 선택해 변경량을 확인하세요.'),{definiteRefusal:true});
+    return data;
+  }
+
   async function checkSaveOutcome() {
     if(!saveOutcome || savePending)return;
     const attempt=saveOutcome;
-    savePending=true;setEditorBusy(true);el('checkSaveButton').disabled=true;el('saveButton').disabled=true;
-    setStatus('저장 결과를 조회하고 있습니다. 같은 저장 요청을 다시 보내지 않습니다.','saving');
+    attempt.observed=null;savePending=true;setEditorBusy(true);updateSaveOutcomeControls();
+    setStatus('현재 저장본을 조회하고 있습니다. 저장·복원 요청은 다시 보내지 않습니다.','saving');
     try {
       const fresh=await api(`/api/report?base=${encodeURIComponent(attempt.base)}&view=editor`);
       if(saveOutcome!==attempt)return;
-      if(fresh.base!==attempt.base || String(fresh.video_no)!==attempt.videoNo || !fresh.manager_edit_revision)
-        throw Error('같은 방송·버전의 저장 결과를 확인하지 못했습니다.');
+      const current=checkedReportResult(fresh,attempt);
+      attempt.observed=fresh;
       const changed=fresh.manager_edit_revision!==attempt.revision;
-      const matches=S.editSignature(S.create(fresh))===attempt.signature;
-      if(changed && matches) {
-        saveOutcome=null;
-        if(state===attempt.model && S.editSignature(state)===attempt.signature)acceptSavedReport(fresh,state.selection);
-        else { state.report=fresh;state.dirty=true;renderHistory(); }
-        setStatus('저장 응답은 끊겼지만 같은 수정 내용이 저장된 것을 확인했습니다. 중복 저장하지 않았습니다.','ok');
-      } else if(!changed) {
-        // The disconnected POST may still be waiting for its transaction lock.
-        // An unchanged GET cannot prove that it will never commit later.
-        setStatus('아직 이전 저장본 그대로입니다. 저장 완료 여부는 미확정입니다. 입력을 유지하며 저장 결과만 다시 확인할 수 있습니다.','error');
-      } else {
-        // A different committed version must keep the old CAS token. Reopening
-        // is a manager decision; never silently rebase the preserved draft.
-        setStatus('다른 수정본이 저장되어 있습니다. 입력을 보존했습니다. 이전 저장본과 비교한 뒤 상세 화면에서 최신 결과를 확인하세요.','error');
-      }
+      const matches=attempt.signature && editableSignature(current)===attempt.signature;
+      const observation=!changed?'현재 저장본은 이전 revision 그대로입니다.':matches?'현재 저장본의 편집 내용이 요청한 내용과 일치합니다.':'현재 저장본이 이전 revision과 다릅니다.';
+      setStatus(`${observation} ${attempt.prewriteConflict?'충돌한 요청은 기록되지 않았습니다.':'이 조회만으로 이전 요청의 성공을 확정하지 않습니다.'} 입력·선택·편집 이력과 원래 저장 기준은 유지했습니다. 확인한 저장본을 채택하려면 다시 열기를 선택하세요.`, 'error');
     } catch(error) {
-      setStatus(`저장 결과가 아직 확인되지 않았습니다. ${error.message || ''} 입력과 선택을 보존하며 다시 저장하지 않습니다.`,'error');
+      setStatus(`현재 저장본을 확인하지 못했습니다. ${error.message || ''} 입력·선택·편집 이력은 유지하며 요청을 다시 보내지 않습니다.`,'error');
     } finally {
-      savePending=false;setEditorBusy(false);el('checkSaveButton').disabled=false;el('checkSaveButton').hidden=!saveOutcome;
-      el('saveButton').disabled=!state.dirty || !!saveOutcome;
+      savePending=false;setEditorBusy(false);updateSaveOutcomeControls();
+    }
+  }
+
+  async function adoptCurrentSave() {
+    const attempt=saveOutcome;
+    if(savePending || !attempt?.observed)return;
+    const observed=attempt.observed;
+    checkedReportResult(observed,attempt);
+    savePending=true;setEditorBusy(true);updateSaveOutcomeControls();
+    try {
+      if(!await confirmWorkspaceChange('확인한 현재 저장본으로 다시 열기',`대상: 같은 방송에서 방금 조회한 현재 저장본\n\n화면의 미저장 수정과 최대 20단계 편집 되돌리기 이력을 버리고 이 저장본으로 교체합니다. 현재 장면 선택은 가능한 경우 유지합니다.\n편집 유지를 선택하면 지금 입력과 이력을 그대로 둡니다.\n\n이전 요청의 성공을 확정하는 동작은 아닙니다. 조회 이후 저장본이 바뀌면 다음 저장에서 다시 확인해야 합니다. 공개 사이트는 바뀌지 않습니다.`,'확인한 저장본으로 다시 열기'))return;
+      if(saveOutcome!==attempt || attempt.observed!==observed)return;
+      const selection=state.selection;
+      saveOutcome=null;acceptSavedReport(observed,selection);
+      setStatus('확인한 현재 저장본을 명시적으로 채택했습니다. 미저장 수정과 편집 되돌리기 이력을 비웠으며 공개 사이트는 바뀌지 않았습니다.','ok');
+      el('status').focus({preventScroll:true});
+    } finally {
+      savePending=false;setEditorBusy(false);updateSaveOutcomeControls();
+      if(saveOutcome)el('adoptCurrentSaveButton').focus({preventScroll:true});
     }
   }
 
@@ -642,59 +752,74 @@
       return;
     }
     const payload = S.serialize(state);
-    const attempt={base:state.report.base,videoNo:String(state.report.video_no),revision:state.report.manager_edit_revision,
-      signature:S.editSignature(state),model:state};
+    const signature=editableSignature(state);
+    const attempt={kind:'save',base:state.report.base,videoNo:String(state.report.video_no),revision:state.report.manager_edit_revision,
+      signature,changed:signature!==editableSignature(S.create(state.report)),candidates:payload.outline.candidates,model:state};
     stopBoundary();
     savePending=true;setEditorBusy(true);
-    el('saveButton').disabled = true;
+    updateSaveOutcomeControls();
     setStatus('저장 중입니다. 구조를 검증하고 로컬 수정본에 기록합니다.','saving');
+    let confirmed=false,refused=false;
     try {
-      const data = await api('/api/manager-outline/save', {method: 'POST', body: JSON.stringify({
+      const data = await requestReportWrite('/api/manager-outline/save', {
         video_no: state.report.video_no,
         base: state.report.base,
         manager_markdown: state.report.manager_markdown,
         outline: payload.outline,
         editorial_review_packet: payload.editorial_review_packet,
         expected_edit_revision: state.report.manager_edit_revision || '',
-      })});
-      if(data.base!==attempt.base || !data.manager_edit_revision || !data.structured_outline) {
-        const error=Error('저장 완료 응답이 불완전합니다.');error.outcomeUnknown=true;throw error;
-      }
+      });
+      checkedReportResult(data,attempt,true);confirmed=true;
       acceptSavedReport(data,state.selection);
       setStatus('로컬 수정본을 저장했습니다. 공개 사이트는 바뀌지 않았습니다.', 'ok');
     } catch (error) {
-      state.dirty = true;
-      if(error.outcomeUnknown){saveOutcome=attempt;el('checkSaveButton').hidden=false;}
-      setStatus(error.outcomeUnknown ? '저장 응답이 끊겨 결과를 확인합니다. 입력을 보존하며 요청은 다시 보내지 않습니다.' : error.message || '저장하지 못했습니다. 입력은 화면에 남아 있습니다.', 'error');
+      if(confirmed)setStatus('로컬 수정본 저장 응답은 확인했습니다. 화면 갱신을 마치지 못했습니다. 저장 요청은 다시 보내지 않습니다.','error');
+      else if(error.definiteRefusal){refused=true;setStatus(error.message,'error');}
+      else {saveOutcome={...attempt,prewriteConflict:error.prewriteConflict===true};setStatus(error.prewriteConflict?'다른 수정본이 먼저 저장되어 요청을 기록하지 않았습니다. 입력과 기존 기준을 유지하며 현재 저장본을 확인합니다.':'저장 결과 미확인입니다. 입력·선택·편집 이력을 보존하며 요청은 다시 보내지 않습니다.','error');}
     } finally {
       savePending=false;setEditorBusy(false);
-      el('saveButton').disabled=!state.dirty || !!saveOutcome;el('previewButton').disabled=false;
+      updateSaveOutcomeControls();el('previewButton').disabled=false;
+      if(refused)el('saveButton').focus({preventScroll:true});
     }
     if(saveOutcome)await checkSaveOutcome();
   }
 
   async function restore(revisionId) {
     if(!state||savePending||saveOutcome)return;
-    if (!confirm(`${state.dirty?'저장하지 않은 화면 수정 대신 ':''}선택한 이전 버전을 새 로컬 수정본으로 복원할까요? 공개 사이트는 바뀌지 않습니다.`)) return;
+    const opener=document.activeElement;
     const selection=state.selection;
+    const target=(state.report.manager_outline_revisions || []).find(row=>row.revision_id===revisionId);
+    const complete=Array.isArray(target?.outline?.ranges) && Array.isArray(target?.outline?.points)
+      && (!state.packet || Array.isArray(target.qg1_review_packet?.stories) && Array.isArray(target.qg1_review_packet?.editorial_highlights));
+    const signature=complete?editableSignature(S.create({structured_outline:target.outline,qg1_review_packet:target.qg1_review_packet})):null;
+    const attempt={kind:'restore',base:state.report.base,videoNo:String(state.report.video_no),revision:state.report.manager_edit_revision,
+      model:state,targetId:revisionId,signature,candidates:target?.outline?.candidates,
+      changed:!signature || signature!==editableSignature(S.create(state.report))};
     savePending=true;setEditorBusy(true);el('saveButton').disabled=true;el('previewButton').disabled=true;
-    setStatus('이전 버전을 복원하는 중…');
+    updateSaveOutcomeControls();
+    let confirmed=false,refused=false;
     try {
-      const data = await api('/api/manager-outline/restore', {method: 'POST', body: JSON.stringify({
+      if(!await confirmWorkspaceChange('이전 저장본으로 복원',`선택한 저장본: ${revisionId}\n\n화면의 미저장 수정과 최대 20단계 편집 되돌리기 이력을 선택한 저장본의 내용으로 교체합니다. 현재 장면 선택은 가능한 경우 유지합니다.\n복원하면 새 로컬 수정본이 기록됩니다. 공개 사이트는 바뀌지 않습니다.\n편집 유지를 선택하면 현재 입력·선택·이력과 저장본을 그대로 둡니다.`,'선택한 저장본으로 복원')) {
+        refused=true;setStatus('복원을 취소했습니다. 화면의 편집 내용·선택·되돌리기 이력과 저장본은 그대로입니다.');return;
+      }
+      setStatus('이전 버전을 복원하는 중…','saving');
+      const data = await requestReportWrite('/api/manager-outline/restore', {
         video_no: state.report.video_no, base: state.report.base, revision_id: revisionId,
         expected_edit_revision: state.report.manager_edit_revision || '',
-      })});
-      state = S.create(data);
-      S.restoreSelection(state,S.selectionParams(selection));
-      history.clear();
-      renderAll();
+      });
+      checkedReportResult(data,attempt,true);confirmed=true;
+      acceptSavedReport(data,selection);
       setStatus('이전 버전을 새 로컬 수정본으로 복원했습니다.', 'ok');
     } catch (error) {
-      setStatus(error.message || '이전 버전을 복원하지 못했습니다.', 'error');
+      if(confirmed)setStatus('복원 응답은 확인했습니다. 화면 갱신을 마치지 못했습니다. 복원 요청은 다시 보내지 않습니다.','error');
+      else if(error.definiteRefusal){refused=true;setStatus(error.message,'error');}
+      else {saveOutcome={...attempt,prewriteConflict:error.prewriteConflict===true};setStatus(error.prewriteConflict?'다른 수정본이 먼저 저장되어 복원을 기록하지 않았습니다. 입력과 기존 기준을 유지합니다.':'복원 결과 미확인입니다. 입력·선택·편집 이력을 유지하며 복원 요청은 다시 보내지 않습니다.','error');}
     } finally {
       savePending=false;setEditorBusy(false);
-      el('saveButton').disabled=!state.dirty;el('previewButton').disabled=false;
+      updateSaveOutcomeControls();el('previewButton').disabled=false;
+      if(refused)(opener?.isConnected?opener:el('revisionLink')).focus({preventScroll:true});
     }
+    if(saveOutcome)await checkSaveOutcome();
   }
 
   function renderAll() {
@@ -713,6 +838,7 @@
     renderHistory();
     updateSelectedSummary();
     el('saveButton').disabled = savePending || !!saveOutcome || !state.dirty;
+    updateSaveOutcomeControls();
     updateHistoryControls();
     document.querySelectorAll('[data-add-type="D2"]').forEach(button => {
       button.disabled = !(state.selection && state.selection.type === 'D1');
@@ -810,6 +936,7 @@
   el('nextButton').addEventListener('click', () => adjacent(1));
   el('saveButton').addEventListener('click', save);
   el('checkSaveButton').addEventListener('click', checkSaveOutcome);
+  el('adoptCurrentSaveButton').addEventListener('click', adoptCurrentSave);
   el('stopBoundaryButton').addEventListener('click',()=>stopBoundary());
   el('closeRevisionCompareButton').addEventListener('click',closeRevisionComparison);
   el('restoreComparedButton').addEventListener('click',()=>{
@@ -871,7 +998,7 @@
     else undo();
   });
   window.addEventListener('beforeunload', event => {
-    if (!state || !state.dirty) return;
+    if (!state || !(state.dirty || saveOutcome || savePending)) return;
     event.preventDefault();
     event.returnValue = '';
   });

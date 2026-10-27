@@ -120,9 +120,13 @@ class Installer:
         else:
             if mode != "setup":
                 raise ValueError("plugin_or_skill_install_requires_the_complete_release_bundle")
-            release = {"version": "3.0.4"}
+            release = None
             source_identity = digest(runtime / "source-manifest.json")
-        module(runtime / "loki.py", "loki_installer_runtime").verify_release()
+        source_manifest = module(runtime / "loki.py", "loki_installer_runtime").verify_release()
+        if release is None:
+            release = {"version": source_manifest["version"]}
+        if release["version"] != source_manifest["version"]:
+            raise ValueError("installation_release_version_mismatch")
         if self.workspace == here or self.workspace.is_relative_to(here):
             raise ValueError("workspace_must_be_separate_from_installed_files")
 
@@ -283,6 +287,8 @@ class Installer:
         doctor = self.command("doctor", [python, "-B", runtime / "loki.py", "--config", config, "doctor"], json_output=True)
         if doctor.get("status") != "ready" or doctor.get("missing_dependencies") != []:
             raise ValueError("runtime_doctor_not_ready")
+        if doctor.get("version") != release["version"]:
+            raise ValueError("runtime_doctor_version_mismatch")
         verification = plain_path(self.workspace / "verification" / uuid.uuid4().hex[:12])
         verification.parent.mkdir(exist_ok=True)
         check = self.command("selftest", [python, "-B", runtime / "selftest.py", "--workspace", verification],

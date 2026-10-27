@@ -2,6 +2,187 @@
     // A normal Report Admin page can carry the same canonical BroadcastMap.
     // Keep its ordinary base/video identity so one local Save pairs it with Markdown.
     let managerOutlineContext = null;
+    let reportSaveOutcome = null;
+    let reportSaveChecking = false;
+    let reportSavePending = false;
+    let reportLastConfirmed = null;
+
+    function confirmReportSaveAction(title, message, actionLabel) {
+      const dialog = document.getElementById('reportSaveConfirmDialog');
+      if (dialog.open) return Promise.resolve(false);
+      document.getElementById('reportSaveConfirmTitle').textContent = title;
+      document.getElementById('reportSaveConfirmMessage').textContent = message;
+      document.getElementById('reportSaveConfirmAction').textContent = actionLabel;
+      dialog.returnValue = '';
+      return new Promise(resolve => {
+        dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), {once: true});
+        dialog.showModal();
+      });
+    }
+
+    function reportOutlineEditKey(outline, packet) {
+      const text = value => String(value ?? '').trim();
+      return JSON.stringify({
+        ranges: (outline?.ranges || []).map(row => [row.id, row.level, row.parent_id || '', row.start, row.end, text(row.title), text(row.content)]),
+        points: (outline?.points || []).map(row => [row.id, row.timestamp, text(row.title), text(row.content), row.story_ref || '']),
+        candidates: (outline?.candidates || []).map(row => [row.id, row.start, row.end, text(row.title), text(row.content)]),
+        stories: (packet?.stories || []).map(row => [row.story_ref, text(row.why_notable)]),
+        highlights: (packet?.editorial_highlights || []).map(row => [row.highlight_id, text(row.title), text(row.story_summary),
+          Object.prototype.hasOwnProperty.call(row, 'selection_reason') ? text(row.selection_reason) : null, row.source_spans]),
+        collaboration: packet?.collaboration_periods || [],
+      });
+    }
+
+    function validReportSaveRead(data, attempt) {
+      if (!data || data.base !== attempt.base || typeof data.md !== 'string') return false;
+      if (attempt.videoNo && String(data.video_no || '') !== attempt.videoNo) return false;
+      if (attempt.structured) {
+        const outline = data.structured_outline;
+        if (!outline || !['ranges', 'points', 'candidates'].every(key => Array.isArray(outline[key]))
+            || typeof data.manager_markdown !== 'string' || typeof data.manager_edit_revision !== 'string'
+            || !data.manager_edit_revision) return false;
+        if (attempt.packet && (!data.qg1_review_packet || !Array.isArray(data.qg1_review_packet.editorial_highlights)
+            || !Array.isArray(data.qg1_review_packet.stories))) return false;
+      }
+      return true;
+    }
+
+    function validReportSaveAck(data, attempt) {
+      if (!validReportSaveRead(data, attempt)) return false;
+      if (!attempt.structured) return data.kind === attempt.reportKind && typeof data.html === 'string'
+        && (!attempt.bundleId || String(data.bundle_id || '') === attempt.bundleId)
+        && data.publish_status === 'not_requested';
+      if (typeof data.revision_id !== 'string' || !data.revision_id) return false;
+      const authority = data.manager_outline_authority || {};
+      const selected = authority.saved_revision?.revision_id || authority.revision_id;
+      if (selected && selected !== data.revision_id) return false;
+      if (attempt.kind === 'restore') return data.restored_from_revision_id === attempt.revisionId;
+      const returned = reportOutlineEditKey(data.structured_outline, data.qg1_review_packet);
+      // A pending Markdown edit is merged by stable row ID by the existing
+      // save owner. Its returned rows legitimately differ from the older
+      // outline sent alongside it; do not require the stale rows to win.
+      if (!attempt.markdownPending && returned !== attempt.editKey) return false;
+      const before = reportLastConfirmed && reportOutlineEditKey(reportLastConfirmed.structured_outline, reportLastConfirmed.qg1_review_packet);
+      const markdownChanged = String(attempt.markdown || '').trim()
+        !== String(reportLastConfirmed?.manager_markdown ?? savedMd).trim();
+      return (!markdownChanged && returned === before) || data.manager_edit_revision !== attempt.editRevision;
+    }
+
+    function syncReportSaveRecovery() {
+      const check = document.getElementById('reportSaveCheckBtn');
+      const adopt = document.getElementById('reportSaveAdoptBtn');
+      if (check) { check.hidden = !reportSaveOutcome; check.disabled = reportSaveChecking || reportSavePending; }
+      if (adopt) { adopt.hidden = !reportSaveOutcome?.checked; adopt.disabled = reportSaveChecking || reportSavePending; }
+      if (reportSaveOutcome) {
+        [managerOutlineSaveBtn, document.getElementById('saveBtn'), publishBtn,
+          ...managerOutlineHistoryEl.querySelectorAll('[data-outline-restore]')].filter(Boolean)
+          .forEach(button => { button.disabled = true; });
+      }
+    }
+
+    function assertReportSaveReady() {
+      if (reportSaveOutcome || reportSaveChecking || reportSavePending
+          || document.getElementById('reportSaveConfirmDialog')?.open) {
+        throw Error('이전 저장·복원 결과를 먼저 확인하세요. 입력은 유지하며 같은 요청을 다시 보내지 않습니다.');
+      }
+    }
+
+    function holdReportSaveOutcome(attempt, error) {
+      reportSaveOutcome = {...attempt, checked: null};
+      const refused = error?.serverDeclined;
+      const message = refused
+        ? '다른 수정본이 먼저 저장되었습니다. 초안과 기존 저장 기준을 유지했습니다. 현재 저장본을 확인한 뒤 계속하세요.'
+        : '저장·복원 결과를 확인하지 못했습니다. 초안·선택·되돌리기를 유지했습니다. 같은 요청을 반복하지 말고 저장 결과를 확인하세요.';
+      managerOutlineStatusEl.textContent = '저장 결과 확인 필요 · 초안 보존';
+      setStatus(message, 'warn');
+      syncReportSaveRecovery();
+    }
+
+    async function checkReportSaveOutcome() {
+      if (!reportSaveOutcome || reportSaveChecking || reportSavePending) return;
+      const attempt = reportSaveOutcome;
+      reportSaveChecking = true;
+      syncReportSaveRecovery();
+      setStatus('현재 저장본을 읽고 있습니다. 초안은 바꾸지 않으며 저장·복원 요청은 보내지 않습니다.');
+      try {
+        const fresh = await api(`/api/report?base=${encodeURIComponent(attempt.base)}&view=editor`);
+        if (reportSaveOutcome !== attempt) return;
+        if (!validReportSaveRead(fresh, attempt)) throw Error('같은 대상의 저장본 응답을 확인하지 못했습니다.');
+        if ((attempt.structured && fresh.manager_edit_revision === attempt.editRevision)
+            || (!attempt.structured && attempt.md !== attempt.beforeMd && fresh.md === attempt.beforeMd)) {
+          attempt.checked = null;
+          const message = '아직 이전 저장본 그대로입니다. 앞선 요청이 뒤늦게 저장될 가능성을 배제할 수 없습니다. 초안과 기존 저장 기준을 유지하며 저장 결과만 다시 확인하세요.';
+          managerOutlineStatusEl.textContent = '이전 저장본 그대로 · 결과 미확인';
+          setStatus(message, 'warn');
+          return;
+        }
+        attempt.checked = fresh;
+        const matches = attempt.structured && attempt.kind === 'save'
+          ? attempt.markdownPending ? fresh.manager_markdown.trim() === attempt.markdown.trim()
+            : reportOutlineEditKey(fresh.structured_outline, fresh.qg1_review_packet) === attempt.editKey
+          : !attempt.structured && fresh.md === attempt.md;
+        const description = attempt.kind === 'restore' ? '현재 저장본을 조회했습니다.'
+          : matches ? '현재 저장본이 제출한 내용과 일치합니다.' : '현재 저장본은 제출한 내용과 다릅니다.';
+        const message = `${description} 이 조회만으로 앞선 요청의 성공을 확정하지 않습니다. 현재 초안·선택·되돌리기는 그대로입니다. 확인한 저장본으로 다시 열려면 별도로 선택하세요.`;
+        managerOutlineStatusEl.textContent = '현재 저장본 조회됨 · 초안 유지';
+        setStatus(message, 'warn');
+      } catch (error) {
+        attempt.checked = null;
+        managerOutlineStatusEl.textContent = '저장본 확인 실패 · 초안 유지';
+        setStatus('현재 저장본을 확인하지 못했습니다. 초안과 선택은 그대로입니다. 저장 결과 확인만 다시 할 수 있습니다.', 'err');
+      } finally {
+        reportSaveChecking = false;
+        syncReportSaveRecovery();
+      }
+    }
+
+    async function adoptReportSaveOutcome() {
+      const attempt = reportSaveOutcome, fresh = attempt?.checked;
+      if (!fresh || reportSaveChecking || reportSavePending) return;
+      if (!await confirmReportSaveAction('확인한 저장본으로 다시 열기',
+        '현재 미저장 초안과 편집 되돌리기 기록을 조회한 저장본으로 대체합니다.\n앞선 요청의 성공을 확정하거나 저장·복원·공개 요청을 다시 보내지 않습니다.', '확인한 저장본으로 열기')) return;
+      if (reportSaveOutcome !== attempt || attempt.checked !== fresh) return;
+      mdEditor.value = fresh.md;
+      savedMd = fresh.md;
+      normalReportMarkdown = fresh.md;
+      reportSaveOutcome = null;
+      reportLastConfirmed = fresh;
+      renderManagerOutline(fresh);
+      setManagerOutlineActionBusy(false);
+      restoreDetailSceneSelection();
+      updateDetailSceneLinks();
+      setDirty(false);
+      [document.getElementById('saveBtn'), publishBtn].filter(Boolean).forEach(button => { button.disabled = false; });
+      syncReportSaveRecovery();
+      setStatus('확인한 저장본을 채택했습니다. 저장된 화면을 불러오는 중입니다. 저장·복원·공개 요청은 다시 보내지 않습니다.', 'ok');
+      await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(attempt.base)}&t=${Date.now()}`);
+      setStatus('확인한 저장본을 열었습니다. 저장·복원·공개 요청은 다시 보내지 않았습니다.', 'ok');
+      const status = document.getElementById('status');
+      status.tabIndex = -1;
+      status.focus({preventScroll: true});
+    }
+
+    async function requestReportSaveWithConfirmation(path, payload) {
+      let data = await api(path, {method: 'POST', body: JSON.stringify(payload)});
+      if (data?.error_code !== 'report_save_confirmation_required' || data.mayHaveRun !== false) return data;
+      const change = data.destructive_change;
+      if (data.requires_destructive_confirmation !== true || typeof data.confirmation_token !== 'string'
+          || !data.confirmation_token || !change || !['before_chars', 'after_chars', 'removed_chars', 'remaining_percent']
+            .every(key => Number.isFinite(change[key]))) throw Error('save_confirmation_response_incomplete');
+      if (!await confirmReportSaveAction('본문 축소 변경 확인',
+        `${change.before_chars}자 → ${change.after_chars}자 · ${change.removed_chars}자 삭제 · ${change.remaining_percent}% 남음\n확인하면 이 로컬 변경에만 승인합니다. 공개 사이트는 바뀌지 않습니다.`, '검토한 로컬 변경 실행')) {
+        const error = Error('로컬 저장·복원을 취소했습니다. 초안과 저장본은 그대로입니다.');
+        error.saveCanceled = true;
+        throw error;
+      }
+      data = await api(path, {method: 'POST', body: JSON.stringify({...payload, destructive_confirmation_token: data.confirmation_token})});
+      if (data?.error_code === 'report_save_confirmation_required' && data.mayHaveRun === false) {
+        const error = Error('확인이 만료되었거나 본문이 바뀌었습니다. 초안과 저장본은 그대로입니다. 다시 검토하세요.');
+        error.saveCanceled = true;
+        throw error;
+      }
+      return data;
+    }
     const managerOutlineGroupTabsEl = document.getElementById('managerOutlineGroupTabs');
     const managerOutlineRowsEl = document.getElementById('managerOutlineRows');
     const managerOutlineTimelineEl = document.getElementById('managerOutlineTimeline');
@@ -24,7 +205,7 @@
     reportSourceToggle.addEventListener('click', () => {
       const expanded = reportAppEl.classList.toggle('report-source-visible');
       reportSourceToggle.setAttribute('aria-expanded', String(expanded));
-      reportSourceToggle.textContent = expanded ? '본문·게시 도구 닫기' : '본문·게시 도구';
+      reportSourceToggle.textContent = expanded ? '전체본문 직접 편집 닫기' : '전체본문 직접 편집';
     });
     const managerOutlineAddBtn = document.getElementById('managerOutlineAddBtn');
     const managerOutlineAddMenu = document.getElementById('managerOutlineAddMenu');
@@ -1590,6 +1771,7 @@
 
     async function saveManagerOutline() {
       if (managerOutlineBusy) return;
+      assertReportSaveReady();
       if (!validateManagerOutlineFields()) {
         managerOutlineStatusEl.textContent = '시간을 시:분:초 형식으로 바로잡으면 저장할 수 있어요.';
         return;
@@ -1598,28 +1780,33 @@
       window.clearTimeout(managerOutlineSyncTimer);
       window.clearTimeout(managerOutlinePreviewTimer);
       ++managerOutlineSyncSequence;
-      setManagerOutlineActionBusy(true);
       let committed = false;
       let responseKeys = [];
+      const context = managerOutlineContext || {};
+      const outline = collectManagerOutline(), packet = collectEditorialReviewPacket();
+      const attempt = {kind: 'save', structured: true, base: context.base || base,
+        videoNo: String(context.videoNo || base.split(':', 2)[1]), editRevision: context.editRevision || '',
+        outline, packet, editKey: reportOutlineEditKey(outline, packet), markdown: mdEditor.value,
+        markdownPending: managerOutlineMarkdownPending};
+      setManagerOutlineActionBusy(true);
+      reportSavePending = true;
       try {
-        const context = managerOutlineContext || {};
         // Save both current views together. The server merges a pending text
         // edit by row ID; cancelling debounce must never make stale rows win.
-        const data = await api('/api/manager-outline/save', {method: 'POST', body: JSON.stringify({
+        const data = await requestReportSaveWithConfirmation('/api/manager-outline/save', {
           video_no: context.videoNo || base.split(':', 2)[1],
           base: context.base || base,
           manager_markdown: mdEditor.value,
-          outline: collectManagerOutline(),
-          editorial_review_packet: collectEditorialReviewPacket(),
+          outline,
+          editorial_review_packet: packet,
           expected_edit_revision: context.editRevision || '',
-        })});
+        });
         responseKeys = Object.keys(data || {}).slice(0, 20);
         // Only the exact report's new durable revision acknowledges this save.
         // Rendering a response or preview is a separate, fallible step.
-        committed = typeof data.revision_id === 'string' && !!data.revision_id
-          && data.base === (context.base || base)
-          && String(data.video_no || '') === String(context.videoNo || base.split(':', 2)[1]);
+        committed = validReportSaveAck(data, attempt);
         if (!committed) throw new Error('save_revision_ack_missing');
+        reportLastConfirmed = data;
         renderManagerOutline(data);
         if (typeof data.manager_markdown === 'string') {
           mdEditor.value = data.manager_markdown;
@@ -1628,8 +1815,9 @@
         }
         setDirty(false);
         managerOutlineStatusEl.textContent = '변경사항을 저장했어요. 아직 공개되지 않았어요.';
+        setStatus('로컬 수정본을 저장했습니다. 공개 사이트는 바뀌지 않았습니다.', 'ok');
+        return true;
       } catch (error) {
-        const message = managerOutlineErrorMessage(error, 'save');
         const errorName = String(error && error.name || 'Error');
         const errorText = String(error && error.message || '');
         console.warn('Report Admin outline save response', JSON.stringify({
@@ -1643,31 +1831,49 @@
           response_keys: responseKeys,
         }));
         if (committed) {
-          managerOutlineStatusEl.textContent = '변경사항은 저장됐어요. 화면 갱신을 마치지 못했으니 [원본 다시 불러오기]로 저장본을 확인해 주세요.';
+          reportSaveOutcome = {...attempt, checked: reportLastConfirmed, confirmed: true};
+          managerOutlineStatusEl.textContent = '변경사항은 저장됐어요. 화면 갱신을 마치지 못했습니다. 저장·복원을 반복하지 말고 저장본을 다시 확인하세요.';
+          setStatus(managerOutlineStatusEl.textContent, 'warn');
           // A Save-before-Publish caller must also stop at this review boundary.
           throw new Error(managerOutlineStatusEl.textContent);
         }
-        managerOutlineStatusEl.textContent = message === '목차를 저장하지 못했어요. 입력한 내용은 그대로예요. 시간과 제목을 확인한 뒤 다시 시도해 주세요.'
-          ? '저장 결과를 확인하지 못했어요. 입력은 남아 있어요. 같은 저장을 반복하기 전에 [원본 다시 불러오기]로 저장본을 확인해 주세요.'
-          : message;
+        if (error.saveCanceled) {
+          managerOutlineStatusEl.textContent = error.message;
+          setStatus(error.message, 'warn');
+        } else holdReportSaveOutcome(attempt, error);
         throw error;
       } finally {
+        reportSavePending = false;
         setManagerOutlineActionBusy(false);
+        syncReportSaveRecovery();
         managerOutlineSaveBtn.focus({preventScroll: true});
       }
     }
 
     async function restoreManagerOutline(revisionId, reportMarkdownOverride = null) {
       if (managerOutlineBusy) return;
+      assertReportSaveReady();
+      const pairing = typeof reportMarkdownOverride === 'string'
+        ? '\n선택한 본문과 목차 제목·시각이 맞는 구조 후보입니다. Highlight·근거까지 당시의 정확한 짝이라고 확인한 결과는 아닙니다.' : '';
+      if (!await confirmReportSaveAction('이전 저장본 복원',
+        `복원할 저장본: ${revisionId}\n현재 ${dirty ? '미저장 초안과 ' : ''}편집 되돌리기 기록을 대체합니다. 새 로컬 수정본을 만들며 공개 사이트는 바뀌지 않습니다.${pairing}`, '새 로컬 수정본으로 복원')) return false;
       managerOutlineStatusEl.textContent = '선택한 이전 버전을 새 수정본으로 복원하는 중입니다.';
       setManagerOutlineActionBusy(true);
+      reportSavePending = true;
+      const context = managerOutlineContext || {};
+      const attempt = {kind: 'restore', structured: true, base: context.base || base,
+        videoNo: String(context.videoNo || base.split(':', 2)[1]), editRevision: context.editRevision || '',
+        revisionId, packet: managerEditorialPacket};
+      let committed = false;
       try {
-        const context = managerOutlineContext || {};
-        const data = await api('/api/manager-outline/restore', {method: 'POST', body: JSON.stringify({
+        const data = await requestReportSaveWithConfirmation('/api/manager-outline/restore', {
           video_no: context.videoNo || base.split(':', 2)[1], base: context.base || base, revision_id: revisionId,
           report_markdown: typeof reportMarkdownOverride === 'string' ? reportMarkdownOverride : undefined,
           expected_edit_revision: context.editRevision || '',
-        })});
+        });
+        committed = validReportSaveAck(data, attempt);
+        if (!committed) throw Error('restore_revision_ack_missing');
+        reportLastConfirmed = data;
         renderManagerOutline(data);
         if (typeof data.manager_markdown === 'string') {
           mdEditor.value = data.manager_markdown;
@@ -1676,11 +1882,22 @@
         }
         setDirty(false);
         managerOutlineStatusEl.textContent = '이전 버전을 새 로컬 수정본으로 복원했습니다. 공개 사이트는 바뀌지 않았습니다.';
+        setStatus(managerOutlineStatusEl.textContent, 'ok');
+        return true;
       } catch (error) {
-        managerOutlineStatusEl.textContent = managerOutlineErrorMessage(error, 'restore');
+        if (committed) {
+          reportSaveOutcome = {...attempt, checked: reportLastConfirmed, confirmed: true};
+          managerOutlineStatusEl.textContent = '복원은 저장됐습니다. 화면 갱신을 마치지 못했으며 같은 복원은 다시 보내지 않습니다.';
+          setStatus(managerOutlineStatusEl.textContent, 'warn');
+        } else if (error.saveCanceled) {
+          managerOutlineStatusEl.textContent = error.message;
+          setStatus(error.message, 'warn');
+        } else holdReportSaveOutcome(attempt, error);
         throw error;
       } finally {
+        reportSavePending = false;
         setManagerOutlineActionBusy(false);
+        syncReportSaveRecovery();
         const returnButton = managerOutlineHistoryEl.querySelector(`[data-outline-restore="${CSS.escape(revisionId)}"]`);
         (returnButton || managerOutlineSaveBtn).focus({preventScroll: true});
       }

@@ -1,6 +1,6 @@
 {
   "name": "loki",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "현재 Codex가 치지직 원문과 장면을 직접 읽고 요약·타임라인·하이라이트를 작성하는 비공식 도구입니다.",
   "author": {
     "name": "CVA contributors"

@@ -185,6 +185,8 @@ def prepare(spec):
             if saved["spec_sha256"] != digest(spec):
                 raise ValueError("current_conversation_prepare_identity_changed")
             return _prepare_receipt(root, saved)
+        from .loki_version_policy import select_new_pipeline
+        selected_pipeline = select_new_pipeline(spec.get("summary_pipeline_version", "latest"))
         chunks = chunk_srt(str(native_path(spec["srt_path"])))
         source = prepare_source_timing(video_no=video, duration_sec=vod.duration,
             work_dir=source_dir, chunks=chunks,
@@ -226,8 +228,6 @@ def prepare(spec):
                   for a in service.assets.values() if a.bytes_sha256 is not None]
         assets.append(dict(family="metadata", path=str(root / "source-identity.json"),
                            sha256=file_hash(root / "source-identity.json")))
-        from .config import normalize_summary_pipeline_version
-        selected_pipeline = normalize_summary_pipeline_version(spec.get("summary_pipeline_version", "latest"))
         job = bind_current_conversation_job(work_root=work, run_root=root, video_no=video,
             source_assets=assets, job_id=spec["job_id"], code_version=spec["code_version"],
             base_revision=base_revision, author=spec["author"], selected_pipeline=selected_pipeline)

@@ -22,7 +22,6 @@
     <aside class="sidebar" id="sidebar">
       <div class="topbar">
         <a href="/reports">← 리포트 목록으로</a>
-        <a id="reportWorkspaceLink" href="/report-workspace" title="현재 관리자 수정본을 영상과 함께 검토합니다">영상 보며 편집</a>
         <a id="publicLink" href="#" target="_blank" rel="noopener">공개 리포트 열기</a>
         <a id="sourceManifestLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 자막/채팅/커뮤니티/클립/맥락 재료 수집 상태를 한눈에 확인합니다 (관리자 전용, LLM 호출 없음)">재료 상태</a>
         <a id="workEvidenceLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 로컬 work 폴더 산출물을 내용 노출 없이 확인합니다 (관리자 전용)">작업자료</a>
@@ -30,7 +29,6 @@
       </div>
       <h1 id="title"><span class="dirty-dot" title="저장하지 않은 변경 사항이 있습니다"></span><span id="titleText">리포트 불러오는 중...</span></h1>
       <div id="meta" class="muted"></div>
-      <div id="canonicalConflictBanner" class="canonical-conflict-banner" data-testid="canonical-report-conflict" role="status" hidden></div>
       <section class="editor-decision-panel" aria-label="편집 판단 요약">
         <h2>지금 결정할 일</h2>
         <p id="editorDecisionState" class="editor-decision-state">리포트를 불러오는 중입니다.</p>
@@ -51,7 +49,6 @@
         </div>
       </section>
       <label class="muted" for="mdEditor" style="display:block;margin-top:16px;">원본 요약 마크다운</label>
-      <nav id="reportVersions" aria-label="요약 버전"></nav>
       <textarea id="mdEditor" spellcheck="false"></textarea>
       <section id="managerOutlineEditor" aria-labelledby="managerOutlineHeading" hidden>
         <div class="manager-outline-heading-row">
@@ -111,7 +108,7 @@
       <div class="row save-row">
         <button id="saveBtn" class="primary" type="button">저장</button>
         <button id="previewBtn" type="button" class="ghost">미리보기 갱신</button>
-        <button id="reloadBtn" type="button" class="ghost" title="편집 중인 내용을 버리고 디스크 저장본을 다시 불러옵니다.">↻ 원본 다시 불러오기</button>
+        <button id="reloadBtn" type="button" class="ghost" title="저장하지 않은 화면 입력을 버리고 마지막 저장본을 다시 엽니다.">저장본 다시 열기</button>
       </div>
       <div id="publishRow" class="publish-row">
         <button id="publishBtn" class="danger" type="button">공개 사이트에 반영</button>
@@ -173,7 +170,6 @@
         </div>
         <div id="naverCafeClipboardSandbox" class="clipboard-sandbox" aria-hidden="true"></div>
       </section>
-      <div id="status" class="status"></div>
       <details class="section youtube-section">
         <summary>
           <span class="summary-title">유튜브 댓글 만들기</span>
@@ -207,10 +203,22 @@
           <p id="managerOutlineStatus" role="status" aria-live="polite"></p>
         </div>
         <button type="button" class="ghost" id="splitViewToggle" aria-pressed="false" disabled
-          title="타임라인 카드를 누르면 위쪽 플레이어가 그 장면으로 이동합니다">🎬 장면 보며 편집</button>
-        <button type="button" class="ghost" id="reportSourceToggle" aria-controls="sidebar" aria-expanded="false" hidden>본문·게시 도구</button>
+          title="타임라인 카드를 누르면 위쪽 플레이어가 그 장면으로 이동합니다">영상 함께 보기</button>
+        <button type="button" class="ghost" id="reportSourceToggle" aria-controls="sidebar" aria-expanded="false" hidden>전체본문 직접 편집</button>
         <button id="managerOutlineSaveBtn" class="primary" type="button" hidden>수정본 저장</button>
       </div>
+      <section class="report-context-strip" aria-label="현재 요약과 저장 상태">
+        <div class="report-context-row">
+          <nav id="reportVersions" aria-label="요약 버전"></nav>
+          <a id="reportWorkspaceLink" href="/report-workspace" title="현재 요약 버전과 선택 장면을 장면 편집 화면에서 엽니다.">장면 편집 화면 열기</a>
+        </div>
+        <div id="canonicalConflictBanner" class="canonical-conflict-banner" data-testid="canonical-report-conflict" role="status" hidden></div>
+        <div class="report-save-feedback">
+          <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+          <button id="reportSaveCheckBtn" class="ghost" type="button" hidden>저장 결과 확인</button>
+          <button id="reportSaveAdoptBtn" class="ghost" type="button" hidden>확인한 저장본으로 열기</button>
+        </div>
+      </section>
       <div class="split-player-pane" id="splitPlayerPane">
         <div class="split-player-note">
           <span id="splitPlayerStatus">타임라인 카드를 누르면 여기서 그 장면이 재생됩니다.</span>
@@ -353,6 +361,16 @@
       <button id="publishBusyReturn" type="button" class="ghost" hidden>편집 화면으로 돌아가기</button>
     </div>
   </div>
+  <dialog id="reportSaveConfirmDialog" class="report-save-confirm" aria-labelledby="reportSaveConfirmTitle" aria-describedby="reportSaveConfirmMessage">
+    <form method="dialog">
+      <h2 id="reportSaveConfirmTitle">저장본 변경 확인</h2>
+      <p id="reportSaveConfirmMessage"></p>
+      <div class="report-save-confirm-actions">
+        <button type="submit" value="cancel" autofocus>편집 유지</button>
+        <button id="reportSaveConfirmAction" class="primary" type="submit" value="confirm">확인한 변경 실행</button>
+      </div>
+    </form>
+  </dialog>
   <script src="/static/admin/report_lifecycle.js"></script>
   <script src="/static/admin/report_adaptive_context.js"></script>
   <script src="/static/admin/report_signal_timeline.js"></script>

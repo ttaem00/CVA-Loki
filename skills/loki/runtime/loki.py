@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import stat
 import sys
 
 sys.dont_write_bytecode = True
@@ -46,7 +47,16 @@ def contained(root, path):
     current = root
     for part in path.absolute().relative_to(root).parts:
         current /= part
-        if current.is_symlink() or (current.exists() and getattr(current.stat(), "st_file_attributes", 0) & 0x400):
+
+        native = str(current.absolute())
+        if os.name == "nt" and not native.startswith("\\\\?\\"):
+            native = "\\\\?\\UNC\\" + native[2:] if native.startswith("\\\\") else "\\\\?\\" + native
+        checked = Path(native)
+        try:
+            info = checked.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
             raise ValueError("loki_workspace_link_forbidden")
     return resolved
 
@@ -182,6 +192,8 @@ def prepare_spec(root, work, policy, path):
 def verify_release():
     here = Path(__file__).resolve().parent
     manifest = load_json(here / "source-manifest.json")
+    if not isinstance(manifest.get("version"), str) or not manifest["version"].strip():
+        raise ValueError("loki_release_version_missing")
     for row in manifest["files"]:
         candidate = contained(here, row["source_path"])
         if hashlib.sha256(candidate.read_bytes()).hexdigest() != row["export_sha256"]:
@@ -247,7 +259,7 @@ def main(argv=None):
                 speech_error = str(error)
         ready = not missing and (policy["features"] == "core" or tools_ready) and (
             policy["features"] != "multimodal" or model_ready and speech_ready)
-        result = {"status": "ready" if ready else "setup_required", "version": "3.0.4", "source_commit": manifest["source_commit"],
+        result = {"status": "ready" if ready else "setup_required", "version": manifest["version"], "source_commit": manifest["source_commit"],
                   "workspace": str(root), "network": "deny", "author": "current_codex",
                   "model_transport": "disabled", "publish": "unavailable", "writer_language": policy["language"],
                   "missing_dependencies": missing, "features": policy["features"],

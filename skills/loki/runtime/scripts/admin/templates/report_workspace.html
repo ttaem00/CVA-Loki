@@ -23,9 +23,12 @@
         <button id="previewButton" class="button ghost" type="button" disabled>현재 편집안 미리보기</button>
         <a id="revisionLink" class="button ghost" aria-disabled="true">되돌리기 기록</a>
         <button id="saveButton" class="button primary" type="button" disabled>수정본 저장</button>
-        <button id="checkSaveButton" class="button ghost" type="button" hidden>저장 결과 다시 확인</button>
       </div>
-      <div id="status" class="status" role="status" aria-live="polite">불러오는 중…</div>
+      <div class="workspace-save-state">
+        <div id="status" class="status" role="status" aria-live="polite" tabindex="-1">불러오는 중…</div>
+        <button id="checkSaveButton" class="button ghost" type="button" aria-describedby="status" hidden>저장 결과 다시 확인</button>
+        <button id="adoptCurrentSaveButton" class="button ghost" type="button" aria-describedby="status" hidden>확인한 현재 저장본으로 다시 열기</button>
+      </div>
     </section>
 
     <nav id="reportVersions" aria-label="요약 버전"></nav>
@@ -164,6 +167,17 @@
     <p id="revisionCompareSummary" role="status"></p>
     <div id="revisionCompareChanges" class="revision-changes"></div>
     <div class="dialog-actions"><button id="restoreComparedButton" class="button primary" type="button">이 저장본으로 복원…</button></div>
+  </dialog>
+
+  <dialog id="workspaceConfirmDialog" class="revision-dialog workspace-confirm-dialog" aria-labelledby="workspaceConfirmTitle" aria-describedby="workspaceConfirmDescription">
+    <form method="dialog">
+      <div class="dialog-heading"><strong id="workspaceConfirmTitle">편집 내용 확인</strong></div>
+      <p id="workspaceConfirmDescription"></p>
+      <div class="dialog-actions">
+        <button id="workspaceConfirmCancel" class="button ghost" type="submit" value="cancel" autofocus>편집 유지</button>
+        <button id="workspaceConfirmAccept" class="button primary" type="submit" value="confirm">확인한 내용 적용</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="/static/admin/vendor/hls.min.js"></script>
