@@ -5,7 +5,8 @@
 <h1 align="center">CVA-Loki 3.0.5</h1>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
-> **현재 정식 버전: [Loki 3.0.5](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.5)**  
+> **현재 정식 버전: [Loki 3.0.5](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.5)**
+>
 > 이 저장소 링크와 공개 치지직 VOD 링크를 Codex에 함께 주고 요약을 요청하세요.
 >
 > `https://github.com/ttaem00/CVA-Loki 와 이 VOD 링크를 참고해서 Loki 3.0.5로 요약을 만들어줘: <공개 VOD 링크>`
