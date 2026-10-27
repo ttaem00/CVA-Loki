@@ -3,8 +3,15 @@
 </p>
 
 <h1 align="center">CVA-Loki 3.0.5</h1>
-<h1 align="center">이 레포의 링크와 vod 링크를 주고 요약을 만들어달라고 하세요</h1>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
+
+> **현재 정식 버전: [Loki 3.0.5](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.5)**
+>
+> 이 저장소 링크와 공개 치지직 VOD 링크를 Codex에 함께 주고 요약을 요청하세요.
+>
+> `https://github.com/ttaem00/CVA-Loki 와 이 VOD 링크를 참고해서 Loki 3.0.5로 요약을 만들어줘: <공개 VOD 링크>`
+
+파일 목록 옆의 과거 커밋 제목은 해당 파일의 마지막 변경 이력입니다. 현재 배포본·플러그인·새 작업의 `latest`는 모두 **3.0.5**입니다.
 
 <p align="center">
   <a href="https://ttaem.com"><img src="docs/assets/cva-logo.svg" width="320" alt="TTaem CVA 원본 로고" /></a><br />
