@@ -23,6 +23,7 @@ from pipeline.editorial_visual_input import validate_frame_references
 from pipeline.summary.report_html import ReportHtmlRenderRequest, render_summary_report_html
 from pipeline.summary.render import _merge_editorial_review_markdown
 from scripts.admin.manager_outline import (
+    ManagerEditValidationRejected,
     _editable_broadcast_map_markdown, _merge_virtual_markdown,
     _merge_broadcast_map_sections_into_report_markdown, _rebind_editorial_packet_broadcast_map,
     _validate_editorial_packet_edit, manager_outline_edit_revision,
@@ -194,6 +195,11 @@ class ReviewStore:
             source_clock=deepcopy(meta.get("source_clock")),
             manager_outline_authority=dict(revision_id=context["revision_id"]),
             summary_pipeline_integrity=dict(generation_id=meta["report_artifact_family"]["generation_id"]))
+        story_refs = {point["id"]: point["story_ref"]
+            for point in view["qg1_review_packet"]["broadcast_map"]["points"]}
+        for point in view["structured_outline"]["points"]:
+            if not point.get("story_ref") and point["id"] in story_refs:
+                point["story_ref"] = story_refs[point["id"]]
         view["manager_edit_revision"] = manager_outline_edit_revision(view)
         return view
 
@@ -237,7 +243,12 @@ class ReviewStore:
     def _draft(self, context, payload):
         current = context["meta"]
         duration = int(current["duration"])
-        markdown, outline, packet = self._draft_content(context, payload)
+        try:
+            markdown, outline, packet = self._draft_content(context, payload)
+        except ReviewConflict:
+            raise
+        except ValueError as error:
+            raise ManagerEditValidationRejected(str(error)) from error
         vod = VODInfo(video_no=str(current["video_no"]), title=str(current.get("title", "")),
             channel_id=str(current.get("channel_id", "")), channel_name=str(current.get("channel", "")),
             duration=duration, publish_date=str(current.get("publish_date", "")),
@@ -393,7 +404,7 @@ class ReviewStore:
         history = []
         for row in self.revisions(identity)["revisions"]:
             previous = self._history_context(job, row["revision_id"])
-            history.append(dict(row, outline=deepcopy(previous["meta"]["structured_outline"]),
+            history.append(dict(row, outline=self._view(identity, previous)["structured_outline"],
                 qg1_review_packet=deepcopy(previous["meta"]["editorial_review_packet"]), md=previous["md"]))
         context = self._context(job)
         meta = context["meta"]

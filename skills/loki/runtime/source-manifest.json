@@ -6551,8 +6551,9 @@
     {
       "module": "scripts.admin.manager_outline",
       "source_path": "scripts/admin/manager_outline.py",
-      "source_sha256": "3a41582659c67218954f18d793bf28009d8cbce811b2d49f67b6518b6e8f233f",
+      "source_sha256": "322b7256df2df3d1ae2343efa5e6d1f1e05a15e822bc4048fb5a657da6608137",
       "symbols": [
+        "ManagerEditValidationRejected",
         "_editable_broadcast_map_markdown",
         "_merge_broadcast_map_sections_into_report_markdown",
         "_merge_virtual_markdown",
@@ -6561,6 +6562,7 @@
         "manager_outline_edit_revision"
       ],
       "selected_symbols": [
+        "ManagerEditValidationRejected",
         "_editable_broadcast_map_markdown",
         "_merge_broadcast_map_sections_into_report_markdown",
         "_merge_virtual_markdown",
@@ -6578,7 +6580,7 @@
         "re",
         "validate_structured_manager_outline"
       ],
-      "export_sha256": "6fceafb7ffc8d09caa419ccaec839f3f8ac1b90f7db1a74318d77aee4e94b79a",
+      "export_sha256": "a200c754e2b62d79bb6ae7061ed7c861ddad7ab5ab1ae6a5deaa0950c0e97763",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -6594,7 +6596,7 @@
           "exported": "from pipeline.summary.render import _strip_editorial_review_markdown, _validate_editorial_review_projection"
         }
       ],
-      "extracted_sha256": "7b0e12824679a6b5650e7f172ba6df7f6460c3906824674ac55254af40835b12",
+      "extracted_sha256": "3a41dedf34621d108b1837ea50b3d2eccbd01e6ece3067238e94afb17424a861",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -6835,8 +6837,8 @@
     },
     {
       "source_path": "scripts/admin/static/report.js",
-      "source_sha256": "afe2196ae6146e65dd4c67428e88d3e3d2b66935b31f973ba3b9001e51de4e12",
-      "export_sha256": "afe2196ae6146e65dd4c67428e88d3e3d2b66935b31f973ba3b9001e51de4e12"
+      "source_sha256": "43df367293d8db226b4506864dc08934f01101bf2efa5b1e8d74a833ec5a15d3",
+      "export_sha256": "43df367293d8db226b4506864dc08934f01101bf2efa5b1e8d74a833ec5a15d3"
     },
     {
       "source_path": "scripts/admin/static/report_adaptive_context.js",
@@ -6859,8 +6861,8 @@
     },
     {
       "source_path": "scripts/admin/static/report_manager_outline.js",
-      "source_sha256": "6be00e48c03eb7e86d94952992ff3189707fb520afec2b04d4ebd494a0e216ee",
-      "export_sha256": "6be00e48c03eb7e86d94952992ff3189707fb520afec2b04d4ebd494a0e216ee"
+      "source_sha256": "6b4eda24035b00f52ece6cf64a8a23d39b2d973bb56c7c02f462526be58e64c0",
+      "export_sha256": "6b4eda24035b00f52ece6cf64a8a23d39b2d973bb56c7c02f462526be58e64c0"
     },
     {
       "source_path": "scripts/admin/static/report_player.js",
@@ -6903,12 +6905,12 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace.js",
-      "source_sha256": "b3aeb28255cbab38be2a5773fcf29d233a924116ae99cd478de1094574e5c564",
-      "export_sha256": "834b86212205d3569ded1f473aab42e79baeb3d6a5ae97027ead4727e8c850b5",
+      "source_sha256": "5345aa59e38d4bb502589e868a3bb3bd1380fae0559283c36ecbfdef05b8db94",
+      "export_sha256": "a3e02dedd7a34adb2986a72f620ac628cf0a084ad3a65165824ac51737de6ea0",
       "asset_overlay": true,
-      "raw_source_sha256": "b3aeb28255cbab38be2a5773fcf29d233a924116ae99cd478de1094574e5c564",
-      "overlay_sha256": "834b86212205d3569ded1f473aab42e79baeb3d6a5ae97027ead4727e8c850b5",
-      "extracted_sha256": "b3aeb28255cbab38be2a5773fcf29d233a924116ae99cd478de1094574e5c564"
+      "raw_source_sha256": "5345aa59e38d4bb502589e868a3bb3bd1380fae0559283c36ecbfdef05b8db94",
+      "overlay_sha256": "a3e02dedd7a34adb2986a72f620ac628cf0a084ad3a65165824ac51737de6ea0",
+      "extracted_sha256": "5345aa59e38d4bb502589e868a3bb3bd1380fae0559283c36ecbfdef05b8db94"
     },
     {
       "source_path": "scripts/admin/static/report_workspace_history.js",
@@ -7054,18 +7056,18 @@
     },
     {
       "source_path": "review.py",
-      "source_sha256": "7a52067e6ee613d5010870bfd0af5f07233c82348f07c18f9e3404722f87fbea",
-      "export_sha256": "7a52067e6ee613d5010870bfd0af5f07233c82348f07c18f9e3404722f87fbea",
+      "source_sha256": "2d1515b45632bee40abdc695901f59029bccb709c8fe95a0ea094d7289cc5c1c",
+      "export_sha256": "2d1515b45632bee40abdc695901f59029bccb709c8fe95a0ea094d7289cc5c1c",
       "origin": "release_support",
-      "extracted_sha256": "7a52067e6ee613d5010870bfd0af5f07233c82348f07c18f9e3404722f87fbea",
+      "extracted_sha256": "2d1515b45632bee40abdc695901f59029bccb709c8fe95a0ea094d7289cc5c1c",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "review_store.py",
-      "source_sha256": "d7b40207e19bc388ff05ab59233f199f01f66f5a905dd41db622faa6a7084c29",
-      "export_sha256": "d7b40207e19bc388ff05ab59233f199f01f66f5a905dd41db622faa6a7084c29",
+      "source_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
+      "export_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
       "origin": "release_support",
-      "extracted_sha256": "d7b40207e19bc388ff05ab59233f199f01f66f5a905dd41db622faa6a7084c29",
+      "extracted_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7204,6 +7206,6 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "bf8d2d8f61fa37286834e53a75729a5cfc8ffbc4",
+  "source_commit": "c882ffa2292d516fdcd69a5975533bd31b21a149",
   "version": "3.0.5"
 }

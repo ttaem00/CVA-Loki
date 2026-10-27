@@ -164,6 +164,11 @@ def handler(store, *, assets=HERE):
         do_HEAD = do_GET
 
         def _error(self, error):
+            from scripts.admin.manager_outline import ManagerEditValidationRejected
+            if isinstance(error, ManagerEditValidationRejected):
+                self._send(400, {"error": str(error), "error_code": "manager_edit_validation_rejected",
+                    "mayHaveRun": False})
+                return
             conflict = getattr(error, "status", None) == 409 or type(error).__name__ in {"ReviewConflict", "ManagerEditConflict"}
             self._send(409 if conflict else 400, {"error": str(error)[:1200]})
 

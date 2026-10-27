@@ -243,6 +243,9 @@
         error.status = res.status;
         error.serverDeclined = res.status === 409 && data.error_code === 'manager_edit_conflict'
           && data.mayHaveRun === false && typeof data.error === 'string';
+        error.saveCanceled = res.status === 400 && data.error_code === 'manager_edit_validation_rejected'
+          && data.mayHaveRun === false && typeof data.error === 'string' && !!data.error.trim();
+        if (error.saveCanceled) error.message = '저장되지 않았습니다. 입력을 고친 뒤 다시 저장하세요.';
         throw error;
       }
       return data;

@@ -30,7 +30,8 @@
         highlights: (packet?.editorial_highlights || []).map(row => [row.highlight_id, text(row.title), text(row.story_summary),
           Object.prototype.hasOwnProperty.call(row, 'selection_reason') ? text(row.selection_reason) : null, row.source_spans]),
         collaboration: packet?.collaboration_periods || [],
-      });
+      }, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
     }
 
     function validReportSaveRead(data, attempt) {

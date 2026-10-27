@@ -450,6 +450,9 @@ def _merge_virtual_markdown(current: dict, proposed: dict, markdown: str, durati
     validate_structured_manager_outline(merged, duration_sec=duration)
     return merged
 
+class ManagerEditValidationRejected(ValueError):
+    """Editable input was rejected before any report or revision save began."""
+
 def manager_outline_edit_revision(report: dict) -> str:
     """Hash the existing editable report state, without creating new storage."""
     authority = report.get("manager_outline_authority") or {}
