@@ -15,7 +15,7 @@
   "skills": "./skills/",
   "requires_local_executor": true,
   "interface": {
-    "displayName": "CVA-Loki",
+    "displayName": "CVA-Loki 3.0.5",
     "shortDescription": "치지직 원문과 장면을 읽고 요약·편집하기",
     "longDescription": "현재 대화의 Codex가 공개 치지직 다시보기 원자료를 준비하고, 원문과 추출 이미지를 직접 확인해 보고서를 작성합니다. GPU 자동 설치, 로컬 전사·멀티모달 탐색, 기존 보고서 검토·편집 화면을 제공합니다. 네이버·치지직의 공식·제휴 프로젝트가 아닙니다.",
     "developerName": "CVA contributors",

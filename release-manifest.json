@@ -12,8 +12,8 @@
     },
     {
       "path": ".codex-plugin/plugin.json",
-      "sha256": "f3558e106e8e6a4583bdf85a8df69abc8fdaf7a6b2ac878113e00230c6c39fe7",
-      "bytes": 1302
+      "sha256": "76f895f035e1778b490b16ce0cbc7deb9204025685c4cec5c9b23c36245e1442",
+      "bytes": 1308
     },
     {
       "path": ".dockerignore",
@@ -102,8 +102,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "b787fa440b2820f64c8a9d7ac0ef8e419a5cd818be48bb66b959dd45d8739b54",
-      "bytes": 64797
+      "sha256": "d5e63c56293db985106068f7c2fb54e4323cb523f44386623069dfa8b5f4c261",
+      "bytes": 65322
     },
     {
       "path": "SECURITY.md",
