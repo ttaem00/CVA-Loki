@@ -1752,7 +1752,7 @@
     {
       "module": "pipeline.editorial_full_author",
       "source_path": "pipeline/editorial_full_author.py",
-      "source_sha256": "26e7bced1d7140175a531a2f46b4d9c30db5e12fd9338efbdbbc0c696771424e",
+      "source_sha256": "b227c2353466e7234adf4e4928bda35dabbdaa4b17e32ca835cbfe15374e69a3",
       "symbols": [
         "RESPONSE_FIELDS",
         "build_broadcast_flow_context",
@@ -1786,7 +1786,7 @@
         "validate_current_conversation_response",
         "validate_response"
       ],
-      "export_sha256": "47462980571f8bd58202fbae3443c624b9d66b3d0013e3cbbfa0240df2f88cdb",
+      "export_sha256": "241d3118c4673da5f6b46babdf9ae50ce123079b566c0fc858b2edfda0e37732",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -6708,7 +6708,7 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "28db727546368f590fca203df26095c095dc991c",
+  "source_commit": "bf8d2d8f61fa37286834e53a75729a5cfc8ffbc4",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",

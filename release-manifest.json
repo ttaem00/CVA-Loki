@@ -1,9 +1,9 @@
 {
   "schema_version": "loki.release.v1",
   "version": "3.0.5",
-  "source_commit": "28db727546368f590fca203df26095c095dc991c",
+  "source_commit": "bf8d2d8f61fa37286834e53a75729a5cfc8ffbc4",
   "source_recipe": "skills/loki/runtime/source-recipe.json",
-  "source_recipe_sha256": "cccc89cc491b13c6073aa8d0f0d3dc98037bfdce74f3cd72a4d386654b4fcbc1",
+  "source_recipe_sha256": "4bbdc850aa9718da5069a1f293144df1acb9da967db3af655182c420a9fe1486",
   "files": [
     {
       "path": ".agents/plugins/marketplace.json",
@@ -102,8 +102,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "91b0aa6c7c84d96412817b4bc68858aa00b5d473fb65ec299b0b2379d786d2d4",
-      "bytes": 64054
+      "sha256": "b787fa440b2820f64c8a9d7ac0ef8e419a5cd818be48bb66b959dd45d8739b54",
+      "bytes": 64797
     },
     {
       "path": "SECURITY.md",
@@ -492,8 +492,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_full_author.py",
-      "sha256": "456789baa4585b87c0d78a2f685e870ef277770a980fe1a70deba05dc234181e",
-      "bytes": 27015
+      "sha256": "f33da1297141f13b53b75542ba1927d981b2b622150fd42fe36f6fb89482ae3d",
+      "bytes": 27290
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_highlight_candidate_discovery.py",
@@ -1322,12 +1322,12 @@
     },
     {
       "path": "skills/loki/runtime/source-manifest.json",
-      "sha256": "050774828b2b867df3a44416becc3e622c65647b67e6a0192c71faa837d534fe",
+      "sha256": "5cd9892e555f72306e1383c199ea2c1f4226c8542ba36c2471e4c9793bc8f916",
       "bytes": 244273
     },
     {
       "path": "skills/loki/runtime/source-recipe.json",
-      "sha256": "cccc89cc491b13c6073aa8d0f0d3dc98037bfdce74f3cd72a4d386654b4fcbc1",
+      "sha256": "4bbdc850aa9718da5069a1f293144df1acb9da967db3af655182c420a9fe1486",
       "bytes": 215982
     },
     {
@@ -1372,8 +1372,8 @@
     },
     {
       "path": "skills/loki/SKILL.md",
-      "sha256": "e8a788bbfa3762da394a65ae41039878ae5bc0477b6bafe2ec1db377ca1d8872",
-      "bytes": 6834
+      "sha256": "7d2825ddd3d633606ec523075d231ea3c3572b025df727b85f30682513d8c352",
+      "bytes": 7051
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
