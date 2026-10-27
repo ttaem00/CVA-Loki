@@ -3,6 +3,7 @@
 </p>
 
 <h1 align="center">CVA-Loki 3.0.5</h1>
+<h1 align="center">이 레포의 링크와 vod 링크를 주고 요약을 만들어달라고 하세요</h1>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
