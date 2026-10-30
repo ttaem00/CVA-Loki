@@ -414,32 +414,6 @@
       "trimmed_imports": []
     },
     {
-      "module": "pipeline.chat_collector",
-      "source_path": "pipeline/chat_collector.py",
-      "source_sha256": "ed6e48a3741b555fdd883919ce1817a51b36e8e5fe0ca2e03a322504cb7cccfc",
-      "symbols": [
-        "has_complete_chat_cache",
-        "load_chat_log_json"
-      ],
-      "selected_symbols": [
-        "CHAT_PARTIAL_GAP_SEC",
-        "CHAT_PARTIAL_RATIO_THRESHOLD",
-        "Path",
-        "_safe_float",
-        "has_complete_chat_cache",
-        "is_partial_chat_coverage",
-        "json",
-        "latest_chat_sec",
-        "load_chat_log_json",
-        "logger",
-        "logging",
-        "math"
-      ],
-      "export_sha256": "9da545bc582f4a05298eecb2caca54910f99131b92fe8f6c5389fae8ec8cd3a8",
-      "overlay": false,
-      "trimmed_imports": []
-    },
-    {
       "module": "pipeline.chat_emoticons",
       "source_path": "pipeline/chat_emoticons.py",
       "source_sha256": "e5275e80f347f5580deeef4515f0635d35798b35f8ea0d31d2cdae4f04b72cbc",
@@ -6227,17 +6201,16 @@
     {
       "module": "pipeline.vod.process",
       "source_path": "pipeline/vod/process.py",
-      "source_sha256": "35a0b7326b3b9d9f780c0ce932aafe3ed42ac894608a6461f13b33797c1d9c6b",
+      "source_sha256": "391064ea08ba8f2ef0dc1819c0af6fa101a8310bd2c88dc7e1878713c3e8d034",
       "symbols": [
         "_prepare_current_conversation_sources"
       ],
       "selected_symbols": [
         "_load_timeline_comments_for_summary",
         "_load_user_clips_for_summary",
-        "_prepare_current_conversation_sources",
-        "_summary_support_missing"
+        "_prepare_current_conversation_sources"
       ],
-      "export_sha256": "f27d1f7ecc26f5e6467d7035d8974db04905fcec580759956891dc5897c36d90",
+      "export_sha256": "0964dfe8ce7a947ed7c1a75381bbda4ef1a2f25395b0217156e510d0e185143e",
       "overlay": true,
       "trimmed_imports": [],
       "upstream_sha256": "d21ba47326889425c0226bccf81bc43f1f8c9ec35ac8f20f1cf9123dfddfe84c"
@@ -6815,7 +6788,7 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "d26317c9e76e90efc5974ed6b14aba3ae539e2ce",
+  "source_commit": "1b3afb50e1d67ad441d8c749a07f8c21e298048a",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",

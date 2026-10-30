@@ -1,9 +1,9 @@
 {
   "schema_version": "loki.release.v1",
   "version": "3.0.6",
-  "source_commit": "d26317c9e76e90efc5974ed6b14aba3ae539e2ce",
+  "source_commit": "1b3afb50e1d67ad441d8c749a07f8c21e298048a",
   "source_recipe": "skills/loki/runtime/source-recipe.json",
-  "source_recipe_sha256": "f71f70fe2b84ddf53217f9cfd8f2bcf40509a7fe976f5c9752a498b3fd6001c1",
+  "source_recipe_sha256": "71a34adf81bf814e1ffb852e5e46bc8fd244122c7aceb54ccbdb1f974f4933ef",
   "files": [
     {
       "path": ".agents/plugins/marketplace.json",
@@ -82,13 +82,13 @@
     },
     {
       "path": "docs/chatgpt-linux-experiment-plan.md",
-      "sha256": "c9f9286b9efdb961966c56ebd82925ea2887c125304778af43c8201e88be7361",
-      "bytes": 14740
+      "sha256": "b60e5289c9e4bf242cad1947001a25bfaa28c185b6302927e16decc0ba6f998e",
+      "bytes": 15403
     },
     {
       "path": "docs/chatgpt-linux-experiment-prompt.md",
-      "sha256": "cbf8d1bd68cf1a779d60e9895c853140142d4c0aeb72956fd357108708678b8b",
-      "bytes": 9058
+      "sha256": "b9424010f4ea9630c40a21a01630c1b58421513d9169169f54cad982633a76a0",
+      "bytes": 9628
     },
     {
       "path": "install.py",
@@ -314,11 +314,6 @@
       "path": "skills/loki/runtime/pipeline/chat_analyzer.py",
       "sha256": "92388e0ba7a51326ac0d4b7cea91173834bf2ed37f2dd2916c68df25acf90074",
       "bytes": 19812
-    },
-    {
-      "path": "skills/loki/runtime/pipeline/chat_collector.py",
-      "sha256": "1d4f9f569b72dbfaa49222e5812fe27492277ffa003602969c1a7bf3d0ea980c",
-      "bytes": 4023
     },
     {
       "path": "skills/loki/runtime/pipeline/chat_emoticons.py",
@@ -1127,8 +1122,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/vod/process.py",
-      "sha256": "f27d1f7ecc26f5e6467d7035d8974db04905fcec580759956891dc5897c36d90",
-      "bytes": 6177
+      "sha256": "0964dfe8ce7a947ed7c1a75381bbda4ef1a2f25395b0217156e510d0e185143e",
+      "bytes": 5283
     },
     {
       "path": "skills/loki/runtime/pipeline/vod_proposals.py",
@@ -1357,13 +1352,13 @@
     },
     {
       "path": "skills/loki/runtime/source-manifest.json",
-      "sha256": "92577c111e456651e7dc063fc9eac98ce82f9f4553f85664bb5286eb426ce663",
-      "bytes": 248379
+      "sha256": "990de79d99c9a93419bd375af553055199fd4366514590d6605e511758df2b5f",
+      "bytes": 247425
     },
     {
       "path": "skills/loki/runtime/source-recipe.json",
-      "sha256": "f71f70fe2b84ddf53217f9cfd8f2bcf40509a7fe976f5c9752a498b3fd6001c1",
-      "bytes": 219629
+      "sha256": "71a34adf81bf814e1ffb852e5e46bc8fd244122c7aceb54ccbdb1f974f4933ef",
+      "bytes": 218789
     },
     {
       "path": "skills/loki/runtime/source_acquire.py",
