@@ -30,7 +30,11 @@ from pipeline.summary.payload import (
 
 from pipeline.chapter_readiness import validate_youtube_chapter_readiness
 
-from pipeline.editorial_highlight_cards import EDITORIAL_HIGHLIGHT_CARD_CSS, render_pending_editorial_review
+from pipeline.editorial_highlight_cards import (
+    EDITORIAL_HIGHLIGHT_CARD_CSS,
+    render_editorial_highlight_cards,
+    render_pending_editorial_review,
+)
 
 from pipeline.models import UserClipsBundle, VODInfo
 
@@ -58,7 +62,6 @@ from pipeline.summary.render import (
     _html_escape,
     _hms_to_seconds,
     _normalize_viewer_clip_title,
-    _project_editorial_review_html,
     _render_chzzk_comment_text,
     _render_collaboration_chips_html,
     _render_community_reaction_md,
@@ -905,6 +908,8 @@ def _generate_html(
     """구조화된 카드 레이아웃 HTML 렌더링 (Tokyo Night 팔레트, 중앙 정렬)"""
     if _source_platform(vod_info) == "youtube":
         return _generate_youtube_html(summary_md, vod_info)
+    source_chzzk_url = _build_chzzk_vod_url(vod_info.video_no)
+    source_chzzk_video_no = str(vod_info.video_no).strip() if source_chzzk_url else ""
     from pipeline.chat_analyzer import WINDOW_SEC
 
     scoped_viewer_editor_tools_source = (
@@ -1062,7 +1067,7 @@ def _generate_html(
             public_evidence = _strip_timestamp_confidence_markers(t["evidence"])
             if public_evidence:
                 evidence_html = f'<div class="t-evidence">{_render_inline_md(public_evidence)}</div>'
-            tc_html = _render_tc_anchor_html(vod_info.video_no, t["tc"])
+            tc_html = _render_tc_anchor_html(source_chzzk_video_no, t["tc"])
             injected_badge = _viewer_clip_badge_html(
                 is_injected=viewer_clip,
             )
@@ -1114,7 +1119,7 @@ def _generate_html(
             public_title = _strip_timestamp_confidence_markers(h["title"])
             public_reason = _strip_timestamp_confidence_markers(h["reason"])
             reason_html = f'<div class="hl-reason">{_render_inline_md(public_reason)}</div>' if public_reason else ""
-            tc_html = _render_tc_anchor_html(vod_info.video_no, h["tc_range"])
+            tc_html = _render_tc_anchor_html(source_chzzk_video_no, h["tc_range"])
             injected_badge = _viewer_clip_badge_html(
                 is_injected=bool(h.get("is_injected")),
             )
@@ -1136,11 +1141,16 @@ def _generate_html(
 
     editorial_review_html = ""
     if editorial_review_packet is not None:
-        editorial_count = len(_validate_editorial_review_projection(editorial_review_packet)["highlights"])
+        editorial_view = _validate_editorial_review_projection(editorial_review_packet)
+        editorial_count = len(editorial_view["highlights"])
+        editorial_cards = render_editorial_highlight_cards(
+            {**editorial_view, "review_progress": review_progress},
+            video_no=str(vod_info.video_no or ""),
+        )
         editorial_review_html = f'''
 <div class="card editorial-review-packet" id="editorial-highlights">
   <div class="card-head"><h2>🎬 편집 Highlight {editorial_count}</h2></div>
-  <div class="card-body">{_project_editorial_review_html(editorial_review_packet, video_no=str(vod_info.video_no or ""))}</div>
+  <div class="card-body">{editorial_cards}</div>
 </div>'''
 
     elif (pending_review := render_pending_editorial_review(
@@ -1297,8 +1307,12 @@ def _generate_html(
     viewer_editor_tools_payload["report_projection"] = copy.deepcopy(report_projection)
 
     from ..collaboration_replays import load_replays, attach_member_vods, render_replay_links, watch_root, _read
-    collaboration_replays = load_replays(str(vod_info.video_no), duration_sec=vod_info.duration,
-                                        channel_id=vod_info.channel_id)
+
+
+    collaboration_replays = (
+        load_replays(source_chzzk_video_no, duration_sec=vod_info.duration, channel_id=vod_info.channel_id)
+        if source_chzzk_video_no else None
+    )
     if collaboration_replays:
         viewer_editor_tools_payload["collaboration_replays"] = collaboration_replays
         sec["collaboration_replays"] = collaboration_replays
@@ -1319,10 +1333,19 @@ def _generate_html(
 
     og_meta = _build_og_meta(vod_info, public_summary_md_for_page, public_url_base, sec)
     top_vod_link_html = _render_top_vod_link_html(vod_info.video_no)
-    chzzk_plain_url = _html_escape(_build_chzzk_vod_url(vod_info.video_no))
+    chzzk_plain_url = _html_escape(source_chzzk_url)
+    editor_entry_attrs = (
+        f' data-editor-entry data-editor-entry-state="fallback" data-editor-mode="companion"'
+        f' data-editor-video-no="{_html_escape(vod_info.video_no)}" data-editor-chzzk-url="{chzzk_plain_url}"'
+        if source_chzzk_url else ""
+    )
+    editor_primary_html = (
+        f'<a class="report-editor-inline-button editor-companion-entry-link" data-editor-entry-primary href="{chzzk_plain_url}" target="ttaem-chzzk-companion" rel="opener" aria-label="영상 연결. 브라우저별 분할 보기 안내를 확인하세요">영상 연결</a>'
+        if source_chzzk_url else '<span class="editor-entry-status">연결된 원본 영상이 없습니다.</span>'
+    )
     editor_jump_html = f'''
-  <div class="editor-jump report-editor-entry" data-editor-entry data-editor-entry-state="fallback" data-editor-mode="companion" data-editor-video-no="{_html_escape(vod_info.video_no)}" data-editor-chzzk-url="{chzzk_plain_url}">
-    <a class="report-editor-inline-button editor-companion-entry-link" data-editor-entry-primary href="{chzzk_plain_url}" target="ttaem-chzzk-companion" rel="opener" aria-label="영상 연결. 브라우저별 분할 보기 안내를 확인하세요">영상 연결</a>
+  <div class="editor-jump report-editor-entry"{editor_entry_attrs}>
+    {editor_primary_html}
     <span class="editor-entry-status" data-editor-entry-status hidden></span>
     <a class="editor-jump-link report-editor-tool-link" href="#youtube-editor-tools" aria-label="유튜브 편집자용 장면 도구로 이동" title="장면 도구로 이동">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

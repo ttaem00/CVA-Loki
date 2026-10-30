@@ -14,6 +14,19 @@ from .editorial_visual_input import owned_images, PROFILE
 
 SCHEMA = "editorial.media-request.v1"
 
+def original_media_scope(*, video_no, duration_sec):
+    """Bind the existing bounded downloader to the current VOD, without URLs."""
+    from .media_tools.chzzk import resolve_chzzk_source
+    from .media_tools.contracts import MediaToolError
+    try:
+        source = resolve_chzzk_source(str(video_no), target_height=720, public_only=True)
+    except MediaToolError as exc:
+        return dict(original_source_error=exc.code)
+    if source.duration_sec != duration_sec:
+        return dict(original_source_error="source_clock_mismatch")
+    return dict(original_source=dict(profile="chzzk_bounded_v1",
+        source_revision_sha256=source.source_revision, duration_sec=source.duration_sec))
+
 def production_media_window(*, video_path, video_no, work_dir, duration_sec):
     """Bind only the normal collector's local VOD, never a guessed cache file.
 
@@ -59,7 +72,9 @@ def current_conversation_media_session(*, root, prepared):
             windows.append(window)
         preserve(path, dict(schema_version=SCHEMA, source_id=source["asset"]["source_id"],
             source_revision=source["asset"]["bytes_sha256"], video_no=prepared["identity"]["video_no"],
-            windows=windows, timeline_preview=dict(duration_sec=prepared["vod_info"]["duration"])))
+            windows=windows, timeline_preview=dict(duration_sec=prepared["vod_info"]["duration"]),
+            **original_media_scope(video_no=prepared["identity"]["video_no"],
+                                   duration_sec=prepared["vod_info"]["duration"])))
     cfg = dict(candidate_output_dir=str(root), codex_cli_required_runtime_root=str(root),
         summary_author_mode="current_conversation_codex", editorial_context_visual_input=PROFILE,
         editorial_context_media_requests=dict(manifest=dict(path=str(path), sha256=file_hash(path)),
@@ -142,7 +157,6 @@ def media_scope(cfg, source=None, *, owner_root=None, _verify_window_bytes=True)
 
 def _validate_window(window, catalog, folder):
     """Bind newly acquired bytes to this source and the existing tool's receipt."""
-    from .outline.continuation import _load_bound
     if window.get("kind") == "timeline_preview":
         saved = json.loads((native_path(folder) / "receipt.json").read_text(encoding="utf-8"))
         body = saved["payload"]
@@ -164,7 +178,9 @@ def _validate_window(window, catalog, folder):
     receipt_path = native_path(receipt_ref.get("path", "")).resolve()
     if not receipt_path.is_relative_to(native_path(folder).resolve() / "acquisition"):
         raise ValueError("editorial_media_acquisition_outside_request")
-    receipt = _load_bound(receipt_ref)
+    if file_hash(receipt_path) != receipt_ref.get("sha256"):
+        raise ValueError("editorial_media_acquisition_receipt_changed")
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     rows = [r for r in receipt.get("artifacts", []) if r.get("kind") == "video"]
     if (receipt.get("status") != "ok" or receipt.get("action") != "video"
             or str(receipt.get("video_no")) != str(catalog["video_no"])
@@ -349,8 +365,14 @@ class AuthorMediaSession:
         self.requests.add(key)
         if preview:
             return self._preview(request, action, key)
-        windows = {digest([w["sha"], w["start"], w["end"]]): w for w in self.catalog["windows"]
-                   if w["start"] <= request.start_sec and request.start_sec + request.duration_sec <= w["end"]}
+        from .media_tools.executor import FRAME_PROFILES
+        required_height = FRAME_PROFILES[request.inspection_mode]["height"]
+        covered = [w for w in self.catalog["windows"]
+                   if w["start"] <= request.start_sec and request.start_sec + request.duration_sec <= w["end"]]
+        adequate = [w for w in covered if w["saved_height"] >= required_height]
+        best_height = min((w["saved_height"] for w in adequate), default=None)
+        windows = {digest([w["sha"], w["start"], w["end"]]): w for w in adequate
+                   if w["saved_height"] == best_height}
         acquisition = self.catalog.get("original_source")
         folder = self.root / "windows" / key
         if not windows and acquisition:
@@ -371,8 +393,11 @@ class AuthorMediaSession:
                     return self._pending(action,exc.code)
             windows = {"acquired":window}
         if len(windows) != 1:
-            return self._pending(action, "ambiguous_media_window" if windows else "media_not_collected")
+            return self._pending(action, "ambiguous_media_window" if windows else
+                self.catalog.get("original_source_error", "required_resolution_unavailable" if covered else "media_not_collected"))
         window = next(iter(windows.values()))
+        if window["saved_height"] < required_height:
+            return self._pending(action, "required_resolution_unavailable")
         path = folder / "receipt.json"
         if path.exists():
             saved = json.loads(path.read_text(encoding="utf-8"))
@@ -421,7 +446,7 @@ class AuthorMediaSession:
                 preview = resolve_chzzk_preview_catalog(str(self.catalog["video_no"]))
                 scope = self.catalog.get("timeline_preview") or self.catalog.get("original_source")
                 if scope and preview["duration_sec"] != scope["duration_sec"]:
-                    raise ValueError("editorial_media_source_changed")
+                    return self._pending(action, "editorial_media_source_changed")
                 if request.start_sec + request.duration_sec > preview["duration_sec"]:
                     return self._pending(action, "window_out_of_range")
                 rows = read_chzzk_preview_frames(preview, request.start_sec, request.duration_sec, folder)

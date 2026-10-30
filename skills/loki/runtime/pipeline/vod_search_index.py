@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from contextlib import closing
 
+from concurrent.futures import ThreadPoolExecutor
+
 import hashlib
 
 import json
@@ -316,7 +318,8 @@ def register_report(*, database_path, roots, metadata_path, markdown_path, html_
                 report_key=key, vector_status=status, vector_mode=vector_mode,
                 vector_count=len(vector["items"]) if vector else 0, provider_calls=0)
 
-def list_registered_reports(*, database_path, roots, base=None, video_no=None, catalog_cache=False, include_context=False):
+def list_registered_reports(*, database_path, roots, base=None, video_no=None, catalog_cache=False,
+                            include_context=False, exclude_bases=()):
     """Internal current report locations, independent of old vector freshness.
 
     A normal committed Save may replace the family at its registered paths.
@@ -326,6 +329,10 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
     that the current STT or stored vector body passed freshness validation.
     """
     from .report_artifact_family import ReportArtifactFamilyError, validate_report_artifact_family
+    excluded = frozenset(exclude_bases)
+    if any(not isinstance(value, str) or not value or any(c in value for c in '/\\\x00')
+           for value in excluded):
+        raise ValueError("search_report_identity_invalid")
     roots = _roots(roots)
     records, unavailable, seen = [], 0, set()
     with closing(_connect(database_path, readonly=True)) as db:
@@ -343,84 +350,100 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
             query += " AND video_no=?"
             parameters += (video_no,)
         query += " ORDER BY video_no,base,report_key"
-        for row in db.execute(query, parameters):
-            try:
-                binding = _registration_binding(row, tier)
-                source = binding["files"].get("stt")
-                source_sha256 = None
-                if source is not None:
-                    if not isinstance(source, dict) or not re.fullmatch(r"[0-9a-f]{64}", source.get("sha256", "")):
-                        raise ValueError("search_report_identity_invalid")
-                    _resolve(source["ref"], roots)
-                    source_sha256 = source["sha256"]
-                if tier == "cold":
-                    validate_cold_end_proof(binding["end_proof"], video_no=row["video_no"], now_ms=time.time_ns() // 1_000_000)
-                paths = {name: _resolve(binding["files"][name]["ref"], roots)
-                         for name in ("metadata", "markdown", "html")}
-                names = tuple(paths[name].name for name in ("markdown", "html", "metadata"))
-                expected = (row["base"] + ".md", row["base"] + ".html", row["base"] + "_metadata.json")
-                if (len({path.parent for path in paths.values()}) != 1
-                        or names not in (expected, ("report.md", "report.html", "metadata.json"))):
-                    raise ValueError("search_report_location_invalid")
-                cache_key = (str(database_path), row['report_key'], row['binding_json'],
-                             tuple(str(paths[name]) for name in ('metadata', 'markdown', 'html')))
-                before = tuple(_report_file_revision(path) for path in paths.values())
-                if catalog_cache and tier != 'cold':
-                    with _REGISTERED_CATALOG_LOCK:
-                        cached = _REGISTERED_CATALOG_CACHE.get(cache_key)
-                    if cached is not None:
-                        alias_path, signature, cached_record = cached
-                        current_signature = before + ((_report_file_revision(alias_path),) if alias_path else ())
-                        if current_signature == signature:
-                            records.append(dict(cached_record))
-                            continue
-                captured = {name: _capture(path, roots) for name, path in paths.items()}
-                current_files = {name: value[0] for name, value in captured.items()}
-                metadata = json.loads(captured["metadata"][1].decode("utf-8"))
-                alias = metadata["report_artifact_family"].get("artifacts", {}).get("candidate_alias")
-                alias_before = None
-                if alias is not None:
-                    name = alias["name"]
-                    if not isinstance(name, str) or not name or Path(name).name != name or any(c in name for c in "\\/:\x00"):
-                        raise ValueError("search_report_location_invalid")
-                    alias_before = _report_file_revision(paths['metadata'].parent / name)
-                    current_files["candidate_alias"], _ = _capture(paths["metadata"].parent / name, roots)
-                current = validate_report_artifact_family(paths["markdown"], paths["html"], paths["metadata"])
-                if str(current["metadata"].get("video_no")) != row["video_no"]:
+
+
+        rows = [dict(row) for row in db.execute(query, parameters) if row["base"] not in excluded]
+
+    def read_row(row):
+        try:
+            binding = _registration_binding(row, tier)
+            source = binding["files"].get("stt")
+            source_sha256 = None
+            if source is not None:
+                if not isinstance(source, dict) or not re.fullmatch(r"[0-9a-f]{64}", source.get("sha256", "")):
                     raise ValueError("search_report_identity_invalid")
-                _fresh({"files": current_files}, roots)
-                alias_path = paths['metadata'].parent / alias['name'] if alias is not None else None
-                after = tuple(_report_file_revision(path) for path in paths.values())
-                alias_after = _report_file_revision(alias_path) if alias_path else None
-                if before != after or alias_before != alias_after:
-                    raise ValueError('search_source_revision_changed')
-                identity = (row["video_no"], row["base"], *paths.values())
+                _resolve(source["ref"], roots)
+                source_sha256 = source["sha256"]
+            if tier == "cold":
+                validate_cold_end_proof(binding["end_proof"], video_no=row["video_no"], now_ms=time.time_ns() // 1_000_000)
+            paths = {name: _resolve(binding["files"][name]["ref"], roots)
+                     for name in ("metadata", "markdown", "html")}
+            names = tuple(paths[name].name for name in ("markdown", "html", "metadata"))
+            expected = (row["base"] + ".md", row["base"] + ".html", row["base"] + "_metadata.json")
+            if (len({path.parent for path in paths.values()}) != 1
+                    or names not in (expected, ("report.md", "report.html", "metadata.json"))):
+                raise ValueError("search_report_location_invalid")
+            cache_key = (str(database_path), row['report_key'], row['binding_json'],
+                         tuple(str(paths[name]) for name in ('metadata', 'markdown', 'html')))
+            before = tuple(_report_file_revision(path) for path in paths.values())
+            if catalog_cache and tier != 'cold':
+                with _REGISTERED_CATALOG_LOCK:
+                    cached = _REGISTERED_CATALOG_CACHE.get(cache_key)
+                if cached is not None:
+                    alias_path, signature, cached_record = cached
+                    current_signature = before + ((_report_file_revision(alias_path),) if alias_path else ())
+                    if current_signature == signature:
+                        return dict(cached_record), None, None
+            captured = {name: _capture(path, roots) for name, path in paths.items()}
+            current_files = {name: value[0] for name, value in captured.items()}
+            metadata = json.loads(captured["metadata"][1].decode("utf-8"))
+            alias = metadata["report_artifact_family"].get("artifacts", {}).get("candidate_alias")
+            alias_before = None
+            if alias is not None:
+                name = alias["name"]
+                if not isinstance(name, str) or not name or Path(name).name != name or any(c in name for c in "\\/:\x00"):
+                    raise ValueError("search_report_location_invalid")
+                alias_before = _report_file_revision(paths['metadata'].parent / name)
+                current_files["candidate_alias"], _ = _capture(paths["metadata"].parent / name, roots)
+            current = validate_report_artifact_family(paths["markdown"], paths["html"], paths["metadata"])
+            if str(current["metadata"].get("video_no")) != row["video_no"]:
+                raise ValueError("search_report_identity_invalid")
+            _fresh({"files": current_files}, roots)
+            alias_path = paths['metadata'].parent / alias['name'] if alias is not None else None
+            after = tuple(_report_file_revision(path) for path in paths.values())
+            alias_after = _report_file_revision(alias_path) if alias_path else None
+            if before != after or alias_before != alias_after:
+                raise ValueError('search_source_revision_changed')
+            identity = (row["video_no"], row["base"], *paths.values())
+            record = dict(video_no=row["video_no"], base=row["base"], report_key=row["report_key"],
+                family_id=current["generation_id"], tier=tier, vector_status=row["vector_status"],
+                metadata_path=paths["metadata"], markdown_path=paths["markdown"], html_path=paths["html"])
+            if source_sha256 is not None:
+                record["source_sha256"] = source_sha256
+            record['catalog_metadata'] = _registered_catalog_metadata(current['metadata'])
+            if include_context:
+                record['_validated_context'] = {
+                    'metadata': current['metadata'], 'family': current,
+                    'markdown': captured['markdown'][1].decode('utf-8'),
+                    'html': captured['html'][1].decode('utf-8'), 'signature': after,
+                    'alias_path': alias_path,
+                    'alias_revision': alias_after,
+                }
+            cache_entry = None
+            if catalog_cache and tier != 'cold':
+                signature = after + ((alias_after,) if alias_path else ())
+                cache_entry = (cache_key, alias_path, signature, dict(record))
+            return record, identity, cache_entry
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, IndexError, ReportArtifactFamilyError):
+            return None, None, None
+
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for record, identity, cache_entry in executor.map(read_row, rows):
+            if record is None:
+                unavailable += 1
+                continue
+            if identity is not None:
                 if identity in seen:
                     continue
                 seen.add(identity)
-                record = dict(video_no=row["video_no"], base=row["base"], report_key=row["report_key"],
-                    family_id=current["generation_id"], tier=tier, vector_status=row["vector_status"],
-                    metadata_path=paths["metadata"], markdown_path=paths["markdown"], html_path=paths["html"])
-                if source_sha256 is not None:
-                    record["source_sha256"] = source_sha256
-                record['catalog_metadata'] = _registered_catalog_metadata(current['metadata'])
-                if include_context:
-                    record['_validated_context'] = {
-                        'metadata': current['metadata'], 'family': current,
-                        'markdown': captured['markdown'][1].decode('utf-8'),
-                        'html': captured['html'][1].decode('utf-8'), 'signature': after,
-                        'alias_path': alias_path,
-                        'alias_revision': alias_after,
-                    }
-                if catalog_cache and tier != 'cold':
-                    signature = after + ((alias_after,) if alias_path else ())
-                    with _REGISTERED_CATALOG_LOCK:
-                        _REGISTERED_CATALOG_CACHE[cache_key] = (alias_path, signature, dict(record))
-                        _REGISTERED_CATALOG_CACHE.move_to_end(cache_key)
-                        while len(_REGISTERED_CATALOG_CACHE) > 128:
-                            _REGISTERED_CATALOG_CACHE.popitem(last=False)
-                records.append(record)
-            except (OSError, ValueError, TypeError, KeyError, AttributeError, IndexError, ReportArtifactFamilyError):
-                unavailable += 1
+            if cache_entry is not None:
+                cache_key, alias_path, signature, cached_record = cache_entry
+                with _REGISTERED_CATALOG_LOCK:
+                    _REGISTERED_CATALOG_CACHE[cache_key] = (alias_path, signature, cached_record)
+                    _REGISTERED_CATALOG_CACHE.move_to_end(cache_key)
+                    while len(_REGISTERED_CATALOG_CACHE) > 128:
+                        _REGISTERED_CATALOG_CACHE.popitem(last=False)
+            records.append(record)
     return dict(schema_version=SCHEMA, status="partial" if unavailable else "ready",
                 reports=records, unavailable_reports=unavailable, tier=tier)

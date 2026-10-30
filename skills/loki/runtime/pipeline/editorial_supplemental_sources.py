@@ -283,9 +283,16 @@ def validate_supplemental_sources(cfg: Mapping, *, video_no=None, work_dir=None)
             raise ValueError("supplemental_sources_path_invalid")
         path = native_path(asset["path"]).resolve()
         expected = f"{video}_context.md" if family == "manager_context" else "timeline_comments.json"
-        if path.name != expected or (work_dir is not None and path.parent != native_path(work_dir).resolve()):
+        scope = native_path(work_dir).resolve() if work_dir is not None else None
+        if scope is None and production and cfg.get('work_dir'):
+            scope = native_path(cfg['work_dir']).resolve() / video
+        source_root = path.parent
+        if production:
+            source_root = (scope if path.is_relative_to(scope) else None) if scope is not None else next(
+                (parent for parent in path.parents if parent.name == video), None)
+        if path.name != expected or (work_dir is not None and source_root != native_path(work_dir).resolve()):
             raise ValueError("supplemental_sources_path_scope_mismatch")
-        if path.parent.name != video:
+        if source_root is None or source_root.name != video:
             raise ValueError("supplemental_sources_video_directory_mismatch")
         try:
             raw = path.read_bytes()
@@ -307,7 +314,7 @@ def validate_supplemental_sources(cfg: Mapping, *, video_no=None, work_dir=None)
                 raise ValueError("supplemental_sources_manager_context_invalid") from exc
             if not memo and not production:
                 raise ValueError("supplemental_sources_manager_context_empty")
-        parents.add(path.parent)
+        parents.add(source_root)
         seen.add(family)
         rows.append({"family": family, "path": str(path), "sha256": asset["sha256"]})
     if len(parents) != 1 and not (production and not parents):
@@ -342,7 +349,8 @@ def build_supplemental_context(cfg: Mapping, *, video_no, work_dir, duration_sec
         not production or identity["availability"]["timeline_comments"] == "available")
 
 
-    bundle = load_timeline_comment_bundle(str(video_no), work_dir, cache_ttl_hours=0,
+    comment_path = next((row['path'] for row in identity['assets'] if row['family'] == 'timeline_comments'), None)
+    bundle = load_timeline_comment_bundle(str(video_no), native_path(comment_path).parent, cache_ttl_hours=0,
         expected_source_url=f"https://chzzk.naver.com/video/{video_no}") if comment_available else None
     if bundle is None and (not production or identity.get("availability", {}).get("timeline_comments") == "available"):
         raise ValueError("supplemental_sources_comments_unavailable")

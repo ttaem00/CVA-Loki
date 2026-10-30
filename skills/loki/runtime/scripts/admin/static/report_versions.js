@@ -7,7 +7,8 @@
   const route = location.pathname === '/report-workspace' ? '/report-workspace' : '/report';
   const link = (version, label) => {
     const a = document.createElement('a');
-    const query=new URLSearchParams({base:version.base}),current=new URLSearchParams(location.search);
+    const query=window.ReportNavigation.list(new URLSearchParams({base:version.base})),current=new URLSearchParams(location.search);
+    window.ReportNavigation.view(query);
     const type=current.get('type'),id=current.get('id') || '',span=current.get('span') || '0';
     if(['D1','D2','Point','Highlight'].includes(type)&&id&&id.length<=256&&!/[\x00-\x1f\x7f]/.test(id)&&/^\d{1,6}$/.test(span)){
       query.set('type',type);query.set('id',id);query.set('span',span);
@@ -18,7 +19,7 @@
   };
   async function load() {
     host.textContent = '요약 버전 확인 중…';
-    const response = await fetch(`/api/report-catalog?q=${encodeURIComponent(videoNo)}&limit=100`);
+    const response = await fetch(`/api/report-catalog?video_no=${encodeURIComponent(videoNo)}&limit=100`);
     if (!response.ok) throw new Error('요약 버전을 불러오지 못했습니다.');
     const data = await response.json();
     const report = (data.reports || []).find(row => String(row.video_no) === videoNo);

@@ -12,13 +12,9 @@ import hashlib
 
 import json
 
-import logging
-
 from pathlib import Path
 
 import re
-
-import shutil
 
 from .evidence_world.contracts import SourcePolicy, canonical_json, digest, file_hash, native_path
 
@@ -90,6 +86,10 @@ def _load(job_root):
     for asset in prepared.get('source_bundle', {}).get('frozen_assets', []):
         if asset['family'] != 'media' and file_hash(asset['path']) != asset['sha256']:
             raise ValueError('current_conversation_support_source_changed')
+    from .live_vod_chat import is_bound_chat, descriptor_status
+    for asset in prepared['identity']['source_assets']:
+        if asset['family'] == 'chat' and is_bound_chat(asset['path']):
+            descriptor_status(asset['path'])
     from .evidence_world.contracts import AssetBinding
     assert_asset_fresh(AssetBinding(**prepared["source"]["asset"]))
     return root, prepared, job
@@ -142,9 +142,7 @@ def _orientation_binding(value, path, source, source_dir):
         original_binding=deepcopy(binding), prior_world_revision_is_not_current_read_receipt=True)
 
 def prepare(spec):
-    """Refresh optional public clips into this job; reuse STT without ASR or model calls."""
-    from .chunker import chunk_srt
-    from .editorial_source_timing import prepare_source_timing
+    """Refresh public support into this job; reuse STT without ASR or model calls."""
     from .editorial_full_author import build_broadcast_flow_context, full_source_context, RESPONSE_FIELDS
     from .models import VODInfo
     required = {"vod_info", "work_root", "source_work_dir", "srt_path", "base_path", "job_id",
@@ -187,36 +185,19 @@ def prepare(spec):
             return _prepare_receipt(root, saved)
         from .loki_version_policy import select_new_pipeline
         selected_pipeline = select_new_pipeline(spec.get("summary_pipeline_version", "latest"))
-        chunks = chunk_srt(str(native_path(spec["srt_path"])))
-        source = prepare_source_timing(video_no=video, duration_sec=vod.duration,
-            work_dir=source_dir, chunks=chunks,
-            srt_path=spec["srt_path"])
-        if source["asset"].get("clock_authority", {}).get("kind") == "live":
-            raise ValueError("current_conversation_requires_confirmed_vod_clock")
         if not vod.duration or vod.duration <= 0:
             raise ValueError("current_conversation_duration_required")
-        clip_dir = root / 'clip-source'
-        clip_path = clip_dir / 'user_clips.json'
-        try:
-            clip_dir.mkdir(parents=True, exist_ok=True)
-            previous_clips = source_dir / 'user_clips.json'
-            if previous_clips.is_file():
-                shutil.copyfile(previous_clips, clip_path)
-            from .vod.process import _load_user_clips_for_summary
-            _load_user_clips_for_summary(vod=vod,
-                cfg=dict(candidate_output_dir=str(root), data_dir=str(root / 'data'),
-                    candidate_source_data_dir=str(spec.get('source_data_dir') or work.parent / 'data')),
-                cookies=None, work_dir=str(clip_dir),
-                output_dir=str(spec.get('source_output_dir') or work.parent / 'output'),
-                logger=logging.getLogger(__name__))
-        except (OSError, ValueError) as error:
-            logging.getLogger(__name__).warning('Optional public clips unavailable; prepared STT remains usable: %s', error)
+        from .vod.process import _prepare_current_conversation_sources
+        (chunks, source, prepared_media_path, chat_source_path, comment_dir, clip_path) = (
+            _prepare_current_conversation_sources(vod=vod, spec=spec, source_dir=source_dir,
+                root=root, work=work, selected_pipeline=selected_pipeline))
         _create(root / "source-identity.json", spec["vod_info"])
         service = EvidenceWorldService.prepare(video_no=video, srt_path=spec["srt_path"],
             source_work_dir=source_dir, cache_root=root / "evidence-world-cache",
             run_root=root / "source-reads", duration_sec=vod.duration,
             policy=SourcePolicy(allowed_families=("stt", "chat", "clip", "audio_features"), required_families=("stt",)),
-            owner=spec["author"]["thread_id"], clip_source_path=clip_path)
+            owner=spec["author"]["thread_id"], clip_source_path=clip_path,
+            chat_source_path=chat_source_path)
         service.configure_read(read_page_policy)
         service.configure_hierarchy(spec.get('hierarchy'))
         from .evidence_world.summary_hints import vod_hint_configuration
@@ -235,12 +216,9 @@ def prepare(spec):
         orientation_artifacts, orientations = [], []
         from .editorial_current_sources import prepare_sources
         bundle = prepare_sources(service=service, source_dir=source_dir, vod=vod,
-                                 base_path=base, chunks=chunks)
+                                 base_path=base, chunks=chunks, comment_source_dir=comment_dir)
         media = None
-        media_path = spec.get('media_path')
-        if not media_path:
-            from .collected_vod_media import collected_vod_media
-            media_path = collected_vod_media(srt_path=spec['srt_path'], video_no=video, duration_sec=vod.duration)
+        media_path = prepared_media_path
         if media_path:
             media_path = native_path(media_path).resolve()
             if not media_path.is_relative_to(source_dir) or not media_path.is_file():

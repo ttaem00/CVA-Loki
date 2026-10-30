@@ -4,7 +4,7 @@
   --shell-border: #363b54;
   --shell-text: #c0caf5;
   --shell-strong: #e8ebf3;
-  --shell-muted: #7982a9;
+  --shell-muted: #9aa5c9;
   --shell-accent: #7aa2f7;
 }
 
@@ -16,9 +16,11 @@
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 18px;
-  width: min(1180px, calc(100% - 32px));
-  margin: 20px auto 24px;
+  gap: 14px;
+  width: min(1440px, calc(100vw - 32px));
+  margin: 20px 0 24px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 9px 12px;
   color: var(--shell-text);
   background: linear-gradient(180deg, var(--shell-panel), var(--shell-bg));
@@ -61,14 +63,19 @@
 }
 .app-shell-groups > .app-shell-tab,
 .app-shell-groups > .app-shell-menu { flex: 0 0 auto; }
+.app-shell-utilities { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; padding-left: 10px; border-left: 1px solid var(--shell-border); }
+.app-shell-utilities > .app-shell-tab,
+.app-shell-utilities > .app-shell-menu { flex: 0 0 auto; }
+.app-shell-utilities .app-shell-tab,
+.app-shell-utilities .app-shell-menu > summary { font-size: 13px; font-weight: 500; }
 
 .app-shell-tab,
 .app-shell-menu > summary {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 38px;
-  padding: 8px 13px;
+  min-height: 44px;
+  padding: 8px 11px;
   color: var(--shell-text);
   border: 1px solid transparent;
   border-radius: 999px;
@@ -84,6 +91,10 @@
 .app-shell-menu > summary::-webkit-details-marker { display: none; }
 .app-shell-menu > summary::after { content: "⌄"; color: var(--shell-muted); font-size: 12px; }
 .app-shell-current-page {
+  max-width: 148px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding-left: 7px;
   border-left: 1px solid var(--shell-border);
   color: var(--shell-strong);
@@ -174,6 +185,8 @@
     gap: 8px;
     width: calc(100% - 20px);
     margin: 10px auto 18px;
+    left: auto;
+    transform: none;
     padding: 9px;
   }
   .app-shell-brand {
@@ -185,7 +198,11 @@
     gap: 3px;
     width: auto;
     overflow: visible;
+    grid-column: 1;
+    grid-row: 1;
   }
+  .app-shell-utilities { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; padding: 6px 0 0; border-left: 0; border-top: 1px solid var(--shell-border); }
+  .app-shell-notifications { grid-column: 2; grid-row: 1; }
   .app-shell-nav .app-shell-menu { position: static; }
   .app-shell-tab,
   .app-shell-menu > summary {

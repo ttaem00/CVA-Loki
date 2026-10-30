@@ -30,7 +30,7 @@ from ..scene_signal_contract import (
     overview_lane_keys as _scene_signal_overview_lane_keys,
 )
 
-from ..editorial_highlight_cards import editorial_scene_image_data_url, render_editorial_highlight_cards
+from ..editorial_highlight_cards import editorial_scene_image_data_url
 
 from ..models import VODInfo
 
@@ -1374,7 +1374,7 @@ def _audio_peak_badge_html(tc_text: str, audio_peak_secs: list[float], tolerance
 
 def _build_chzzk_vod_url(video_no: str = "") -> str:
     video_no = str(video_no or "").strip()
-    if not video_no:
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", video_no):
         return ""
     return f"https://chzzk.naver.com/video/{video_no}"
 
@@ -1677,12 +1677,6 @@ def _prepend_summary_webpage_line(text: str, summary_url: str = "") -> str:
         if not line.strip().startswith(prefix)
     ]
     return "\n".join([f"{prefix} {summary_url}", *lines])
-
-def _project_editorial_review_html(packet: dict, *, video_no: str) -> str:
-    """Render public editorial cards inside the existing full report family."""
-
-    view = _validate_editorial_review_projection(packet)
-    return render_editorial_highlight_cards(view, video_no=video_no)
 
 def _render_chzzk_comment_text(
     sec: dict,
@@ -2059,6 +2053,8 @@ def _validate_editorial_review_projection(packet: dict) -> dict[str, Any]:
         "external_review_draft": review_mode in {"external_review_draft", "composed_review_draft"},
         "review_mode": review_mode,
         "unresolved_group_count": len(packet.get("unresolved_group_outcomes") or []),
+        "unresolved_questions": packet.get("unresolved_questions") or [],
+        "unresolved_group_outcomes": packet.get("unresolved_group_outcomes") or [],
         "unresolved_proposal_count": len(packet.get("unresolved_proposals") or []),
         "unresolved_exploration_count": len((packet.get("source_exploration") or {}).get("unresolved_questions") or []),
     }

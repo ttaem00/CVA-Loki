@@ -18,10 +18,11 @@ import re
 
 from ..chunker import TIME_LINE_RE, _ts_to_ms, parse_srt
 
-from .contracts import (AssetBinding, EvidenceError, PARSER_REVISION, RECORD_SCHEMA,
+from .contracts import (AssetBinding, EvidenceError, PARSER_REVISION, RECORD_SCHEMA, canonical_json,
                         digest, file_hash, native_path, time_projection)
 
-def register_assets(*, video_no, srt_path, work_dir, duration_sec, policy, clip_source_path=None):
+def register_assets(*, video_no, srt_path, work_dir, duration_sec, policy, clip_source_path=None,
+                    chat_source_path=None):
     """Only caller-bound paths; never walk a directory or accept model paths."""
     source_id = f"chzzk:{video_no}"
     root = native_path(work_dir)
@@ -31,6 +32,8 @@ def register_assets(*, video_no, srt_path, work_dir, duration_sec, policy, clip_
     if live_clock:
         source_id = live_clock["source_id"]
     paths = {"stt": native_path(srt_path), "chat": root / f"{video_no}_chat.log.json"}
+    if chat_source_path is not None:
+        paths['chat'] = native_path(chat_source_path)
     from .derived_records import PATHS, REVISION, collection_state
     paths.update({family: root / rel for family, rel in PATHS.items()})
     if clip_source_path is not None:
@@ -43,8 +46,15 @@ def register_assets(*, video_no, srt_path, work_dir, duration_sec, policy, clip_
         if path is not None:
             locator["path"] = str(path.resolve())
             status = "present" if path.is_file() else "not_collected"
-        if family == "chat" and status == "present":
-            meta_path = root / f"{video_no}_chat.log.meta.json"
+        from ..live_vod_chat import is_bound_chat
+        if family == 'chat' and status == 'present' and chat_source_path is not None and is_bound_chat(path):
+            from ..live_vod_chat import descriptor_status, KIND
+            collection = descriptor_status(path)
+            identity = json.loads(path.read_text(encoding='utf8'))
+            locator.update(kind=KIND, archive=identity['archive'],
+                           producer_source_id=identity['producer_source_id'])
+        elif family == "chat" and status == "present":
+            meta_path = path.with_suffix('.meta.json')
             locator["meta_path"] = str(meta_path.resolve())
             if meta_path.is_file():
                 meta_hash = file_hash(meta_path)
@@ -100,6 +110,9 @@ def assert_asset_fresh(asset):
     actual = file_hash(path) if path and native_path(path).is_file() else None
     if actual != asset.bytes_sha256:
         raise EvidenceError("source_revision_changed")
+    if asset.source_locator.get('kind') == 'verified_live_vod_chat':
+        from ..live_vod_chat import descriptor_status
+        descriptor_status(path)
     meta_path = asset.source_locator.get("meta_path")
     if meta_path:
         actual = file_hash(meta_path) if native_path(meta_path).is_file() else None
@@ -197,6 +210,20 @@ def _chat_rows(asset):
 def iter_chat_records(asset):
     assert_asset_fresh(asset)
     duration = asset.clock_authority["duration_sec_decimal"]
+    if asset.source_locator.get('kind') == 'verified_live_vod_chat':
+        from ..live_vod_chat import iter_bound_chat
+        for ordinal, (native, row) in enumerate(iter_bound_chat(asset.source_locator['path'])):
+            locator = dict(kind='live_vod_chat_row', primary_key=native['message_pk'],
+                archive=asset.source_locator['archive'],
+                producer_source_id=asset.source_locator['producer_source_id'],
+                observations=native['observations'])
+            timing, status = time_projection(row['ms'], row['ms'], unit='ms',
+                duration_sec=duration, instant=True)
+            yield _record(asset, ordinal, locator, digest(native), row['msg'],
+                dict(unit='ms', start=row['ms'], end=row['ms'], original_utc_ms=native['sent_at_ms']),
+                timing, status, payload={k:row[k] for k in ('ms', 'msg', 'event_kind', 'chat_evidence') if k in row},
+                warnings=[] if timing else ['native_replay_clock_unresolved'])
+        return
     for ordinal, row in enumerate(_chat_rows(asset)):
         locator = dict(kind="chat_row", row_ordinal=ordinal)
         sha = digest(row)
@@ -236,6 +263,15 @@ def read_native(asset, record, *, _verified=False, _chat_data=None, _derived_dat
     if record["asset_id"] != asset.asset_id:
         raise EvidenceError("record_asset_mismatch")
     locator = record["native_locator"]
+    if locator['kind'] == 'live_vod_chat_row':
+        from ..live_vod_chat import read_bound_chat
+        rows = _derived_data if _derived_data is not None else read_bound_chat(
+            asset.source_locator['path'], [locator['primary_key']])
+        row = rows.get(locator['primary_key'])
+        if row is None or digest(row) != record['raw_payload_sha256']:
+            raise EvidenceError('raw_payload_changed')
+        return dict(raw_text=row['text'], raw_payload=record['payload'],
+                    bytes_read=len(canonical_json(record['payload']).encode('utf8')))
     if locator["kind"] == "temporal_row":
         from .temporal_source import read_temporal
         data = _derived_data if _derived_data is not None else json.loads(
@@ -273,8 +309,13 @@ def read_records(asset, records):
     """Verify and parse once per asset/request; preserve each occurrence."""
     assert_asset_fresh(asset)
     temporal = asset.source_locator.get("kind") == "temporal_projection"
-    chat_data = _chat_rows(asset) if asset.family == "chat" and not temporal else None
+    live_chat = asset.source_locator.get('kind') == 'verified_live_vod_chat'
+    chat_data = _chat_rows(asset) if asset.family == "chat" and not temporal and not live_chat else None
     derived_data = None
+    if live_chat:
+        from ..live_vod_chat import read_bound_chat
+        derived_data = read_bound_chat(asset.source_locator['path'],
+            [record['native_locator']['primary_key'] for record in records])
     if temporal:
         derived_data = json.loads(native_path(asset.source_locator["path"]).read_text(encoding="utf-8"))
     if asset.family in {"audio_features", "clip"}:
@@ -350,7 +391,13 @@ def chat_analysis_rows(service, records=None):
             if not math.isfinite(ms):
                 continue
             row = {}
-            if record['native_locator']['kind'] == 'chat_row':
+            if record['native_locator']['kind'] == 'live_vod_chat_row':
+                aid = record['asset_id']
+                if aid not in legacy:
+                    from ..live_vod_chat import load_bound_chat
+                    legacy[aid] = {r['source_message_pk']:r for r in load_bound_chat(assets[aid].source_locator['path'])}
+                row = dict(legacy[aid][record['native_locator']['primary_key']])
+            elif record['native_locator']['kind'] == 'chat_row':
                 aid = record['asset_id']
                 if aid not in legacy:
                     legacy[aid] = _chat_rows(assets[aid])

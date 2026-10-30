@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;600&display=swap">
   <link rel="stylesheet" href="/static/shared-viewer/viewer.css">
   <link rel="stylesheet" href="/static/admin/report.css">
+  <link rel="stylesheet" href="/static/admin/report_navigation.css">
 </head>
 <body>
   <nav id="reportRoleSwitch" class="report-role-switch" aria-label="Report Admin 역할 보기">
@@ -20,15 +21,7 @@
   <main id="viewerRoleSurface" class="report-role-viewer" aria-label="시청자용 방송 요약" hidden></main>
   <div class="app">
     <aside class="sidebar" id="sidebar">
-      <div class="topbar">
-        <a href="/reports">← 리포트 목록으로</a>
-        <a id="publicLink" href="#" target="_blank" rel="noopener">공개 리포트 열기</a>
-        <a id="sourceManifestLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 자막/채팅/커뮤니티/클립/맥락 재료 수집 상태를 한눈에 확인합니다 (관리자 전용, LLM 호출 없음)">재료 상태</a>
-        <a id="workEvidenceLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 로컬 work 폴더 산출물을 내용 노출 없이 확인합니다 (관리자 전용)">작업자료</a>
-        <button id="revisionHistoryBtn" class="link-button" type="button" title="저장/공개 반영 시점의 본문과 화면 기록을 확인합니다">되돌리기 기록</button>
-      </div>
-      <h1 id="title"><span class="dirty-dot" title="저장하지 않은 변경 사항이 있습니다"></span><span id="titleText">리포트 불러오는 중...</span></h1>
-      <div id="meta" class="muted"></div>
+      <section id="reportSourcePane" aria-label="전체본문 직접 편집">
       <section class="editor-decision-panel" aria-label="편집 판단 요약">
         <h2>지금 결정할 일</h2>
         <p id="editorDecisionState" class="editor-decision-state">리포트를 불러오는 중입니다.</p>
@@ -110,6 +103,8 @@
         <button id="previewBtn" type="button" class="ghost">미리보기 갱신</button>
         <button id="reloadBtn" type="button" class="ghost" title="저장하지 않은 화면 입력을 버리고 마지막 저장본을 다시 엽니다.">저장본 다시 열기</button>
       </div>
+      </section>
+      <section id="reportSharePane" aria-label="공개·공유 준비">
       <div id="publishRow" class="publish-row">
         <button id="publishBtn" class="danger" type="button">공개 사이트에 반영</button>
         <span id="publishHint" class="publish-hint">저장과 별도 행동입니다. 누른 뒤 공개 확인과 권한 검사를 통과해야 공개됩니다.</span>
@@ -126,28 +121,57 @@
           </div>
           <span class="naver-post-badge">관리자 전용</span>
         </div>
-        <div class="naver-action-group">
-          <div>
-            <div class="naver-action-title">네이버 카페 글</div>
-            <p class="naver-action-copy">실제 카페 렌더링은 전용 크롬 게시 흐름에서 확인합니다. 아래 미리보기는 구조 확인용입니다.</p>
+        <div class="naver-action-group cafe-publish-module">
+          <div class="naver-action-title">네이버 카페 글</div>
+          <p class="naver-action-copy">현재 편집 내용을 사용합니다. 저장 전 수정도 포함됩니다.</p>
+          <div id="naverCafeDestination" class="naver-post-destination" aria-live="polite">
+            <strong>게시 대상 확인 중</strong><span>현재 리포트의 채널 설정을 불러옵니다.</span>
           </div>
-          <div class="naver-post-actions">
-            <button id="naverCafePostBtn" class="primary" type="button">네이버 카페에 게시하기</button>
-            <button id="naverCafeFillDraftBtn" type="button">글쓰기 창에 채우기</button>
-            <button id="naverCafeCopyBtn" type="button">카페 붙여넣기 복사</button>
-            <button id="naverCafePreviewBtn" type="button">전용 미리보기</button>
+          <div class="naver-post-actions cafe-draft-actions">
+            <button id="naverCafePreviewBtn" type="button">초안 보기</button>
+            <button id="naverCafeCopyBtn" type="button">HTML 복사</button>
+            <button id="naverCafeFillDraftBtn" class="cafe-wide" type="button">작성창에 채우기</button>
+            <button id="naverCafePostBtn" class="primary cafe-wide" type="button" disabled>게시 내용 확인</button>
+          </div>
+          <p class="naver-action-copy">미리보기·복사·작성창 채움은 게시가 아닙니다.</p>
+          <p id="naverCafeCapability" class="naver-action-copy"></p>
+          <div id="naverCafeSubmission" class="cafe-submission" role="status" aria-live="polite" tabindex="-1">현재 게시 기록을 확인합니다.</div>
+          <p id="naverCafeObservation" class="naver-action-copy"></p>
+          <details id="naverCafeHistory" class="cafe-submission-history" hidden>
+            <summary id="naverCafeHistorySummary">이전 제출 기록</summary>
+            <ol id="naverCafeHistoryList"></ol>
+          </details>
+          <div class="cafe-recovery-actions">
+            <button id="naverCafeReadCurrentBtn" type="button">현재 기록 확인</button>
+            <a id="naverCafeLastPostLink" target="_blank" rel="noopener" hidden>마지막 확인 글 열기 ↗</a>
+            <button id="naverCafeNewIntentBtn" type="button" hidden>별도 새 요청 준비</button>
           </div>
         </div>
-        <div id="naverCafeDestination" class="naver-post-destination" aria-live="polite">
-          <strong>게시 대상 확인 중</strong>
-          <span>현재 리포트의 채널 설정을 불러옵니다.</span>
-        </div>
-        <ol class="naver-post-steps" aria-label="네이버 카페 게시 순서">
-          <li><span class="naver-step-num">1</span><span>이 화면의 현재 본문을 사용합니다. 저장 전 수정본도 반영됩니다.</span></li>
-          <li><span class="naver-step-num">2</span><span>전용 네이버 카페 크롬에서 예시 글과 같은 인용구, 중앙 정렬, 줄간격, 링크 카드 형식으로 작성합니다.</span></li>
-          <li><span class="naver-step-num">3</span><span>등록이 끝나면 작성된 글을 열고, 다음부터 버튼은 수정 화면으로 이동합니다.</span></li>
-        </ol>
-        <div id="naverCafeStatus" class="naver-post-status" aria-live="polite">아직 준비 전입니다.</div>
+        <div id="naverCafeStatus" class="naver-post-status" aria-live="polite">초안을 미리 보거나 복사해 사용하세요.</div>
+        <dialog id="naverCafeConfirm" class="report-save-confirm" aria-labelledby="naverCafeConfirmTitle">
+          <h2 id="naverCafeConfirmTitle">카페에 현재 내용을 반영할까요?</h2>
+          <div class="cafe-confirm-body">
+          <p>저장 전 수정 내용을 포함합니다. 이 확인은 사이트 공개·리포트 저장과 별개입니다.</p>
+          <dl class="cafe-confirm-summary">
+            <dt>대상</dt><dd id="naverCafeConfirmDestination"></dd>
+            <dt>내용</dt><dd id="naverCafeConfirmContent"></dd>
+            <dt>방식</dt><dd id="naverCafeConfirmMode"></dd>
+          </dl>
+          <details id="naverCafeConfirmPreview" class="naver-post-preview">
+            <summary>반영할 초안 보기</summary>
+            <div id="naverCafeConfirmPreviewBody" class="naver-post-preview-body"></div>
+          </details>
+          <p>수정 화면을 제출 전에 준비할 수 없는 경우에만 새 글로 게시할 수 있습니다. 제출 결과가 불명확하면 자동으로 다시 게시하지 않습니다.</p>
+          <label id="naverCafeConfirmUnknown" class="cafe-unknown-check" hidden>
+            <input id="naverCafeConfirmUnknownCheck" type="checkbox">
+            이전 요청은 미확정입니다. 카페 글을 직접 확인했고, 중복될 수 있는 별도 새 요청을 진행합니다.
+          </label>
+          </div>
+          <div class="cafe-confirm-actions">
+            <button id="naverCafeConfirmCancel" type="button" autofocus>취소</button>
+            <button id="naverCafeConfirmSubmit" class="primary" type="button">카페에 게시</button>
+          </div>
+        </dialog>
         <details id="naverCafePreviewBox" class="naver-post-preview">
           <summary>카페 글 초안 보기</summary>
           <div id="naverCafePreviewBody" class="naver-post-preview-body">미리보기를 누르면 현재 본문 기준 초안이 표시됩니다.</div>
@@ -193,21 +217,37 @@
         <div id="anchorGrid" class="anchor-grid"></div>
         <div id="youtubePreview" class="preview-box">유튜브 미리보기를 생성하면 여기에 댓글용 텍스트가 표시됩니다.</div>
       </details>
+      </section>
     </aside>
     <div class="resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" tabindex="0" title="드래그해서 사이드바 폭 조절 (Ctrl+더블클릭 = 기본값 복원)"></div>
     <main class="main">
       <div class="preview-bar">
-        <div>
-          <div id="previewTitle" class="preview-title">미리보기</div>
-          <div id="previewInfo" class="muted"></div>
+        <div class="report-heading">
+      <h1 id="title"><span class="dirty-dot" title="저장하지 않은 변경 사항이 있습니다"></span><span id="titleText">리포트 불러오는 중...</span></h1>
+      <div id="meta" class="muted"></div>
+          <div id="previewTitle" class="preview-title" hidden>미리보기</div>
+          <div id="previewInfo" class="muted" hidden></div>
           <p id="managerOutlineStatus" role="status" aria-live="polite"></p>
         </div>
         <button type="button" class="ghost" id="splitViewToggle" aria-pressed="false" disabled
           title="타임라인 카드를 누르면 위쪽 플레이어가 그 장면으로 이동합니다">영상 함께 보기</button>
-        <button type="button" class="ghost" id="reportSourceToggle" aria-controls="sidebar" aria-expanded="false" hidden>전체본문 직접 편집</button>
+        <div class="report-surfaces" role="group" aria-label="작업면 선택">
+          <button type="button" class="ghost" id="reportReadButton" aria-pressed="true" hidden>읽기·장면</button>
+          <button type="button" class="ghost" id="reportSourceToggle" aria-controls="reportSourcePane" aria-expanded="false" hidden>전체본문 직접 편집</button>
+          <button type="button" class="ghost" id="reportShareToggle" aria-controls="reportSharePane" aria-expanded="false" hidden>공개·공유 준비</button>
+        </div>
         <button id="managerOutlineSaveBtn" class="primary" type="button" hidden>수정본 저장</button>
       </div>
       <section class="report-context-strip" aria-label="현재 요약과 저장 상태">
+      <nav class="topbar report-context-navigation" aria-label="현재 방송의 자료와 복귀">
+        <a href="/reports">← 리포트 목록으로</a>
+        <a id="sourceManifestLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 자막/채팅/커뮤니티/클립/맥락 재료 수집 상태를 한눈에 확인합니다 (관리자 전용, LLM 호출 없음)">재료 상태</a>
+        <a id="workEvidenceLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 로컬 work 폴더 산출물을 내용 노출 없이 확인합니다 (관리자 전용)">작업자료·ZIP</a>
+        <button id="revisionHistoryBtn" class="link-button" type="button" title="저장/공개 반영 시점의 본문과 화면 기록을 확인합니다">저장·공개 이력</button>
+        <a id="editorBriefLink" href="#" target="_blank" rel="noopener">편집 브리프</a>
+        <a id="vodOutputsLink" href="#" target="_blank" rel="noopener">결과 모음</a>
+        <a id="publicLink" href="#" target="_blank" rel="noopener">공개 리포트 열기</a>
+      </nav>
         <div class="report-context-row">
           <nav id="reportVersions" aria-label="요약 버전"></nav>
           <a id="reportWorkspaceLink" href="/report-workspace" title="현재 요약 버전과 선택 장면을 장면 편집 화면에서 엽니다.">장면 편집 화면 열기</a>
@@ -371,6 +411,7 @@
       </div>
     </form>
   </dialog>
+  <script src="/static/admin/report_navigation.js"></script>
   <script src="/static/admin/report_lifecycle.js"></script>
   <script src="/static/admin/report_adaptive_context.js"></script>
   <script src="/static/admin/report_signal_timeline.js"></script>

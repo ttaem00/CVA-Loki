@@ -331,6 +331,16 @@ def _seconds_label(duration: float) -> str:
 def _editorial_progress_notice(view: Mapping[str, Any]) -> str:
     """Describe recorded progress without treating missing work as rejection."""
     progress = view.get("review_progress")
+    if (isinstance(progress, Mapping) and progress.get("pipeline_complete") is True
+            and progress.get("completion_disposition") == "context_unverified_preserved"):
+        questions = view.get("unresolved_questions") or []
+        descriptions = [row.get("question") if isinstance(row, Mapping) else row for row in questions]
+        if not descriptions:
+            descriptions = [row.get("reason") for row in view.get("unresolved_group_outcomes") or []]
+        items = "".join(f"<li>미확인: {_esc(text)}</li>" for text in descriptions if isinstance(text, str) and text.strip())
+        return ('<div class="editorial-partial-status" role="status">'
+                '<strong>요약 처리가 완료됐습니다.</strong> 확인하지 못한 내용은 미확인으로 남겼습니다.'
+                f'<ul>{items}</ul></div>')
     pending = isinstance(progress, Mapping) and progress.get("pipeline_complete") is False
     partial = str(view.get("completion_state") or "").startswith("partial_")
     if not pending and not partial:

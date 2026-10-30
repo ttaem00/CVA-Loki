@@ -39,10 +39,12 @@ class EvidenceWorldService:
 
     @classmethod
     def prepare(cls, *, video_no, srt_path, source_work_dir, cache_root, run_root,
-                duration_sec, policy=None, owner="source_navigation", unit_policy=None, clip_source_path=None):
+                duration_sec, policy=None, owner="source_navigation", unit_policy=None, clip_source_path=None,
+                chat_source_path=None):
         policy = policy or SourcePolicy(allowed_families=("stt",))
         assets = register_assets(video_no=video_no, srt_path=srt_path, work_dir=source_work_dir,
-                                 duration_sec=duration_sec, policy=policy, clip_source_path=clip_source_path)
+                                 duration_sec=duration_sec, policy=policy, clip_source_path=clip_source_path,
+                                 chat_source_path=chat_source_path)
         root, manifest = build_snapshot(assets=assets, work_dir=cache_root, policy=policy,
                                         unit_policy=unit_policy)
         return cls(root=root, manifest=manifest, run_root=run_root, owner=owner)

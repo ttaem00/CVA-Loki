@@ -16,6 +16,7 @@
       this.valueNode = root.querySelector('[data-time-value]');
       this.deltaNode = root.querySelector('[data-time-delta]');
       this.input = root.querySelector('[data-time-input]');
+      this.errorNode = root.querySelector('[data-time-error]');
       this.directInput = root.hasAttribute('data-direct-input');
       this.active = null;
       this.editSession = null;
@@ -32,6 +33,7 @@
       });
       this.input.addEventListener('keydown', event => this.onInputKeyDown(event));
       this.input.addEventListener('blur', () => this.finishInput());
+      this.input.addEventListener('invalid', () => this.updateInputError());
       this.sync(this.options.getValue());
     }
 
@@ -40,7 +42,11 @@
       this.valueNode.textContent = formatted;
       this.button.setAttribute('aria-label', `${this.root.dataset.label} ${formatted}. 좌우로 드래그해 조정하거나 클릭해 직접 입력`);
       this.button.title = `${formatted} — 잡고 좌우로 끌어 조정 · 클릭해 직접 입력`;
-      if (!this.editSession) this.input.value = formatted;
+      if (!this.editSession) {
+        this.input.value = formatted;
+        this.input.setCustomValidity?.('');
+        this.updateInputError();
+      }
       const showDelta = Number.isFinite(delta) && delta !== 0;
       this.deltaNode.hidden = !showDelta;
       this.deltaNode.textContent = showDelta ? `${delta > 0 ? '+' : '−'}${Math.abs(delta)}초` : '';
@@ -135,12 +141,26 @@
 
     previewInput() {
       if (!this.editSession) return;
-      if (this.input.value === this.options.format(this.options.getValue())) return;
+      this.input.setCustomValidity?.('');
+      if (this.input.value === this.options.format(this.options.getValue())) {
+        this.updateInputError();
+        return;
+      }
       const value = this.options.parse(this.input.value);
       if (!Number.isFinite(value)) return;
       const result = this.options.preview(value);
       this.input.setCustomValidity?.(result.ok ? '' : result.error || '허용 범위 안의 시간을 입력해 주세요.');
       if (result.ok) this.sync(result.value);
+      if (result.ok || (this.errorNode && !this.errorNode.hidden)) this.updateInputError();
+    }
+
+    updateInputError() {
+      const message = this.input.validationMessage || '';
+      this.input.setAttribute?.('aria-invalid', message ? 'true' : 'false');
+      if (this.errorNode) {
+        this.errorNode.textContent = message;
+        this.errorNode.hidden = !message;
+      }
     }
 
     onInputKeyDown(event) {
@@ -166,11 +186,13 @@
         : Number.isFinite(value) ? this.options.preview(value) : {ok: false};
       if(!result.ok && this.directInput) {
         this.input.setCustomValidity?.(result.error || '시:분:초와 장면 범위를 확인해 주세요.');
+        this.updateInputError();
         this.editSession=null;
         this.options.commit(session.snapshot);
         this.options.invalid();return;
       }
       this.input.setCustomValidity?.('');
+      this.updateInputError();
       this.editSession = null;
       this.input.hidden = !this.directInput;
       this.button.hidden = false;

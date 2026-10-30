@@ -28,6 +28,7 @@
         : '/report-workspace';
       const initialScene=detailSceneParams({type:params.get('type'),id:params.get('id'),spanIndex:Number(params.get('span') || 0)});
       if(base&&initialScene.has('id'))reportWorkspaceLinkEl.href+=`&${initialScene}`;
+      if(base){const target=new URL(reportWorkspaceLinkEl.href,location.href);window.ReportNavigation.list(target.searchParams);window.ReportNavigation.view(target.searchParams);reportWorkspaceLinkEl.href=target.pathname+target.search;}
       reportWorkspaceLinkEl.addEventListener('click',()=>updateDetailSceneLinks());
     }
     function detailSceneParams(selection) {
@@ -48,18 +49,26 @@
       for(const key of ['type','id','span'])current.delete(key);
       for(const [key,value] of query)current.set(key,value);
       window.history?.replaceState(null,'',`${location.pathname}?${current}${location.hash || ''}`);
-      if(reportWorkspaceLinkEl){const target=new URLSearchParams({base});
+      if(reportWorkspaceLinkEl){const target=window.ReportNavigation.list(new URLSearchParams({base}));
+        window.ReportNavigation.view(target);
         for(const [key,value] of query)target.set(key,value);
         reportWorkspaceLinkEl.href=`/report-workspace?${target}`;}
-      document.querySelectorAll('a[href="/reports"], a[href^="/reports?"]').forEach(anchor=>{const target=new URLSearchParams({base});
+      document.querySelectorAll('a[href="/reports"], a[href^="/reports?"]').forEach(anchor=>{const target=window.ReportNavigation.list(new URLSearchParams({base}));
         for(const [key,value] of query)target.set(key,value);anchor.href=`/reports?${target}`;});
       document.querySelectorAll('#reportVersions a').forEach(anchor=>{
         const target=new URL(anchor.href,location.href);
         if(target.origin!==location.origin||!['/report','/report-workspace'].includes(target.pathname))return;
+        window.ReportNavigation.list(target.searchParams);
+        window.ReportNavigation.view(target.searchParams);
         for(const key of ['type','id','span'])target.searchParams.delete(key);
         for(const [key,value] of query)target.searchParams.set(key,value);
         anchor.href=target.pathname+target.search;
       });
+      if(sourceManifestLinkEl)sourceManifestLinkEl.href=window.ReportNavigation.reader('/source-manifest',base,query,'detail');
+      if(workEvidenceLinkEl)workEvidenceLinkEl.href=window.ReportNavigation.reader('/work-evidence',base,query,'detail');
+      for(const [id,path] of [['editorBriefLink','/editor'],['vodOutputsLink','/vod-outputs']]){
+        const anchor=document.getElementById(id);if(anchor)anchor.href=window.ReportNavigation.reader(path,base,query,'detail');
+      }
     }
     function restoreDetailSceneSelection() {
       const query=new URLSearchParams(location.search),type=query.get('type'),id=query.get('id'),rawSpan=query.get('span') || '0';
@@ -76,14 +85,18 @@
     const sourceManifestLinkEl = document.getElementById('sourceManifestLink');
     if (sourceManifestLinkEl) {
       sourceManifestLinkEl.href = base
-        ? `/source-manifest?base=${encodeURIComponent(base)}`
+        ? window.ReportNavigation.reader('/source-manifest',base,window.ReportNavigation.scene(),'detail')
         : '#';
     }
     const workEvidenceLinkEl = document.getElementById('workEvidenceLink');
     if (workEvidenceLinkEl) {
       workEvidenceLinkEl.href = base
-        ? `/work-evidence?base=${encodeURIComponent(base)}`
+        ? window.ReportNavigation.reader('/work-evidence',base,window.ReportNavigation.scene(),'detail')
         : '#';
+    }
+    document.querySelectorAll('a[href="/reports"]').forEach(anchor=>{anchor.href=`/reports?${window.ReportNavigation.list(new URLSearchParams())}`;});
+    for(const [id,path] of [['editorBriefLink','/editor'],['vodOutputsLink','/vod-outputs']]){
+      const anchor=document.getElementById(id);if(anchor&&base)anchor.href=window.ReportNavigation.reader(path,base,window.ReportNavigation.scene(),'detail');
     }
     const mdEditor = document.getElementById('mdEditor');
     const previewTitleEl = document.getElementById('previewTitle');
@@ -280,7 +293,7 @@
     mdEditor.addEventListener('input', () => {
       setDirty(mdEditor.value !== savedMd);
       scheduleManagerOutlineDraftSync('markdown');
-      if (!naverCafePost || !naverCafePost.article_url) resetNaverCafeDraft();
+      resetNaverCafeDraft();
       resetChzzkCommentDraft();
     });
 

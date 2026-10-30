@@ -48,8 +48,17 @@
     const packet = state.packet || {};
     const groups = (packet.unresolved_group_outcomes || []).length;
     const proposals = (packet.unresolved_proposals || []).length;
-    const questions = Array.isArray(packet.unresolved_questions)
-      ? packet.unresolved_questions.filter(question => typeof question === 'string' && question.trim()) : [];
+    const questions = [];
+    for (const question of Array.isArray(packet.unresolved_questions) ? packet.unresolved_questions : []) {
+      const text = typeof question === 'string' ? question : question && question.question;
+      if (typeof text === 'string' && text.trim()) questions.push(text);
+    }
+    const progress = state.report && state.report.manager_outline_review_progress;
+    if (progress && progress.pipeline_complete === true
+        && progress.completion_disposition === 'context_unverified_preserved') {
+      return '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.'
+        + (questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '');
+    }
     if (!String(packet.completion_state || '').startsWith('partial_') && !groups && !proposals && !questions.length) return '';
     const pending = [];
     if (groups) pending.push(`미확정 발견 ${groups}건`);

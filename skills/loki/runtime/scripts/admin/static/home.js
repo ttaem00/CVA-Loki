@@ -25,6 +25,9 @@
     let bundleMode = false;
     let operationsLoaded = false;
     let searchTimer = null;
+    let catalogGeneration = 0;
+    let catalogController = null;
+    let loadedCatalogFilter = null;
     const PAGE_SIZE = 24;
     const selectedBundleBases = new Set();
     let lastBundlePreview = null;
@@ -698,11 +701,16 @@
       });
     }
 
+    function reviewHref(path, base) {
+      const context = new URLSearchParams({q: (searchEl.value || '').trim(), streamer: activeStreamer});
+      return `${path}?${window.ReportNavigation.list(new URLSearchParams({base}), context)}`;
+    }
+
     function renderCard(report) {
       const anchor = document.createElement('a');
       anchor.className = 'card';
       const reviewPath = report.workspace_ready ? '/report-workspace' : '/report';
-      anchor.href = `${reviewPath}?base=${encodeURIComponent(report.base)}`;
+      anchor.href = reviewHref(reviewPath, report.base);
       if (report.kind === 'bundle') {
         anchor.innerHTML = `
           <div class="title">📦 ${escapeHtml(report.title)}</div>
@@ -753,7 +761,7 @@
           const versions = document.createElement('details');
           const time = value => value ? new Date(value).toLocaleString('ko-KR') : '시간 미확인';
           versions.innerHTML = `<summary>이전 요약 버전 ${report.summary_version_count - 1}개</summary>` + report.summary_versions.slice(1).map(version =>
-            `<p><a href="${version.workspace_ready ? '/report-workspace' : '/report'}?base=${encodeURIComponent(version.base)}">${escapeHtml(version.summary_label)} · ${escapeHtml(time(version.saved_at))}</a></p>`).join('');
+            `<p><a href="${escapeHtml(reviewHref(version.workspace_ready ? '/report-workspace' : '/report', version.base))}">${escapeHtml(version.summary_label)} · ${escapeHtml(time(version.saved_at))}</a></p>`).join('');
           shell.appendChild(versions);
         }
         return shell;
@@ -840,36 +848,74 @@
       errorEl.textContent = err.message;
     }
 
+    function invalidateCatalogRead() {
+      catalogGeneration++;
+      catalogController?.abort();
+      catalogController = null;
+      if (loadMoreBtn) {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = '요약 더 보기';
+      }
+    }
+
     async function loadReports({append = false} = {}) {
+      window.clearTimeout(searchTimer);
+      searchTimer = null;
+      invalidateCatalogRead();
+      const generation = catalogGeneration;
+      const controller = new AbortController();
+      catalogController = controller;
+      const filters = new URLSearchParams();
+      const keyword = (searchEl.value || '').trim();
+      if (keyword) filters.set('q', keyword);
+      if (activeStreamer && activeStreamer !== '__all__') filters.set('streamer', activeStreamer);
+      const filterKey = filters.toString();
+      append = append && filterKey === loadedCatalogFilter;
       errorEl.textContent = '';
       if (!append) {
-        nextOffset = 0;
         listEl.setAttribute('aria-busy', 'true');
+        loadMoreBtn.hidden = true;
+      } else {
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = '불러오는 중...';
       }
-      const params = new URLSearchParams({limit: String(PAGE_SIZE), offset: String(nextOffset)});
-      const keyword = (searchEl.value || '').trim();
-      if (keyword) params.set('q', keyword);
-      if (activeStreamer && activeStreamer !== '__all__') params.set('streamer', activeStreamer);
-      const data = await api(`/api/report-catalog?${params}`);
-      const pageRows = Array.isArray(data.reports) ? data.reports : [];
-      reports = append ? reports.concat(pageRows) : pageRows;
-      streamerFacets = Array.isArray(data.streamers) ? data.streamers : [];
-      catalogStats = {
-        total: Number(data.total || 0),
-        matchedTotal: Number(data.matched_total || 0),
-      };
-      nextOffset = reports.length;
-      hasMore = !!data.has_more;
-      const availableBases = new Set(reports.map((report) => report.base));
-      Array.from(selectedBundleBases).forEach((base) => {
-        if (!availableBases.has(base)) selectedBundleBases.delete(base);
-      });
-      syncExplorerUrl();
-      render();
+      const params = new URLSearchParams({limit: String(PAGE_SIZE), offset: String(append ? nextOffset : 0)});
+      for (const [key, value] of filters) params.set(key, value);
+      try {
+        const data = await api(`/api/report-catalog?${params}`, {signal: controller.signal});
+        if (generation !== catalogGeneration) return;
+        const pageRows = Array.isArray(data.reports) ? data.reports : [];
+        reports = append ? reports.concat(pageRows) : pageRows;
+        streamerFacets = Array.isArray(data.streamers) ? data.streamers : [];
+        catalogStats = {
+          total: Number(data.total || 0),
+          matchedTotal: Number(data.matched_total || 0),
+        };
+        nextOffset = reports.length;
+        hasMore = !!data.has_more;
+        loadedCatalogFilter = filterKey;
+        const availableBases = new Set(reports.map((report) => report.base));
+        Array.from(selectedBundleBases).forEach((base) => {
+          if (!availableBases.has(base)) selectedBundleBases.delete(base);
+        });
+        syncExplorerUrl();
+        render();
+      } catch (err) {
+        if (generation === catalogGeneration && !controller.signal.aborted) showCatalogError(err);
+      } finally {
+        if (generation === catalogGeneration) {
+          catalogController = null;
+          loadMoreBtn.disabled = false;
+          loadMoreBtn.textContent = '요약 더 보기';
+        }
+      }
     }
 
     searchEl.addEventListener('input', () => {
       window.clearTimeout(searchTimer);
+      invalidateCatalogRead();
+      listEl.setAttribute('aria-busy', 'true');
+      loadMoreBtn.hidden = true;
       searchTimer = window.setTimeout(() => loadReports().catch(showCatalogError), 240);
     });
     if (bundlePreviewBtn) bundlePreviewBtn.addEventListener('click', () => previewExistingSummaryBundle());
@@ -898,12 +944,8 @@
       });
     }
     if (loadMoreBtn) {
-      loadMoreBtn.addEventListener('click', async () => {
-        loadMoreBtn.disabled = true;
-        loadMoreBtn.textContent = '불러오는 중...';
-        try { await loadReports({append: true}); }
-        catch (err) { showCatalogError(err); }
-        finally { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '요약 더 보기'; }
+      loadMoreBtn.addEventListener('click', () => {
+        loadReports({append: true}).catch(showCatalogError);
       });
     }
     document.getElementById('reloadBtn').addEventListener('click', () => {

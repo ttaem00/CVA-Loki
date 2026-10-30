@@ -24,6 +24,8 @@ UI_ASSETS = (
     "scripts/admin/static/report_distribution.js",
     "scripts/admin/static/report_timeline_candidate.js",
     "scripts/admin/static/report_versions.js",
+    "scripts/admin/static/report_navigation.js",
+    "scripts/admin/static/report_navigation.css",
     "scripts/admin/static/report_workspace.css",
     "scripts/admin/static/report_workspace.js",
     "scripts/admin/static/report_workspace_state.js",
@@ -51,7 +53,7 @@ NAV = """<link rel="stylesheet" href="/static/admin/app_shell.css">
     </div>
   </nav>"""
 
-LOCAL_STYLE = '<style>.deep-search-link,#bundleModeBtn{display:none!important}</style>'
+LOCAL_STYLE = '<style>.deep-search-link,#bundleModeBtn,#workspaceMaterials,#editorBriefLink,#vodOutputsLink{display:none!important}</style>'
 
 _FONT_LINK = re.compile(r'^[ \t]*<link\b(?=[^>]*\bhref=["\']https://fonts\.(?:googleapis|gstatic)\.com(?:[/:"\']))[^>]*>\r?\n?', re.IGNORECASE | re.MULTILINE)
 

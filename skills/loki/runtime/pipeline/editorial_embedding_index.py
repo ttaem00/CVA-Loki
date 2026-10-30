@@ -11,6 +11,8 @@ import json
 
 import time
 
+from contextlib import nullcontext
+
 from functools import lru_cache
 
 from .evidence_world.contracts import EvidenceError, digest, native_path
@@ -147,8 +149,8 @@ def encode_media_cached(content,*,modality,root,runtime,model,media_sha256,windo
         dict(key=key,role=modality,vector=vector[0].tolist())])
     return vector
 
-def prepare(service, *, source_dir, runtime):
-    """Called by source preparation, before author dispatch; resume by content ID."""
+def prepare(service, *, source_dir, runtime, cached_only=False):
+    """Build or reuse source-bound vectors; optional admission uses cached_only."""
     import pyarrow as pa
     from .evidence_world.records import assert_asset_fresh
     for asset in service.assets.values():assert_asset_fresh(asset)
@@ -164,7 +166,7 @@ def prepare(service, *, source_dir, runtime):
         relative_root='embedding-index')
     root.mkdir(parents=True,exist_ok=True)
     receipt = root/'manifests'/(identity+'.json')
-    with build_lock(root):
+    with (nullcontext() if cached_only else build_lock(root)):
         if receipt.is_file():
             saved=json.loads(receipt.read_text(encoding='utf-8'))
             if saved['config']!=cfg:
@@ -172,11 +174,9 @@ def prepare(service, *, source_dir, runtime):
             table=_connect(root/'lance').open_table(name)
             if table.count_rows()!=len(rows) or table.version!=saved['table_version']:
                 raise EvidenceError('gemma_index_changed')
-            from .editorial_multimodal_navigation import _bound_json
-            model,_=_bound_json(runtime['model_ref'])
-            _encoder(json.dumps(model,sort_keys=True),runtime['sdk_root'],
-                runtime['limits']['cpu_threads'],runtime.get('device','auto'))
             return cfg
+        if cached_only:
+            return None
         vectors, stats = encode_cached([r['norm_text'] for r in rows],role='document',root=root,runtime=runtime)
         schema=pa.schema([pa.field('unit_id',pa.string()),pa.field('family',pa.string()),
             pa.field('start_us',pa.int64()),pa.field('end_us',pa.int64()),
@@ -196,17 +196,21 @@ def prepare(service, *, source_dir, runtime):
         for asset in service.assets.values():assert_asset_fresh(asset)
     return cfg
 
-def prepare_optional(service,*,source_dir,runtime):
-    """Retrieval preparation never locks unrelated original reading or saving."""
+def prepare_optional(service,*,source_dir,runtime,cached_only=True):
+    """New authoring reuses settled vectors; lexical originals need no encoder."""
     if runtime is None:return None
     root=native_path(source_dir)/'embedding-index'
     try:
-        result=prepare(service,source_dir=source_dir,runtime=runtime)
+        result=prepare(service,source_dir=source_dir,runtime=runtime,cached_only=cached_only)
     except (ImportError,OSError,ValueError,RuntimeError) as exc:
         atomic_json(root/'preparation-status.json',dict(status='unavailable',
             reason=type(exc).__name__,original_search_available=True))
         return None
-    atomic_json(root/'preparation-status.json',dict(status='ready',config=result))
+    if result is None:
+        atomic_json(root/'preparation-status.json',dict(status='unavailable',
+            reason='index_not_prepared',original_search_available=True))
+    else:
+        atomic_json(root/'preparation-status.json',dict(status='ready',config=result))
     return result
 
 class SavedGemmaSearch:

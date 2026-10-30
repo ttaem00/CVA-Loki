@@ -12,7 +12,7 @@ import json
 
 from .evidence_world.contracts import file_hash, native_path
 
-def prepare_sources(*, service, source_dir, vod, base_path, chunks):
+def prepare_sources(*, service, source_dir, vod, base_path, chunks, comment_source_dir=None):
     from .evidence_world.records import chat_analysis_rows
     from .chat_analyzer import find_edit_points
     from .chat_semantic_sampler import sample_semantic_chat_rows_with_stats
@@ -54,10 +54,10 @@ def prepare_sources(*, service, source_dir, vod, base_path, chunks):
 
     support_assets, availability = [], {}
     for family, path in (('manager_context', source_dir / f'{video}_context.md'),
-                         ('timeline_comments', source_dir / 'timeline_comments.json')):
+                         ('timeline_comments', (comment_source_dir or source_dir) / 'timeline_comments.json')):
         available = path.is_file()
         if family == 'timeline_comments' and available:
-            available = load_timeline_comment_bundle(video, source_dir, cache_ttl_hours=0,
+            available = load_timeline_comment_bundle(video, path.parent, cache_ttl_hours=0,
                 expected_source_url=f'https://chzzk.naver.com/video/{video}') is not None
         availability[family] = 'available' if available else 'not_collected'
         if available:

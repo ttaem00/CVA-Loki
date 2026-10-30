@@ -64,13 +64,47 @@ def check_dispatch(cfg):
         return
     guard(archive_folder(archive))
 
+def _verified_candidate_live_transcript(cfg, video_no, duration_sec, selected):
+    """Verify the unchanged original owner before trusting a relocated view."""
+    from copy import deepcopy
+    from .evidence_world.contracts import native_path
+    origin = selected["source_original"]
+    if (not cfg.get("candidate_output_dir") or not isinstance(origin, dict)
+            or set(origin) != {"work_dir", "selected"} or not isinstance(origin["selected"], dict)
+            or "source_original" in origin["selected"]
+            or Path(origin["work_dir"]).resolve() != Path(cfg.get("candidate_source_work_dir", "")).resolve()
+            or Path(cfg["work_dir"]).resolve() == Path(origin["work_dir"]).resolve()):
+        raise ValueError("finalize_candidate_source_scope_changed")
+    original_cfg = dict(cfg, work_dir=origin["work_dir"], live_finalize_source=origin["selected"])
+    original = Path(verified_live_transcript(original_cfg, video_no, duration_sec))
+    original_work = Path(origin["work_dir"]).resolve() / str(video_no)
+    work = Path(cfg["work_dir"]).resolve() / str(video_no)
+    output = local_file(work, original.relative_to(original_work).as_posix())
+    expected = deepcopy(origin["selected"])
+    expected.update(transcript=str(output), source_original=origin)
+    if expected.get("manager_context") is not None:
+        relative = native_path(expected["manager_context"]["path"]).resolve().relative_to(native_path(original_work).resolve()).as_posix()
+        context = native_path(local_file(work, relative)).resolve()
+        expected["manager_context"] = dict(path=str(context), sha256=expected["manager_context"]["sha256"])
+    if selected != expected:
+        raise ValueError("finalize_candidate_source_identity_changed")
+    if (sha(output) != expected["source_sha256"]
+            or sha(output.with_suffix(".live-vod-source.json")) != expected["provenance_sha256"]):
+        raise ValueError("finalize_candidate_subtitles_changed")
+    if expected.get("manager_context") is not None:
+        from .live_editorial_source import load_live_manager_context
+        load_live_manager_context(output, source_clock=expected["manager_context_clock"], binding=expected["manager_context"])
+    return str(output)
+
 def verified_live_transcript(cfg, video_no, duration_sec):
     """Verify the selected immutable live result within this VOD's work folder."""
     archive = cfg.get("live_finalize_archive")
     if not archive:
         return None
-    check_dispatch(cfg)
     selected = cfg.get("live_finalize_source") or {}
+    if "source_original" in selected:
+        return _verified_candidate_live_transcript(cfg, video_no, duration_sec, selected)
+    check_dispatch(cfg)
     work = Path(cfg["work_dir"]).resolve() / str(video_no)
     output = local_file(work, Path(selected.get("transcript") or "").relative_to(work).as_posix())
     provenance = local_file(work, output.with_suffix(".live-vod-source.json").relative_to(work).as_posix())

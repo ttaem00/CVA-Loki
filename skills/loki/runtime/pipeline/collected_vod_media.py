@@ -3,9 +3,6 @@
 def collected_clock(srt_path, video_no, duration_sec):
     return None
 
-def collected_vod_media(*, srt_path, video_no, duration_sec):
-    return None
-
 def assert_collected_media_fresh(*args, **kwargs):
     from pathlib import Path
     path = Path(args[0]).resolve(strict=True)

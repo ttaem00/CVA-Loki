@@ -92,7 +92,14 @@ def resolve_session(*, generation_root, channel_uid, live_id, cold_archive_root=
         if cold_archive_root is not None:
             command.append(str(cold_archive_root))
         try:
-            result = subprocess.run(command, capture_output=True, timeout=30, check=False)
+            for attempt in range(2):
+                try:
+                    result = subprocess.run(command, capture_output=True, timeout=30, check=False)
+                    break
+                except subprocess.TimeoutExpired:
+
+                    if attempt:
+                        raise
             if len(result.stdout) > 16000:
                 raise EvidenceError('temporal_location_unbounded')
             value = json.loads(result.stdout.decode('utf8'))

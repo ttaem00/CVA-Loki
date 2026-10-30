@@ -1,7 +1,7 @@
 {
   "schema_version": "loki.version-policy.v1",
   "product_name": "Loki",
-  "current_pipeline": "loki_3_0_5",
+  "current_pipeline": "loki_3_0_6",
   "pipelines": {
     "legacy_v1": {"kind": "legacy", "label": "기존 요약"},
     "pipeline_2_5": {"kind": "structured", "version": "2.9.4.2"},
@@ -9,8 +9,9 @@
     "aemeth_3_0_2": {"kind": "full_author", "version": "3.0.2", "adoption_status": "manager_selected"},
     "loki_3_0_3": {"kind": "full_author", "version": "3.0.3", "adoption_status": "manager_selected"},
     "loki_3_0_4": {"kind": "full_author", "version": "3.0.4", "adoption_status": "manager_selected"},
-    "loki_3_0_5": {"kind": "full_author", "version": "3.0.5", "adoption_status": "manager_selected"}
+    "loki_3_0_5": {"kind": "full_author", "version": "3.0.5", "adoption_status": "manager_selected"},
+    "loki_3_0_6": {"kind": "full_author", "version": "3.0.6", "adoption_status": "manager_selected"}
   },
   "aliases": {"aemeth_2_5": "pipeline_2_5"},
-  "new_choices": ["latest", "loki_3_0_5"]
+  "new_choices": ["latest", "loki_3_0_6"]
 }

@@ -16,6 +16,8 @@ from .payload import _bucketed_eligible_clip_objects
 
 from .render_primitives import _audio_peak_delta_text, _build_public_vod_url, _chzzk_video_url_at, _html_escape
 
+from .viewer_editor import _build_chzzk_vod_url
+
 _CAFE_SECTION_TITLE_STYLE = "font-size:24px;line-height:1.55;margin:0;font-weight:900;color:#111827"
 
 _CAFE_PARAGRAPH_STYLE = "font-size:16px;line-height:2.0;margin:0 0 14px;color:#202124"
@@ -228,7 +230,9 @@ def _should_render_cafe_highlights() -> bool:
     return False
 
 def _cafe_video_url(video_no: str, tc: str = "") -> str:
-    base = f"https://chzzk.naver.com/video/{video_no}"
+    base = _build_chzzk_vod_url(video_no)
+    if not base:
+        return ""
     clean_tc = (tc or "").split("~", 1)[0].strip().strip("[]")
     if not clean_tc:
         return base

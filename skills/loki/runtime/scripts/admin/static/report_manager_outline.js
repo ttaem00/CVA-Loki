@@ -203,11 +203,25 @@
     const managerOutlineReadOnlyEl = document.getElementById('managerOutlineReadOnly');
     const managerOutlineSaveBtn = document.getElementById('managerOutlineSaveBtn');
     const reportSourceToggle = document.getElementById('reportSourceToggle');
-    reportSourceToggle.addEventListener('click', () => {
-      const expanded = reportAppEl.classList.toggle('report-source-visible');
-      reportSourceToggle.setAttribute('aria-expanded', String(expanded));
-      reportSourceToggle.textContent = expanded ? '전체본문 직접 편집 닫기' : '전체본문 직접 편집';
-    });
+    const reportShareToggle = document.getElementById('reportShareToggle');
+    const reportReadButton = document.getElementById('reportReadButton');
+    function setReportSurface(requested, updateUrl = true) {
+      const surface = ['source', 'share'].includes(requested)
+        && !(requested === 'share' && reportAppEl.classList.contains('manager-outline-mode')) ? requested : 'read';
+      reportAppEl.dataset.reportSurface = surface;
+      reportAppEl.classList.toggle('report-source-visible', surface !== 'read');
+      reportSourceToggle.setAttribute('aria-expanded', String(surface === 'source'));
+      reportShareToggle.setAttribute('aria-expanded', String(surface === 'share'));
+      reportReadButton.setAttribute('aria-pressed', String(surface === 'read'));
+      if (updateUrl) {
+        const query = new URLSearchParams(location.search); query.set('tab', surface);
+        window.history?.replaceState(null, '', `${location.pathname}?${query}${location.hash || ''}`);
+        updateDetailSceneLinks();
+      }
+    }
+    reportSourceToggle.addEventListener('click', () => setReportSurface(reportAppEl.dataset.reportSurface === 'source' ? 'read' : 'source'));
+    reportShareToggle.addEventListener('click', () => setReportSurface(reportAppEl.dataset.reportSurface === 'share' ? 'read' : 'share'));
+    reportReadButton.addEventListener('click', () => setReportSurface('read'));
     const managerOutlineAddBtn = document.getElementById('managerOutlineAddBtn');
     const managerOutlineAddMenu = document.getElementById('managerOutlineAddMenu');
     const managerOutlineUndoBtn = document.getElementById('managerOutlineUndoBtn');
@@ -1535,9 +1549,16 @@
     }
 
     function managerEditorialCompletionText(packet, progress) {
-      const questions = packet && Array.isArray(packet.unresolved_questions)
-        ? packet.unresolved_questions.filter(question => typeof question === 'string' && question.trim()) : [];
+      const questions = [];
+      for (const question of packet && Array.isArray(packet.unresolved_questions) ? packet.unresolved_questions : []) {
+        const text = typeof question === 'string' ? question : question && question.question;
+        if (typeof text === 'string' && text.trim()) questions.push(text);
+      }
       const questionNotice = questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '';
+      if (progress && progress.pipeline_complete === true
+          && progress.completion_disposition === 'context_unverified_preserved') {
+        return '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.' + questionNotice;
+      }
       if (progress && progress.schema_version === 'manager_outline.review_progress.v1'
           && progress.review_available === true && progress.pipeline_complete === false) {
         return '기본 요약 준비 · 장면 분석 미완. 현재 목차와 Point는 검토·수정할 수 있어요. '
@@ -1589,6 +1610,9 @@
       if (isOutline) applyReportPageRole('manager');
       if (reportRoleSwitchEl) reportRoleSwitchEl.hidden = isOutline;
       if (reportAppEl) reportAppEl.classList.toggle('manager-outline-mode', isOutline);
+      reportReadButton.hidden = !hasStructuredOutline;
+      reportShareToggle.hidden = !hasStructuredOutline || isOutline;
+      if (hasStructuredOutline) setReportSurface(reportAppEl.dataset.reportSurface || new URLSearchParams(location.search).get('tab'), false);
       managerOutlineEditorEl.hidden = !hasStructuredOutline;
       if (chzzkCommentGroupEl) {
         if (hasStructuredOutline) managerOutlineEditorEl.append(chzzkCommentGroupEl);
@@ -1661,9 +1685,9 @@
         block.querySelector('pre').textContent = String(readOnly[block.dataset.outlineReadonly] || '없음');
       });
       const revisions = data.manager_outline_revisions || [];
-      managerOutlineHistorySummaryEl.textContent = `이전 버전 ${revisions.length}개`;
+      managerOutlineHistorySummaryEl.textContent = `로컬 수정 이력 ${revisions.length}개`;
       managerOutlineHistoryEl.innerHTML = revisions.map(version => {
-        return `<section><strong>${escapeHtml(version.revision_id)}</strong> <button type="button" data-outline-restore="${escapeHtml(version.revision_id)}">이 버전 복원</button><pre>${escapeHtml(outlineVersionSummary(version.outline))}</pre></section>`;
+        return `<section class="outline-history-entry"><strong>${escapeHtml(window.ReportNavigation.revisionTitle(version))}</strong> <button type="button" data-outline-restore="${escapeHtml(version.revision_id)}">이 저장본 복원…</button><p>${escapeHtml(window.ReportNavigation.revisionSummary(version))}</p><details><summary>기록 ID·저장 내용 보기</summary><code>${escapeHtml(version.revision_id)}</code><pre>${escapeHtml(outlineVersionSummary(version.outline))}</pre></details></section>`;
       }).join('') || '<p>아직 저장된 수정본이 없습니다.</p>';
       managerOutlineStatusEl.textContent = '목차를 불러왔어요.';
       if (typeof data.chzzk_comment_text === 'string') {

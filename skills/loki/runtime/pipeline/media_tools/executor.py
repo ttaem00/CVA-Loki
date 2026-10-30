@@ -292,6 +292,9 @@ def _extract_frames(
         "9",
         "-q:v",
         "3",
+
+        "-threads:v",
+        "1",
         str(pattern),
     ]
     _run(command, timeout_sec=_timeout(duration_sec, minimum=120))

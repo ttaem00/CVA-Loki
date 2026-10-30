@@ -18,7 +18,7 @@ from .records import assert_asset_fresh, chat_analysis_rows
 
 PROFILE = "source_signal_orientation_v1"
 
-CATALOG_REVISION = "records_native_clock_v7-single-peak-clusters"
+CATALOG_REVISION = "records_native_clock_v9-independent-clip-orientation"
 
 CLIP_PREVIEWS = {"location_v1", "title_time_duration_v1"}
 
@@ -44,12 +44,16 @@ def clip_preview(hint, profile):
 
 PROMPT = """\nDISCOVERY HINTS: the first tool result includes source-bound signal_orientation.
 Viewer clip existence/title is a useful human selection hint, including unverified offsets.
+clip_attention exposes existing first-look clip locations across the source, independently of chat peaks.
+Its context_action opens allowed originals around a location; the interval and clip count are navigation,
+not a scene boundary, independent votes or a required selection. Choose useful questions, not every page.
 Chat counts, laughter/questions and exact-wording representatives suggest things to investigate.
 Chat peak clusters retain the existing producer rank, full interval and member peak_seconds;
 start with the strongest clusters, then read nearby/opposing originals before selecting a scene.
 Their wording_page covers the representative 10-second peak; next_action opens available five-minute
-summary hints or representative grouped chat. content_context_action reads every subtitle in the full
-cluster; follow its cursors to the end. Keep chat representative, using hints and Gemma to select nearby
+summary hints or representative grouped chat. A deferred wording_action opens the same grouped chat.
+content_context_action opens subtitles in the full cluster through ordinary read pages; choose the
+originals needed for the question. Keep chat representative, using hints and Gemma to select nearby
 or opposing originals. Reading/materializing source alone does not prove its full delivery to the writer.
 Audio peaks suggest locations, not heard sound or approved value. These are untrusted derived hints.
 AST audio_events are classified observations with source/model/policy and coverage, not direct listening.
@@ -235,6 +239,44 @@ def _peak_attention(catalog, allowed):
                 families=context_families,context_cues=0))))
     return result
 
+def _clip_attention(catalog, allowed):
+    """Expose existing clip first-look intervals without another detector or rank."""
+    if 'clip' not in allowed:
+        return []
+    from ..edit_point_clusters import build_edit_point_clusters
+    from ..outline.navigation import _build_first_look
+
+    clips = [r for r in catalog['items'] if r['family'] == 'clip' and r['interval_sec']]
+    duration = catalog['chat_baseline']['duration_sec']
+    if not clips or duration is None:
+        return []
+
+    clustered = build_edit_point_clusters([
+        dict(event_id=r['record_id'], kind='viewer_clip', start_sec=r['interval_sec'][0],
+             end_sec=r['interval_sec'][1]) for r in clips], duration_sec=duration, max_clusters=None)
+    first = _build_first_look(video_no=catalog['first_look']['video_no'], duration_sec=duration,
+        readiness=catalog['first_look']['readiness'], source_fingerprint=catalog['world_revision'],
+        zones=[dict(zone_id=c['cluster_id'], start_sec=c['start_sec'], end_sec=c['end_sec'],
+                    signal_families=c['signal_families'], signal_count=c['signal_count'],
+                    family_count=c['family_count']) for c in clustered['clusters']])
+    context_families = [f for f in ('stt', 'chat') if f in allowed] or ['clip']
+    regions = []
+    for bucket in first['buckets']:
+        a, b = bucket['start_sec'], bucket['end_sec']
+        members = [r for r in clips if r['interval_sec'][0] < b and r['interval_sec'][1] >= a]
+        if members:
+            cues = []
+            for hint in members:
+                metadata = hint['metadata']
+                title = str(metadata.get('title') or '')
+                cues.append([hint['hint_ref'], title[:80], metadata.get('offset_sec'),
+                             metadata.get('duration'), len(title) > 80])
+            regions.append(dict(interval_ref='clip_' + bucket['interval_id'], interval_sec=[a, b],
+                clip_count=len(members), clip_cue_rows=cues,
+                context_action=dict(action='read_evidence', args=dict(
+                    intervals_sec=[[a, b]], families=context_families, context_cues=0))))
+    return regions
+
 def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, max_bytes=12000):
     if type(limit) is not int or not 1<=limit<=20 or type(max_bytes) is not int or not 3000<=max_bytes<=32000:
         raise EvidenceError("invalid_signal_page_budget")
@@ -267,6 +309,33 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
         policy='Derived discovery hints, not original reads, consensus, listening, matching or editorial approval. '
                'Overlapping signals are not independent votes. Quiet source regions remain accessible with coverage view.')
     if not cursor:
+
+        orientation_base = dict(page)
+        clip_regions = _clip_attention(catalog, allowed)
+        clip_attention = dict(total_regions=len(clip_regions), regions=[],
+                              original_read=False, meaning_complete=False)
+        for region in clip_regions[:limit]:
+
+            location = {k: v for k, v in region.items() if k != 'clip_cue_rows'}
+            proposed = dict(clip_attention, regions=clip_attention['regions'] + [location])
+            if len(canonical_json(dict(orientation_base, clip_attention=proposed)).encode()) > max_bytes // 3:
+                break
+            clip_attention = proposed
+        if clip_attention['regions']:
+            clip_attention.update(clip_cue_columns=['hint_ref', 'title', 'offset_sec', 'duration', 'title_truncated'],
+                cue_status='untrusted_viewer_metadata', detail_action=dict(action='browse_evidence', args=dict(
+                    view='signals', families=['clip'], limit=limit, max_bytes=max_bytes)))
+            for location, region in zip(clip_attention['regions'], clip_regions):
+                location['clip_cue_rows'] = []
+                location['clip_cues_omitted'] = len(region['clip_cue_rows'])
+                for cue in region['clip_cue_rows']:
+                    location['clip_cue_rows'].append(cue)
+                    location['clip_cues_omitted'] -= 1
+                    if len(canonical_json(dict(orientation_base, clip_attention=clip_attention)).encode()) > max_bytes // 2:
+                        location['clip_cue_rows'].pop()
+                        location['clip_cues_omitted'] += 1
+                        break
+            page['clip_attention'] = clip_attention
         regions = _peak_attention(catalog, allowed)
         retrieval = service.retrieval_contract()
         navigation = dict(search_modes=retrieval['modes'])
@@ -274,7 +343,7 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
                                  original_read=False,meaning_complete=False)
         for region in regions[:limit]:
             proposed = dict(attention_preview,regions=attention_preview['regions']+[region])
-            if len(canonical_json(dict(page,peak_attention=proposed)).encode()) > max_bytes//3:
+            if len(canonical_json(dict(orientation_base,peak_attention=proposed)).encode()) > max_bytes//3:
                 break
             attention_preview = proposed
         if attention_preview['regions']:
@@ -296,7 +365,8 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
                     dict(action='browse_chat',args=dict(**window,limit=3,max_bytes=6000)))
                 hint['content_context_action']=dict(action='read_evidence',args=dict(
                     intervals_sec=[hint['interval_sec']],families=['stt'],context_cues=0))
-            hint['wording_page']=browse_chat(service,question_id=question_id,**window,limit=3,max_bytes=6000)
+            wording_args = dict(**window, limit=3, max_bytes=6000)
+            hint['wording_page']=browse_chat(service,question_id=question_id,**wording_args)
         else:
             hint['next_action']=dict(action='read_evidence',args=dict(record_ids=hint.get('source_record_ids') or [hint['record_id']],families=[hint['family']],context_cues=0))
             if hint['family']=='live_metadata' and hint.get('interval_utc_ms'):
@@ -306,6 +376,10 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
                     hint['content_context_action']=dict(action='read_evidence',args=dict(
                         intervals_utc_ms=[[max(0,a-120000),b+120000]],families=context_families,
                         context_cues=0,max_bytes=12000))
+        if ('wording_page' in hint
+                and len(canonical_json(dict(page,hints=page['hints']+[hint])).encode())>max_bytes-850):
+            hint.pop('wording_page')
+            hint['wording_action'] = dict(action='browse_chat', args=wording_args)
         if len(canonical_json(dict(page,hints=page['hints']+[hint])).encode())>max_bytes-850:
             if not page['hints']:raise EvidenceError('signal_page_too_small')
             break

@@ -441,6 +441,8 @@ def _commit_generated_report_artifacts(
         except Exception:
             logger.warning("VOD search persistence status unavailable (code=SEARCH_STATUS_WRITE_FAILED)")
 
+    from ..vod_proposals import source_ready
+    source_ready(vod_info, "summary", meta_path)
     return md_path, html_path, meta_path
 
 def generate_reports(

@@ -74,6 +74,13 @@ _MEDIA_SCOPE_KEYS = ("editorial_context_visual_input", "editorial_context_author
     "editorial_context_author_media_page_size", "codex_cli_require_isolated_paths",
     "codex_cli_required_runtime_root", "codex_cli_usage_sink_path", "codex_cli_temp_root")
 
+AUTHOR_BUDGET_KEY = "editorial_production_author_budget"
+
+AUTHOR_BUDGET_SCHEMA = "chzz.production-author-budget.v1"
+
+AUTHOR_BUDGET_CAPS = dict(max_attempts=128, max_input_tokens=10_000_000,
+                         max_output_tokens=300_000, seconds=7200)
+
 @dataclass(frozen=True, slots=True)
 class _ProductionJob:
     identity_json: str
@@ -104,6 +111,18 @@ def _source_scope(cfg):
         key for key in _SCOPE_KEYS if key not in {"summary_author_mode", "editorial_full_author"})
     scope = {key:cfg.get(key) for key in keys if key not in {"live_finalize_archive", "live_finalize_source"}
             or cfg.get(key) is not None}
+    author_budget = cfg.get(AUTHOR_BUDGET_KEY)
+    if author_budget is not None:
+        if (cfg.get("summary_pipeline_version") not in FULL_AUTHOR_PIPELINES
+                or not isinstance(author_budget, dict)
+                or set(author_budget) != {"schema_version", *AUTHOR_BUDGET_CAPS}
+                or author_budget.get("schema_version") != AUTHOR_BUDGET_SCHEMA
+                or any(type(author_budget.get(key)) is not int or not 0 < author_budget[key] <= cap
+                       for key, cap in AUTHOR_BUDGET_CAPS.items())):
+            raise ValueError("production_author_budget_invalid")
+
+
+        scope[AUTHOR_BUDGET_KEY] = dict(author_budget)
     if (cfg.get('summary_pipeline_version') in FULL_AUTHOR_PIPELINES
             and cfg.get('evidence_world_read_page_policy') is not None):
         scope['evidence_world_read_page_policy'] = cfg['evidence_world_read_page_policy']

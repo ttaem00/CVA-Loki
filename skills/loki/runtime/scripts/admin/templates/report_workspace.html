@@ -15,23 +15,44 @@
         <h1 id="reportTitle">장면 보며 편집</h1>
         <p id="reportMeta" class="subtle">관리자 수정본을 불러오는 중입니다.</p>
       </div>
+      <a id="reportLibraryLink" class="button ghost" href="/reports">← 리포트 목록</a>
     </header>
     <section class="workspace-taskbar" aria-label="선택한 장면과 저장 상태">
       <strong id="taskSelection">장면을 선택하세요</strong>
       <div class="header-actions">
+        <div class="history-actions" aria-label="편집 기록 · 최대 20단계">
+          <button id="undoButton" class="quiet-action" type="button" aria-keyshortcuts="Control+Z" disabled>↶ 되돌리기</button>
+          <button id="redoButton" class="quiet-action" type="button" aria-keyshortcuts="Control+Y Control+Shift+Z" disabled>다시 실행 ↷</button>
+        </div>
         <a id="legacyLink" class="button ghost" aria-disabled="true">기존 상세 화면</a>
         <button id="previewButton" class="button ghost" type="button" disabled>현재 편집안 미리보기</button>
-        <a id="revisionLink" class="button ghost" aria-disabled="true">되돌리기 기록</a>
+        <a id="revisionLink" class="button ghost" aria-disabled="true">저장·공개 이력</a>
         <button id="saveButton" class="button primary" type="button" disabled>수정본 저장</button>
+        <button id="publishButton" class="button publish" type="button" aria-describedby="publishHint" aria-controls="publishDialog" disabled>공개 사이트에 반영…</button>
       </div>
       <div class="workspace-save-state">
         <div id="status" class="status" role="status" aria-live="polite" tabindex="-1">불러오는 중…</div>
         <button id="checkSaveButton" class="button ghost" type="button" aria-describedby="status" hidden>저장 결과 다시 확인</button>
         <button id="adoptCurrentSaveButton" class="button ghost" type="button" aria-describedby="status" hidden>확인한 현재 저장본으로 다시 열기</button>
       </div>
+      <div class="workspace-publication-state">
+        <p id="publishHint" class="subtle" role="status" aria-live="polite">저장본을 확인한 뒤 공개 후보를 볼 수 있습니다.</p>
+        <progress id="publishProgress" max="100" aria-label="공개 반영 진행률" hidden></progress>
+        <p id="publishDestinations" class="publish-destinations" aria-label="공개 대상별 상태" hidden></p>
+        <button id="checkPublishButton" class="button ghost" type="button" hidden>공개 진행 상태 다시 확인</button>
+      </div>
     </section>
 
     <nav id="reportVersions" aria-label="요약 버전"></nav>
+    <details id="workspaceMaterials" class="workspace-materials">
+      <summary>자료·근거</summary>
+      <nav aria-label="현재 방송의 자료">
+        <a id="sourceManifestLink" class="button ghost">재료 상태</a>
+        <a id="workEvidenceLink" class="button ghost">작업자료·ZIP</a>
+        <a id="editorBriefLink" class="button ghost">편집 브리프</a>
+        <a id="vodOutputsLink" class="button ghost">결과 모음</a>
+      </nav>
+    </details>
     <p id="publicationState" class="subtle" role="status">공개 상태 확인 필요 · 로컬 저장과 공개는 별도입니다.</p>
 
     <div id="completionNotice" class="status" data-kind="dirty" role="status" aria-live="polite" hidden></div>
@@ -65,6 +86,7 @@
           </div>
           <button id="nextButton" class="icon-button" type="button">다음 장면 →</button>
         </div>
+        <div class="boundary-feedback"><span id="boundaryStatus" role="status" aria-live="polite">경계 확인은 시간을 바꾸거나 저장하지 않습니다.</span><button id="stopBoundaryButton" class="icon-button" type="button" hidden>경계 확인 중지</button></div>
         <section id="workspaceTimeline" class="workspace-timeline" aria-labelledby="timelineHeading">
           <div class="timeline-toolbar">
             <div>
@@ -114,10 +136,6 @@
                 <button type="button" role="menuitem" data-add-type="Point"><strong>Point 추가</strong><span>현재 영상 시각에 핵심 순간</span></button>
               </div>
             </details>
-            <div class="history-actions" aria-label="편집 기록 · 최대 20단계">
-              <button id="undoButton" class="quiet-action" type="button" aria-keyshortcuts="Control+Z" disabled>↶ 되돌리기</button>
-              <button id="redoButton" class="quiet-action" type="button" aria-keyshortcuts="Control+Y Control+Shift+Z" disabled>다시 실행 ↷</button>
-            </div>
           </div>
           <div id="sceneList" class="scene-list"></div>
         </section>
@@ -137,15 +155,14 @@
             <div id="editorEmpty" class="editor-empty">위에서 장면을 선택하면 제목과 시간을 고칠 수 있습니다.</div>
             <div id="editorFields" hidden></div>
           </form>
-          <div class="boundary-feedback"><span id="boundaryStatus" role="status" aria-live="polite">경계 확인은 시간을 바꾸거나 저장하지 않습니다.</span><button id="stopBoundaryButton" class="icon-button" type="button" hidden>경계 확인 중지</button></div>
           <details class="history-block">
             <summary>이전 저장본 <span id="historyCount">0</span>개</summary>
             <div id="historyList" class="history-list"></div>
           </details>
           <div class="handoff-note">
-            <strong>공개 작업은 기존 상세 화면에서</strong>
-            <p>이 화면의 저장은 공개가 아닙니다. Markdown·배포·카페 게시는 기존 안전 경계를 사용합니다.</p>
-            <a id="advancedLink" aria-disabled="true">기존 상세 화면에서 계속 →</a>
+            <strong>저장과 공개 반영은 별도입니다</strong>
+            <p>상단의 공개 버튼으로 현재 저장본의 후보를 확인한 뒤 게시하세요. Markdown·카페 작업은 상세 화면에서 이어갈 수 있습니다.</p>
+            <a id="advancedLink" aria-disabled="true">Markdown·카페 작업 열기 →</a>
           </div>
         </section>
       </div>
@@ -160,6 +177,18 @@
     <p id="previewStatus" role="status" aria-live="polite"></p>
     <button id="retryPreviewButton" class="icon-button" type="button" hidden>현재 편집안 다시 확인</button>
     <iframe id="previewFrame" title="현재 편집안 미리보기" hidden></iframe>
+  </dialog>
+
+  <dialog id="publishDialog" class="preview-dialog publish-dialog" aria-labelledby="publishTitle" aria-describedby="publishCandidateStatus">
+    <div class="dialog-heading">
+      <div><strong id="publishTitle">공개할 저장본 확인</strong><span id="publishCandidateNotice">아래 후보를 확인한 뒤 공개 반영을 선택하세요. 닫으면 게시하지 않습니다.</span></div>
+      <button id="cancelPublishButton" class="icon-button" type="button">닫기</button>
+    </div>
+    <p id="publishCandidateStatus" role="status" aria-live="polite"></p>
+    <iframe id="publishFrame" title="정확한 공개 후보" hidden></iframe>
+    <div class="dialog-actions">
+      <button id="confirmPublishButton" class="button publish" type="button" disabled>확인한 저장본을 공개 사이트에 반영</button>
+    </div>
   </dialog>
 
   <dialog id="revisionCompareDialog" class="revision-dialog" aria-labelledby="revisionCompareTitle">
@@ -181,6 +210,7 @@
   </dialog>
 
   <script src="/static/admin/vendor/hls.min.js"></script>
+  <script src="/static/admin/report_navigation.js"></script>
   <script src="/static/admin/report_versions.js"></script>
   <script src="/static/admin/report_workspace_state.js"></script>
   <script src="/static/admin/report_workspace_history.js"></script>

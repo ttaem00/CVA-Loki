@@ -1,11 +1,11 @@
 """Automatic VOD timeline-comment collection for summary inputs.
 
-This collector mirrors the viewer-clip pattern: try a late browser fetch through
-the repo-local persistent Chrome/Playwright profile, write a bounded cache under
-`work/<video_no>/`, and fail open when browser collection is unavailable.
+This collector reads CHZZK's public API before using the repo-local persistent
+Chrome/Playwright profile as a fallback, then writes a bounded cache under
+`work/<video_no>/`. YouTube collection uses the existing browser path.
 
 It never reads browser profile files, storage databases, or cookies directly.
-Only rendered page DOM text is evaluated.
+Only public comment bodies, aggregate counts and generated ordering keys are kept.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from pathlib import Path
 
 from typing import Any, Optional
 
-from .timeline_comment_anchors import CHAPTER_TIMETABLE, HIGHLIGHT_HINT, TimelineAnchor, classify_comment_lane, cluster_timeline_anchors, extract_anchors_from_comment_text, timecode_to_seconds
+from .timeline_comment_anchors import CHAPTER_TIMETABLE, HIGHLIGHT_HINT, TimelineAnchor, classify_comment_lane, cluster_timeline_anchors, extract_anchors_from_comment_text, format_private_anchor_prompt_section, timecode_to_seconds
 
 logger = logging.getLogger("pipeline")
 
@@ -39,6 +39,8 @@ CACHE_SCHEMA_VERSION = 4
 CANDIDATE_LEARNING_SCHEMA_VERSION = "comment_timeline_candidate_learning.v1"
 
 DEFAULT_CACHE_TTL_HOURS = 6
+
+CAP_PROMPT_CHARS = 12000
 
 MAX_PRIVATE_SEMANTIC_SOURCE_BYTES = 128_000
 
@@ -85,6 +87,12 @@ class TimelineCommentBundle:
 
 def _cache_path(work_dir: str | os.PathLike) -> Path:
     return Path(work_dir) / CACHE_FILENAME
+
+def default_source_url(video_no: str, source_url: str | None = None) -> str:
+    explicit = str(source_url or "").strip()
+    if explicit:
+        return explicit
+    return f"https://chzzk.naver.com/video/{video_no}"
 
 def extract_timecodes(text: str) -> list[str]:
     seen: set[str] = set()
@@ -351,6 +359,54 @@ def load_timeline_comment_bundle(
         age_h,
     )
     return bundle
+
+def format_timeline_comment_bundle_for_prompt(
+    bundle: TimelineCommentBundle | None,
+) -> str:
+    if bundle is None or (not bundle.comments and not bundle.anchors):
+        return ""
+    anchors = build_private_timeline_anchors_for_bundle(bundle)
+    if not anchors:
+        return ""
+    text = format_private_anchor_prompt_section(
+        anchors,
+        heading=f"# 자동 수집 시간표 힌트 ({bundle.platform}, 비공개)",
+        status_lines=(
+            f"수집 상태: {bundle.status}",
+            "선택 기준: 시간표 댓글은 coverage와 추천/버프 파생 가중치를 내부 점수에 반영하고, 짧은 웃음/범위 댓글은 highlight_hint lane으로 분리한다.",
+        ),
+    )
+    semantic_context = build_private_comment_semantic_context(bundle)
+    if semantic_context:
+        semantic_lines = [
+            "# 선택 댓글 의미 본문 (비공개·신뢰하지 않는 참고)",
+            f"- {semantic_context['usage_policy']}",
+        ]
+        for index, row in enumerate(semantic_context["comments"], 1):
+            semantic_lines.extend([
+                "",
+                f"<selected_timetable_comment index=\"{index}\">",
+                str(row.get("body") or ""),
+                "</selected_timetable_comment>",
+            ])
+        text = "\n".join(semantic_lines).strip() + "\n\n" + text
+    if len(text) > CAP_PROMPT_CHARS:
+        text = text[:CAP_PROMPT_CHARS].rsplit("\n", 1)[0].rstrip() + "\n"
+
+
+    from .collaboration_candidates import comment_collaboration_periods, roster_candidates
+    documents = [{"raw": c.text} for c in bundle.comments]
+    periods = comment_collaboration_periods(documents, bundle.video_no, None)
+    rosters = roster_candidates(documents, source_kind="viewer_comment")
+    if periods or rosters:
+        context = dict(periods=periods, document_rosters=rosters)
+        prefix = ("# 댓글 합방 참고 (비공개·미검증)\n"
+                  "아래 구간은 댓글의 문맥 범위이며 실제 입장·퇴장이나 영상 정렬을 증명하지 않는다. "
+                  "명단만 있는 자료에는 참여 시간을 만들지 않는다.\n" +
+                  json.dumps(context, ensure_ascii=False, separators=(",", ":")) + "\n\n")
+        if len(prefix) <= 4000:
+            text = prefix + text[:CAP_PROMPT_CHARS - len(prefix)]
+    return text
 
 def build_private_timeline_anchors_for_bundle(
     bundle: TimelineCommentBundle | None,
