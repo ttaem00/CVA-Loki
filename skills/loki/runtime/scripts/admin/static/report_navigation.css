@@ -1,0 +1,7 @@
+.report-context-navigation { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin:10px 0; }
+.report-context-navigation > a,
+.report-context-navigation > button { display:inline-flex; align-items:center; min-height:44px; padding:8px 12px; border:1px solid #363b54; border-radius:8px; background:#24283b; color:#c0caf5; font:inherit; font-size:13px; line-height:1.5; text-decoration:none; cursor:pointer; }
+.report-context-navigation > a:hover,
+.report-context-navigation > button:hover { background:#2a2f43; color:#e8ebf3; }
+.report-context-navigation > a:focus-visible,
+.report-context-navigation > button:focus-visible { outline:2px solid #7aa2f7; outline-offset:3px; }

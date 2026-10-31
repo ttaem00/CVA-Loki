@@ -1,0 +1,12 @@
+{
+  "name": "cva-loki",
+  "interface": {"displayName": "CVA-Loki"},
+  "plugins": [
+    {
+      "name": "loki",
+      "source": {"source": "local", "path": "./"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    }
+  ]
+}
