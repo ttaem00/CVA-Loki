@@ -1,4 +1,4 @@
-"""Workspace-local entrypoint for the current Codex to author Loki reports."""
+"""Workspace-local tools for the selected current conversation to author Loki reports."""
 from __future__ import annotations
 
 import argparse
@@ -73,13 +73,22 @@ def configuration(path):
             or value["multimodal_runtime"] is not None and (
                 not isinstance(value["multimodal_runtime"], dict)
                 or set(value["multimodal_runtime"]) != {"path", "sha256"})
-            or value["network"] != "deny" or value["author_mode"] != "current_codex"
+            or value["network"] != "deny" or value["author_mode"] not in {"current_codex", "current_chatgpt"}
             or not isinstance(value["work_dir"], str) or Path(value["work_dir"]).is_absolute()):
         raise ValueError("loki_configuration_policy")
     root = path.parent
     work = contained(root, value["work_dir"])
     work.mkdir(parents=True, exist_ok=True)
     return root, work, value
+
+
+def validate_author_mode(author, author_mode):
+    """Use the current-conversation owner, never infer a platform identity."""
+    from pipeline.editorial_production_job import current_conversation_author_mode
+    expected = {"current_codex": "current_conversation_codex",
+                "current_chatgpt": "current_conversation_chatgpt"}[author_mode]
+    if current_conversation_author_mode(author) != expected:
+        raise ValueError("loki_author_mode_mismatch")
 
 
 def isolate(root, config_path=None):
@@ -149,6 +158,8 @@ def prepare_spec(root, work, policy, path):
                "search_mode", "read_page_policy"}
     if set(spec) - allowed:
         raise ValueError("loki_unavailable_prepare_option")
+    if spec.get("author") is not None or policy["author_mode"] == "current_chatgpt":
+        validate_author_mode(spec.get("author"), policy["author_mode"])
     spec["work_root"] = str(work)
     for key in ("source_work_dir", "srt_path", "base_path", "packet_path", "media_path"):
         if key in spec:
@@ -211,6 +222,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser("init")
     init.add_argument("--directory", required=True)
+    init.add_argument("--author-mode", choices=("current_codex", "current_chatgpt"), default="current_codex")
     sub.add_parser("doctor")
     prep = sub.add_parser("prepare")
     prep.add_argument("--spec", required=True)
@@ -229,7 +241,7 @@ def main(argv=None):
         if root.exists() and any(root.iterdir()):
             raise ValueError("loki_init_requires_empty_directory")
         root.mkdir(parents=True, exist_ok=True)
-        write_new(root / "loki.json", DEFAULTS)
+        write_new(root / "loki.json", dict(DEFAULTS, author_mode=args.author_mode))
         (root / "base.md").write_text("", encoding="utf-8")
         (root / "work").mkdir()
         print(json.dumps({"config": str(root / "loki.json"), "workspace": str(root)}))
@@ -260,7 +272,7 @@ def main(argv=None):
         ready = not missing and (policy["features"] == "core" or tools_ready) and (
             policy["features"] != "multimodal" or model_ready and speech_ready)
         result = {"status": "ready" if ready else "setup_required", "version": manifest["version"], "source_commit": manifest["source_commit"],
-                  "workspace": str(root), "network": "deny", "author": "current_codex",
+                  "workspace": str(root), "network": "deny", "author": policy["author_mode"],
                   "model_transport": "disabled", "publish": "unavailable", "writer_language": policy["language"],
                   "missing_dependencies": missing, "features": policy["features"],
                   "media_tools_ready": tools_ready, "multimodal_model_ready": model_ready,
@@ -276,6 +288,14 @@ def main(argv=None):
             job = contained(root, args.job_root)
             if not job.is_relative_to(work):
                 raise ValueError("loki_job_outside_work")
+            saved_identity = job / "prepared.json"
+            if saved_identity.is_file():
+                try:
+                    saved = json.loads(contained(root, saved_identity).read_text(encoding="utf-8-sig"))
+                    author = saved["identity"]["author"]
+                except (OSError, ValueError, KeyError, TypeError) as error:
+                    raise ValueError("loki_job_author_mode_invalid") from error
+                validate_author_mode(author, policy["author_mode"])
             if args.command == "memory":
                 result = current.memory(job, expected_revision=args.expected_revision, query=args.query)
             elif args.command == "submit":

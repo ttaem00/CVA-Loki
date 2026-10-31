@@ -1,4 +1,4 @@
-"""Prepare one anonymous public CHZZK VOD for the current Codex; never author a report."""
+"""Prepare one anonymous public CHZZK VOD for the selected caller; never author a report."""
 from __future__ import annotations
 
 import argparse
@@ -20,6 +20,8 @@ HEIGHTS = (144, 360, 480, 720, 1080)
 
 
 def video_number(url):
+    if re.fullmatch(r"[0-9]{1,16}", str(url)):
+        return str(url)
     match = re.fullmatch(r"https://chzzk\.naver\.com/video/([0-9]{1,16})/?", str(url))
     if not match:
         raise ValueError("loki_single_public_vod_url_required")
@@ -186,10 +188,11 @@ def collect_chat(network, video, duration, target):
 
 def run(workspace, vod, *, height=480, max_download_seconds=21600):
     video = video_number(vod)
+    vod = "https://chzzk.naver.com/video/" + video
     if height not in HEIGHTS or type(max_download_seconds) is not int or not 60 <= max_download_seconds <= 21600:
         raise ValueError("loki_source_limits_invalid")
     root = Path(workspace).resolve(strict=True)
-    from loki import configuration
+    from loki import configuration, validate_author_mode
     config = owned(root, root / "loki.json")
     root, work, policy = configuration(config)
     limit = min(policy["max_media_bytes"], 20_000_000_000)
@@ -281,18 +284,41 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
         template = dict(vod_info=vod_info, source_work_dir=str(source), srt_path=str(srt),
                         media_path=str(media), base_path=str(base), job_id="vod-" + video + "-" + attempt.name)
         template_path = attempt / "prepare-spec.template.json"
+        author_mode = policy["author_mode"]
+        existing = None
         if template_path.exists():
             existing = json.loads(template_path.read_text(encoding="utf-8-sig"))
             if any(existing.get(key) != value for key, value in template.items()):
                 raise ValueError("loki_source_prepare_template_changed")
-        else:
+        if state.get("chatgpt_session_id") and author_mode != "current_chatgpt":
+            raise ValueError("loki_author_mode_mismatch")
+        if existing is not None and "author" in existing:
+            validate_author_mode(existing["author"], author_mode)
+        if author_mode == "current_chatgpt":
+            author = existing.get("author") if existing is not None else None
+            pinned = state.get("chatgpt_session_id")
+            if author is None:
+                if pinned:
+                    raise ValueError("loki_source_author_changed")
+                author = dict(host="chatgpt", session_id=uuid.uuid4().hex,
+                    actual_model="unknown", identity_basis="workspace_local")
+            validate_author_mode(author, author_mode)
+            if pinned is not None and pinned != author["session_id"]:
+                raise ValueError("loki_source_author_changed")
+            if existing is None or "author" not in existing:
+                save(template_path, dict(existing or template, author=author))
+            state["chatgpt_session_id"] = author["session_id"]
+            save(checkpoint, state)
+        elif existing is None:
             save(template_path, template)
         result = dict(status="ready", schema_version=SCHEMA, video_no=video, workspace=str(root),
-            prepare_spec_path=str(template_path), author_required=True, source_work_dir=str(source),
+            prepare_spec_path=str(template_path), author_required=author_mode == "current_codex", source_work_dir=str(source),
             media=state["media"], srt_path=str(srt), srt_sha256=state["srt_sha256"], clock=state["clock"],
             speech_receipt=state["speech"].get("receipt_path"), cookies_used=False, model_author_calls=0,
             optional_chat=state.get("chat"),
-            next_action="Current Codex must add its actual author identity to the spec, then prepare/read/author/submit.")
+            next_action=("Current ChatGPT must read the prepared originals, author and submit; the session ID is workspace-local, not a platform identity."
+                if author_mode == "current_chatgpt" else
+                "Current Codex must add its actual author identity to the spec, then prepare/read/author/submit."))
         save(attempt / "source-result.json", result)
         state["status"] = "ready"
         save(checkpoint, state)

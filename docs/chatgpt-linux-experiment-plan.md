@@ -2,7 +2,7 @@
 
 이 문서는 실행 결과가 아니라 조건부 실험 계획이다. GitHub 연결만으로 Linux 실행, VOD 다운로드, GPU 또는 하위 에이전트가 준비됐다고 가정하지 않는다. 실제 배포 파일과 버전은 [CVA-Loki 공개 저장소](https://github.com/ttaem00/CVA-Loki)의 게시된 릴리스에서 확인한다. 확인한 태그·ZIP SHA와 현재 대화의 도구를 기록한 뒤 시작한다.
 
-목표는 별도 Codex 작성자나 모델 API를 호출하지 않고 현재 ChatGPT가 원자료를 읽어 요약·D1/D2·Point·Story·Highlight를 작성하는 것이다. Loki의 현재 ChatGPT 호환성이나 사용량 분리가 검증됐다는 뜻은 아니다. 설치·다운로드·전사·분석·최종 작성·개선 제안을 구분한다.
+목표는 별도 Codex 작성자나 모델 API를 호출하지 않고 현재 ChatGPT가 원자료를 읽어 요약·D1/D2·Point·Story·Highlight를 작성하는 것이다. ChatGPT 호환성은 공개된 v3.0.6 이후의 소스 개선이며 기존 v3.0.6 ZIP은 변경하지 않는다. 아래 명령은 `current_chatgpt`를 지원하는 검토된 소스/후보 패키지에 적용한다. 설치·다운로드·전사·분석·최종 작성·개선 제안과 실제 ChatGPT 호스트의 능력·사용량을 구분한다.
 
 ## 먼저 구분할 세 가지 환경
 
@@ -39,7 +39,7 @@ Work의 shell networking, 연결 앱, 웹 검색, cloud browser는 별도 권한
 준비된 SRT 등 텍스트 자료만 분석하는 작은 설치 예시는 다음과 같다. 이 core 설치가 영상 다운로드나 STT까지 준비한다는 뜻은 아니다.
 
 ```sh
-python3 install.py --workspace ../loki-workspace --mode skill --features core
+python3 install.py --workspace ../loki-workspace --mode skill --features core --author-mode current_chatgpt
 <workspace-python> <runtime>/loki.py --config <workspace>/loki.json doctor
 ```
 
@@ -48,18 +48,18 @@ VOD 다운로드·전사는 필요한 media/speech 의존성과 모델을 먼저
 공개 익명 접근이 가능한 VOD 한 개의 원자료 준비 인터페이스는 다음과 같다.
 
 ```sh
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://chzzk.naver.com/video/<VOD번호>
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <VOD번호>
 ```
 
 이 명령은 영상·메타데이터·자막·clock 기록과 prepare spec 템플릿을 준비하고 선택적인 익명 채팅 수집 상태를 남긴다. 의미 요약은 만들지 않는다. 익명 접근이 실패하면 로그인·유료 접근·쿠키 수집으로 전환하지 않는다. 영상·음성의 다운로드 성공이나 STT 결과를 실제 시청·청취로 보고하지 않는다.
 
 `features`는 설치된 도구의 범위이며 원자료 전체 수집 보장이 아니다. 공개 `prepare`는 확정 VOD clock의 STT를 필수로 사용하고, `media_path`를 제공하면 해당 기능·실제 파일·source 소유 경로를 검증한다. media·multimodal 설치도 모든 job에 영상·완전 채팅·클립·댓글을 요구하지 않는다. 정상 CHZZ 저장소의 엄격한 수집 완료 조건은 별도 제품 경로에 유지되며 이 공개 입력 계약과 혼동하지 않는다.
 
-VOD 번호만 제공된 실험은 다음 순서로 가능 여부를 판정한다. 아래 작성자 신원 확장은 **향후 최소 제안이며 3.0.6에 구현됐다는 뜻이 아니다**.
+VOD 번호만 제공된 실험은 다음 순서로 진행한다. 숫자와 기존 공개 URL은 같은 canonical URL로 정규화되며 준비·재개의 source identity를 유지한다.
 
 1. 실제 셸·네트워크·설치 자원과 `source_acquire`의 대상 VOD 접근을 확인한다. 이 조건이 없으면 같은 방송의 ZIP을 사용하는 경로 B로 진행한다.
 2. 원자료의 수집 범위를 확인한다. `source_acquire`는 영상·메타데이터·STT와 선택적 채팅을 준비하며 클립·댓글까지 수집하지 않는다. 공개 prepare는 같은 VOD의 `user_clips.json`·`timeline_comments.json`이 있으면 소비하고, 없어도 미수집 상태를 유지한다. `not_collected`·부분 수집·일시 실패를 확인된 부재와 구분하고 빈 스냅샷으로 바꾸지 않는다. 판단을 바꿀 질문에 필요한 경우 같은 방송의 기존 ZIP·스냅샷을 재사용하거나 준비 단계의 허용된 기존 익명 수집 경로를 사용한다. 공개 도구에 그 수집 연결이 없으면 기존 수집 owner에 한정한 향후 변경안을 제안한다. 선택 자료 전체나 모든 매체의 수집을 작성 선행 조건으로 만들지 않는다.
-3. 아래 작성자 신원 계약을 확인한다. 현재 Codex 전용 계약과 ChatGPT의 실제 신원이 맞지 않으면, 기존 author identity·consumer receipt가 ChatGPT 작성 사실을 정직하게 검증·기록하도록 확장하는 최소 호환성 변경을 제안한다. 거짓 Codex/대화 ID가 거절되는 반례도 포함한다. 별도 작성자나 두 번째 실행 경로를 추가하지 않는다. 지원 전에는 경로 B의 외부 초안으로 완성하고 정식 Loki submit 성공으로 보고하지 않는다.
+3. 설치 때 `--author-mode current_chatgpt`를 선택한다. `source_acquire`가 반환한 `prepare_spec_path`의 작성자를 그대로 사용해 `prepare`한다. 로컬 UUID는 기존 템플릿/체크포인트에 한 번 발급·고정되며 Codex thread/turn ID를 추가하지 않는다. 현재 ChatGPT가 작성한 응답은 기존 `submit` 검증과 renderer를 사용한다. 플랫폼 기능이 부족하면 경로 B를 사용하며 원인을 신원 우회로 숨기지 않는다.
 
 입력과 작성자 계약이 실제로 충족된 경우에만 다음 로컬 작성 경로로 이어간다. 지원하지 않는 submit을 반복 시도하며 호환성 격차를 숨기지 않는다.
 
@@ -75,9 +75,9 @@ VOD 번호만 제공된 실험은 다음 순서로 가능 여부를 판정한다
 
 ### 현재의 실제 호환성 경계
 
-공개 `skills/loki/runtime/loki.py`는 `network=deny`, `author_mode=current_codex`, `model_transport=disabled` 계약을 사용한다. 현재 conversation job은 실제 `author={thread_id,turn_id,actual_model}`를 요구하고 provenance mode도 `current_conversation_codex`다. prepare/read/remember/submit은 로컬 어댑터이며 별도 provider 작성 호출은 없지만, 그것만으로 일반 ChatGPT의 정식 작성·제출 지원이 입증되지는 않는다.
+공개 `skills/loki/runtime/loki.py`는 두 작성 모드 모두 `network=deny`, `model_transport=disabled`를 사용한다. 기존 기본 `current_codex`와 그 세 필드 author·저장된 identity는 유지된다. 새 `current_chatgpt`는 `author={host:chatgpt,session_id:<로컬 UUID>,actual_model:unknown,identity_basis:workspace_local}`를 사용하고 최종 provenance는 `current_conversation_chatgpt`다. prepare/read/remember/memory/submit은 같은 로컬 어댑터이며 별도 provider 작성 호출을 추가하지 않는다.
 
-실제 대화 정체성을 확인하지 못하거나 ChatGPT 작성자가 이 provenance 계약에 맞지 않으면 ID·모델명·Codex 실행 이력을 만들어 넣지 않는다. config나 validator를 약화해 통과시키지 않는다. 가능한 원문 준비·분석은 유지하고 경로 B의 명시적인 ChatGPT 초안으로 결과를 내며, 정식 Loki submit은 `호환성 미확인`으로 구분한다. 이 계획은 위 호환성 변경을 제안할 뿐 ChatGPT provenance 지원을 구현하지 않는다.
+로컬 UUID는 작업의 원문 읽기·소유 범위·재개를 연결하며 ChatGPT 계정 인증이나 플랫폼 대화 ID를 증명하지 않는다. 실제 모델을 관측하지 못하면 `unknown`을 유지한다. 작성 모드와 준비 작업이 다르면 거부하며 기존 Codex 작업을 ChatGPT로 다시 표기하지 않는다. 도구·실제 원자료·GPU·직접 시청/청취 능력과 실제 방송 품질은 해당 호스트의 별도 검증 대상이다. 코드의 합성 계약 성공을 실제 ChatGPT에서의 VOD 완성 성공으로 계산하지 않는다.
 
 ## 경로 B: GitHub 읽기와 파일 분석만 가능한 경우
 

@@ -20,6 +20,8 @@ python <skill>/runtime/install.py --workspace <new-workspace> --mode setup
 | `--features multimodal` | 기본 전체 프로필. core/UI, Node/npm, FFmpeg/ffprobe, text/image/audio/video 임베딩, 공개 VOD 준비와 로컬 Whisper/Silero/F2 STT |
 | `--features media` | core/UI, Node/npm과 로컬 프레임 추출. 임베딩 모델은 내려받지 않음 |
 | `--features core` | 텍스트 원문 읽기·메모·응답 검사·보고서와 검토 UI |
+| `--author-mode current_chatgpt` | 현재 ChatGPT가 직접 작성. 원자료 준비가 로컬 세션 UUID를 기존 템플릿에 한 번 보존하며 Codex thread/turn ID를 요구하지 않음 |
+| `--author-mode current_codex` | 기존 기본값. 확인한 Codex 작성자 정보와 과거 작업의 identity를 보존 |
 | `--model-source <directory>` | 고정 revision의 EmbeddingGemma 2 파일을 명시적으로 제공. 13개 해시가 모두 일치해야 하며 Whisper/F2는 별도의 고정 자산을 준비 |
 | `--device auto` | 지원되는 NVIDIA CUDA 또는 Apple Silicon MPS를 선택. 호환 GPU가 없으면 CPU 선택 |
 | `--device cpu` | GPU가 있는 호스트를 포함해 CPU 실행을 명시적으로 선택 |

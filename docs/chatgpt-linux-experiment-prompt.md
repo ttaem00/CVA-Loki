@@ -2,13 +2,13 @@
 
 아래 블록의 VOD 번호와 실제 게시된 릴리스 정보를 바꾸어 사용한다. GitHub 연결과 셸 실행 권한은 다르다. 일부 플랜은 Work와 Codex 사용량을 공유하므로 이 입력문은 Codex 할당량을 전혀 쓰지 않는다는 보장을 하지 않는다. [공식 사용량 안내](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)
 
-현재 공개 런타임의 Codex 작성자/provenance 계약을 ChatGPT용으로 우회하라는 요청도 아니다. 자세한 조건과 정확한 기존 명령은 [실험 계획](chatgpt-linux-experiment-plan.md)에 있다.
+`current_chatgpt` 호환성은 공개된 v3.0.6 이후의 소스 개선이다. 해당 옵션을 지원하는 검토된 소스/후보를 사용하며 기존 v3.0.6 ZIP을 바꾸거나 Codex 신원을 만들어 우회하지 않는다. 자세한 조건과 명령은 [실험 계획](chatgpt-linux-experiment-plan.md)에 있다.
 
 ```text
 대상 VOD: <VOD 번호>
 VOD URL: https://chzzk.naver.com/video/<VOD 번호>
 공개 저장소: https://github.com/ttaem00/CVA-Loki
-사용할 릴리스: <실제로 게시된 버전·릴리스 URL·ZIP SHA256>
+사용할 소스/패키지: <current_chatgpt 지원을 확인한 호환성 소스 commit 또는 후보 ZIP SHA256>
 첨부 원자료: <없음 / 같은 VOD의 ChatGPT용 원자료 ZIP과 추가 매체 파일>
 
 목표
@@ -48,13 +48,14 @@ VOD URL: https://chzzk.naver.com/video/<VOD 번호>
   가능한 GitHub 코드 조사와 첨부 자료 분석은 진행하고, 부족한 같은 VOD 원자료 ZIP을 명확히 알려라.
 - 일반 데이터 분석 Python만 있으면 첨부된 ChatGPT용 ZIP의 START_PROMPT.txt,
   EDITORIAL_CONTRACT.md와 입력 manifest를 정본으로 사용해라.
-- Loki의 author_mode/current conversation provenance가 실제 ChatGPT 작성자와 맞지 않거나
-  실제 thread/turn 정보를 확인할 수 없으면 거짓 ID·Codex 이력을 만들어 넣지 마라.
-  기존 author identity·consumer receipt에 실제 ChatGPT 작성 사실을 정직하게 연결할
-  최소 호환성 변경안과 거짓 신원 거절 반례를 먼저 제안해라. 두 번째 작성자를 부르거나
-  가드·config를 약화해 submit을 강제하지 마라. 지원되지 않는 submit을 반복하지 말고
-  ZIP의 chzz.chatgpt_editorial_draft.v2 외부 초안 경로로 결과를 완성해라.
-  이 제안은 구현·가드 우회 권한이나 정식 Loki 작성 성공의 증거가 아니다.
+- 새 작업공간은 --mode skill --author-mode current_chatgpt로 설치해라.
+  VOD 번호를 source_acquire에 전달하고 반환된 prepare_spec_path를 기존 prepare에 사용해라.
+  템플릿에 한 번 발급된 로컬 session_id와 identity_basis=workspace_local을 보존해라.
+  Codex thread/turn ID는 필요하지 않으며 플랫폼 신원으로 위장하지 마라.
+  실제 모델이 노출되지 않으면 unknown을 유지하고 모드·출처·원문 검증을 약화하지 마라.
+  기존 read/remember/memory/submit으로 현재 네가 직접 작성하고 두 번째 작성자를 부르지 마라.
+  이미 준비한 Codex 작업을 ChatGPT로 재표기하지 마라. 실행 도구나 원자료가 부족하면
+  정확한 부족 능력을 남기고 경로 B의 명시적 외부 초안과 정식 Loki 결과를 구분해라.
 
 3. 읽기와 작성
 - 방송 전체의 분할 관찰·잠정 지도·반응/클립 신호는 가벼운 위치 단서로 사용해라.

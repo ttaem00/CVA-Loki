@@ -378,8 +378,27 @@ def _report_records(*, output_dir, site_dir, work_dir, canonical_records,
             provenance = meta.get('llm_provider_provenance') or {}
             if (current and isinstance(provenance, dict)
                     and provenance.get('profile') == 'full_broadcast_v302'
-                    and provenance.get('actual_provider') == 'current_conversation_codex'
+                    and provenance.get('actual_provider') in {
+                        'current_conversation_codex', 'current_conversation_chatgpt'}
                     and provenance.get('job_id') == job.name):
+                from .editorial_production_job import current_conversation_author_mode
+                if ('author' in provenance and current_conversation_author_mode(provenance['author'])
+                        != provenance['actual_provider']):
+                    continue
+                if provenance['actual_provider'] == 'current_conversation_chatgpt':
+                    prepared = _json(job / 'prepared.json', max_bytes=64_000_000)
+                    identity = prepared.get('identity') or {}
+                    if (prepared.get('schema_version') != 'chzz.current_conversation_prepared.v1'
+                            or digest({k:v for k,v in prepared.items() if k != 'prepared_revision'})
+                            != prepared.get('prepared_revision')
+                            or native_path(identity.get('run_root')).resolve() != job
+                            or identity.get('job_id') != job.name
+                            or current_conversation_author_mode(identity.get('author'))
+                               != provenance['actual_provider']
+                            or identity.get('summary_author_mode') != provenance['actual_provider']
+                            or provenance.get('author') != identity['author']
+                            or provenance.get('job_identity_sha256') != digest(identity)):
+                        continue
                 native_sha = provenance.get('native_source_sha256')
                 if not mm._sha(native_sha) or any(value != native_sha for value in hashes):
                     continue

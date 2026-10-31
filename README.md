@@ -33,7 +33,22 @@
 
 치지직 로고는 대상 플랫폼을 안내하기 위해 원본 형태로 표시합니다. [치지직 공식 로고 사용 안내](https://help.naver.com/service/23946/contents/23364?lang=ko&osType=COMMONOS)의 형태·색상·비율 보존, 제휴 오인 금지, 상업적 목적 사용 금지 조건을 따릅니다. CVA의 이용허락은 치지직 로고나 방송 원자료의 이용 권리까지 부여하지 않습니다.
 
-공개 치지직 VOD 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다.
+공개 치지직 VOD 번호 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex 또는 명시적으로 선택한 ChatGPT가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다.
+
+### ChatGPT 자체 Linux에서 사용
+
+ChatGPT 호환성은 공개된 v3.0.6 이후의 소스 개선입니다. 기존 v3.0.6 태그·ZIP은 그대로이며, 이 옵션을 지원하는 검토된 호환성 소스/후보 패키지를 사용합니다. 실제 셸·패키지 설치·영상 CDN 접근·메모리와 디스크가 있는 환경인지 먼저 확인합니다. GitHub 연결만 있는 일반 채팅에 실행 도구를 추가하는 기능은 아닙니다.
+
+```sh
+python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode current_chatgpt
+# 이후 설치 결과의 실제 Python/runtime 경로를 사용한다.
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <VOD번호>
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json prepare --spec <반환된-prepare_spec_path>
+```
+
+설치 기본값은 전체 multimodal 도구와 로컬 전사 자산을 준비합니다. 텍스트 자료만 제공받은 작은 실험은 `--features core`를 선택할 수 있으며, core 설치가 영상 다운로드·전사 준비까지 증명하지는 않습니다. ChatGPT 모드는 로컬 세션 UUID를 기존 준비 템플릿에 한 번 기록합니다. Codex 설치·로그인·thread/turn ID가 필요하지 않고, 실제 모델이 노출되지 않으면 `unknown`으로 유지합니다. 이는 플랫폼 계정 인증이 아니라 로컬 작업 출처입니다.
+
+이후 현재 ChatGPT가 `author-input.json`의 계약을 읽고 기존 `read`·`remember`·`memory`·`submit`으로 직접 작성합니다. 다른 CLI/API 작성자는 호출하지 않습니다. 준비 성공·합성 selftest·원문 처리와 실제 방송의 발견 품질은 구분합니다. [실험 계획](docs/chatgpt-linux-experiment-plan.md)과 [복사 입력문](docs/chatgpt-linux-experiment-prompt.md)을 따르세요.
 
 | 원문에서 시작 | 장면을 근거로 선택 | 기존 UI로 마무리 |
 | :--- | :--- | :--- |

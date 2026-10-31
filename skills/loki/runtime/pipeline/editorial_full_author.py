@@ -442,8 +442,9 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
 def validate_current_conversation_response(payload, *, job, source, packet, duration_sec,
                                            raw_sha256, source_reads):
     """Use the normal semantic projection with truthful native author provenance."""
-    from .editorial_production_job import current_conversation_job_binding, CURRENT_CONVERSATION_MODE
+    from .editorial_production_job import current_conversation_job_binding
     identity = current_conversation_job_binding(job)
+    mode = identity["summary_author_mode"]
     assert_asset_fresh(AssetBinding(**source["asset"]))
     bound = next(row for row in identity["source_assets"] if row["family"] == "stt")
     if (source["asset"]["video_no"] != identity["video_no"]
@@ -453,7 +454,7 @@ def validate_current_conversation_response(payload, *, job, source, packet, dura
         packet=packet, duration_sec=duration_sec,
         highlight_producer_run_ref="current-conversation:" + digest([identity, raw_sha256]))
     result["full_author_receipt"] = dict(profile=PROFILE,
-        selected_mode=CURRENT_CONVERSATION_MODE, actual_provider=CURRENT_CONVERSATION_MODE,
+        selected_mode=mode, actual_provider=mode,
         actual_model=identity["author"]["actual_model"], author=deepcopy(identity["author"]),
         job_id=identity["job_id"], job_identity_sha256=digest(identity),
         source_revision=source["sha256"], native_source_sha256=bound["sha256"],
@@ -464,5 +465,5 @@ def validate_current_conversation_response(payload, *, job, source, packet, dura
         call_count=0, external_transport_calls=0,
         existing_response_relabelled=False)
     result["full_author_projection"]["story_shadow"]["story_provider_meta"] = dict(
-        actual_model=identity["author"]["actual_model"], selected_provider=CURRENT_CONVERSATION_MODE)
+        actual_model=identity["author"]["actual_model"], selected_provider=mode)
     return result

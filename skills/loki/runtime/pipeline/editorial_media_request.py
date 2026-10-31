@@ -54,6 +54,10 @@ def production_media_window(*, video_path, video_no, work_dir, duration_sec):
 
 def current_conversation_media_session(*, root, prepared):
     """Bind the existing media reader to this local writer's immutable source."""
+    from .editorial_production_job import current_conversation_author_mode
+    mode = current_conversation_author_mode(prepared["identity"]["author"])
+    if prepared["identity"]["summary_author_mode"] != mode:
+        raise ValueError("current_conversation_identity_changed")
     source = prepared["source"]
     if source["asset"]["source_locator"].get("kind") == "temporal_projection":
         return None
@@ -76,7 +80,7 @@ def current_conversation_media_session(*, root, prepared):
             **original_media_scope(video_no=prepared["identity"]["video_no"],
                                    duration_sec=prepared["vod_info"]["duration"])))
     cfg = dict(candidate_output_dir=str(root), codex_cli_required_runtime_root=str(root),
-        summary_author_mode="current_conversation_codex", editorial_context_visual_input=PROFILE,
+        summary_author_mode=mode, editorial_context_visual_input=PROFILE,
         editorial_context_media_requests=dict(manifest=dict(path=str(path), sha256=file_hash(path)),
             max_windows=None, max_window_sec=120))
 
@@ -113,7 +117,9 @@ def media_scope(cfg, source=None, *, owner_root=None, _verify_window_bytes=True)
     if not spec:
         return None
     unlimited = isinstance(spec, dict) and spec.get("max_windows") is None
-    if unlimited and cfg.get("summary_author_mode", "api_direct") not in {"api_direct", "current_conversation_codex"}:
+    if unlimited and cfg.get("summary_author_mode", "api_direct") not in {
+        "api_direct", "current_conversation_codex", "current_conversation_chatgpt",
+    }:
         raise ValueError("editorial_media_unlimited_requires_free")
     if (not isinstance(spec, dict) or not cfg.get("candidate_output_dir") or cfg.get("editorial_context_visual_input") != PROFILE
             or set(spec) != {"manifest", "max_windows", "max_window_sec"}

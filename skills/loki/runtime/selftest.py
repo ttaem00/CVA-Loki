@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import uuid
 
 
 KIND = "synthetic_contract_selftest"
@@ -44,8 +45,9 @@ def original_records(page):
     return [dict(defaults, **dict(zip(columns, row))) for row in rows]
 
 
-def run(runtime, workspace):
+def run(runtime, workspace, *, author_mode="current_codex"):
     """Exercise the installed CLI, writing only a new verification workspace."""
+    require(author_mode in {"current_codex", "current_chatgpt"}, "selftest_author_mode_invalid")
     runtime = Path(runtime).resolve(strict=True)
     cli = runtime / "loki.py"
     require(cli.is_file(), "selftest_runtime_entrypoint_missing")
@@ -67,7 +69,10 @@ def run(runtime, workspace):
             raise RuntimeError("selftest_cli_failed: " + args[0] + ": " + result.stdout + result.stderr)
         return json.loads(result.stdout)
 
-    call("init", "--directory", str(workspace))
+    initialize = ["init", "--directory", str(workspace)]
+    if author_mode == "current_chatgpt":
+        initialize += ["--author-mode", author_mode]
+    call(*initialize)
     doctor = call("doctor")
     require(isinstance(doctor, dict) and doctor.get("status") == "ready" and doctor.get("missing_dependencies") == [],
             "selftest_dependencies_not_ready: " + json.dumps(doctor, ensure_ascii=False))
@@ -77,6 +82,8 @@ def run(runtime, workspace):
     version = policy["pipelines"][selected]["version"]
     require(manifest["version"] == version, "selftest_source_version_mismatch")
     require(doctor.get("version") == version, "selftest_runtime_version_mismatch")
+    if author_mode == "current_chatgpt":
+        require(doctor.get("author") == author_mode, "selftest_runtime_author_mode_mismatch")
     source = workspace / "work/1/sources"
     source.mkdir(parents=True)
     srt = source / "source.srt"
@@ -92,6 +99,9 @@ def run(runtime, workspace):
             "source_work_dir": "work/1/sources", "srt_path": "work/1/sources/source.srt",
             "base_path": "base.md", "job_id": "synthetic-contract-fixture",
             "author": {"thread_id": "synthetic-contract-fixture", "turn_id": "fixture-no-model-call", "actual_model": "unknown"}}
+    if author_mode == "current_chatgpt":
+        spec["author"] = dict(host="chatgpt", session_id=uuid.uuid4().hex,
+            actual_model="unknown", identity_basis="workspace_local")
 
     def write(name, value):
         path = workspace / name
@@ -104,6 +114,10 @@ def run(runtime, workspace):
     job = prepared["job_root"]
     saved_preparation = json.loads((Path(job) / "prepared.json").read_text(encoding="utf-8"))
     require(saved_preparation["identity"]["selected_pipeline"] == selected, "selftest_selected_pipeline_mismatch")
+    if author_mode == "current_chatgpt":
+        require(saved_preparation["identity"]["author"] == spec["author"]
+            and saved_preparation["identity"]["summary_author_mode"] == "current_conversation_chatgpt",
+            "selftest_job_author_mode_mismatch")
     revision = prepared["prepared_revision"]
     identity = ["--job-root", job, "--expected-revision", revision]
     payload = {"base_revision": prepared["base_revision"],
@@ -171,6 +185,17 @@ def run(runtime, workspace):
     report_pipeline = metadata.get("summary_pipeline", {})
     require(report_pipeline.get("actual_version") == selected
             and report_pipeline.get("mechanism_version") == version, "selftest_report_version_mismatch")
+    if author_mode == "current_chatgpt":
+        require(metadata.get("llm_provider_provenance", {}).get("actual_provider") == "current_conversation_chatgpt",
+            "selftest_report_author_mode_mismatch")
+    review_check = subprocess.run([sys.executable, "-B", "-c",
+        "import json,sys; from review_store import ReviewStore; "
+        "s=ReviewStore(sys.argv[1]); r=s.list_reports(); "
+        "print(json.dumps(s.workspace_revisions(s.load(r[0]['id'])['base'])))", str(workspace)],
+        cwd=runtime, text=True, encoding="utf-8", capture_output=True, timeout=120)
+    require(review_check.returncode == 0, "selftest_review_revisions_failed: " + review_check.stderr)
+    original = next(row for row in json.loads(review_check.stdout)["records"] if row["revision_id"] == "original")
+    require(original["actor_kind"] == author_mode, "selftest_review_author_mode_mismatch")
     result = {"status": "PASS", "kind": KIND, "semantic_author": SEMANTIC_AUTHOR,
               "editorial_quality": "not_evaluated", "doctor": doctor, "source_hash": source_hash,
               "runtime": str(runtime), "workspace": str(workspace), "report_paths": paths,
@@ -185,6 +210,8 @@ def run(runtime, workspace):
                          "source-linked note and recall", "synthetic fixture response contract validation",
                          "normal HTML/Markdown/metadata renderer", "submit replay", "changed settled response conflict",
                          "source and existing report preserved", "zero model transport"]}
+    if author_mode == "current_chatgpt":
+        result["author_mode"] = author_mode
     write("selftest-result.json", result)
     return result
 
@@ -192,9 +219,10 @@ def run(runtime, workspace):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, help="A new verification workspace; existing paths are refused")
+    parser.add_argument("--author-mode", choices=("current_codex", "current_chatgpt"), default="current_codex")
     args = parser.parse_args(argv)
     try:
-        result = run(Path(__file__).resolve().parent, args.workspace)
+        result = run(Path(__file__).resolve().parent, args.workspace, author_mode=args.author_mode)
     except (ValueError, OSError, RuntimeError, KeyError, AssertionError, subprocess.SubprocessError) as error:
         print(json.dumps({"status": "FAIL", "kind": KIND, "semantic_author": SEMANTIC_AUTHOR,
                           "error": str(error)}, ensure_ascii=False, indent=2))
