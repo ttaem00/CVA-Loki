@@ -476,14 +476,31 @@ class ReviewStore:
                     publish_status="not_requested", marker_warnings=[])
 
     def workspace_revisions(self, base):
+        from pipeline.editorial_production_job import current_conversation_author_mode
         identity = self.workspace_id(base)
         job = self._job(identity)
         records = []
         for row in self.revisions(identity)["revisions"]:
             context = self._history_context(job, row["revision_id"])
             original = row["revision_id"] == "original"
+            actor_kind = "current_codex" if original else "human_manager"
+            if original:
+                provenance = context["meta"].get("llm_provider_provenance") or {}
+                author = provenance.get("author") if isinstance(provenance, dict) else None
+                mode = "current_conversation_chatgpt"
+                if isinstance(provenance, dict) and (
+                        provenance.get("actual_provider") == mode or provenance.get("selected_mode") == mode
+                        or isinstance(author, dict) and author.get("host") == "chatgpt"):
+                    try:
+                        valid = (provenance.get("actual_provider") == provenance.get("selected_mode") == mode
+                            and current_conversation_author_mode(author) == mode)
+                    except ValueError:
+                        valid = False
+                    if not valid:
+                        raise ValueError("review_original_author_invalid")
+                    actor_kind = "current_chatgpt"
             records.append(dict(row, source="ai_original" if original else "admin_save_local",
-                actor_kind="current_codex" if original else "human_manager", test_mode=False,
+                actor_kind=actor_kind, test_mode=False,
                 publish_state="local_draft", approval={},
                 hashes=dict(md=_hash(context["md"].encode()), html=_hash(context["html"].encode())),
                 summary=dict(md_lines=len(context["md"].splitlines()), html_bytes=len(context["html"].encode()))))

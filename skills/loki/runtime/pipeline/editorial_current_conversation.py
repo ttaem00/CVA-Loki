@@ -1,4 +1,4 @@
-"""Prepared-source authoring by this Codex conversation, without a transport.
+"""Prepared-source authoring by the current conversation, without a transport.
 
 prepare/read/submit are local adapters, not provider calls. Submit creates a new
 owned report family; manager save and public publication remain separate actions.
@@ -24,7 +24,10 @@ from .evidence_world.records import assert_asset_fresh
 
 from .evidence_world.service import EvidenceWorldService
 
-from .editorial_production_job import bind_current_conversation_job, current_conversation_job_binding
+from .editorial_production_job import (
+    bind_current_conversation_job, current_conversation_job_binding,
+    current_conversation_author_owner,
+)
 
 SCHEMA = "chzz.current_conversation_prepared.v1"
 
@@ -99,7 +102,8 @@ def _service(root, prepared):
     if sha != prepared["world_manifest_sha256"] or manifest["world_revision"] != prepared["world_revision"]:
         raise ValueError("current_conversation_world_changed")
     service = EvidenceWorldService(root=native_path(prepared["world_manifest_path"]).parent,
-        manifest=manifest, run_root=root / "source-reads", owner=prepared["identity"]["author"]["thread_id"])
+        manifest=manifest, run_root=root / "source-reads",
+        owner=current_conversation_author_owner(prepared["identity"]["author"]))
 
 
     service.configure_read(prepared.get('read_page_policy', 'family_serial_v1'))
@@ -150,6 +154,7 @@ def prepare(spec):
     if (not isinstance(spec, dict) or not required <= set(spec)
             or set(spec) - required - {"summary_pipeline_version", "packet_path", "orientation_paths", "hierarchy", "navigation_path", "media_path", "multimodal_runtime", "summary_hints", "source_output_dir", "source_data_dir", "retrieval", "read_page_policy", "search_mode"}):
         raise ValueError("current_conversation_prepare_spec_shape")
+    author_owner = current_conversation_author_owner(spec["author"])
     from .evidence_world.read_pages import POLICIES
     read_page_policy = spec.get('read_page_policy', 'balanced_compact_v1')
     if not isinstance(read_page_policy, str) or read_page_policy not in POLICIES:
@@ -196,7 +201,7 @@ def prepare(spec):
             source_work_dir=source_dir, cache_root=root / "evidence-world-cache",
             run_root=root / "source-reads", duration_sec=vod.duration,
             policy=SourcePolicy(allowed_families=("stt", "chat", "clip", "audio_features"), required_families=("stt",)),
-            owner=spec["author"]["thread_id"], clip_source_path=clip_path,
+            owner=author_owner, clip_source_path=clip_path,
             chat_source_path=chat_source_path)
         service.configure_read(read_page_policy)
         service.configure_hierarchy(spec.get('hierarchy'))

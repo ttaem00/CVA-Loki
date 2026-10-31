@@ -23,6 +23,26 @@ _MINT = object()
 
 CURRENT_CONVERSATION_MODE = "current_conversation_codex"
 
+CURRENT_CONVERSATION_CHATGPT_MODE = "current_conversation_chatgpt"
+
+def current_conversation_author_mode(author):
+    """Validate legacy Codex fields or explicitly local ChatGPT provenance."""
+    if not isinstance(author, dict) or not all(
+        isinstance(value, str) and value.strip() for value in author.values()
+    ):
+        raise ValueError("current_conversation_author_identity_invalid")
+    if set(author) == {"thread_id", "turn_id", "actual_model"}:
+        return CURRENT_CONVERSATION_MODE
+    if (set(author) == {"host", "session_id", "actual_model", "identity_basis"}
+            and author["host"] == "chatgpt" and author["identity_basis"] == "workspace_local"
+            and re.fullmatch(r"[0-9a-f]{32}", author["session_id"])):
+        return CURRENT_CONVERSATION_CHATGPT_MODE
+    raise ValueError("current_conversation_author_identity_invalid")
+
+def current_conversation_author_owner(author):
+    mode = current_conversation_author_mode(author)
+    return author["thread_id"] if mode == CURRENT_CONVERSATION_MODE else "chatgpt:" + author["session_id"]
+
 @dataclass(frozen=True, slots=True)
 class CurrentConversationJob:
     """Source authority for the current conversation, never a gateway grant."""
@@ -41,13 +61,11 @@ def bind_current_conversation_job(*, work_root, run_root, video_no, source_asset
             or not re.fullmatch(r"[0-9a-f]{64}", str(base_revision))
             or not re.fullmatch(r"[0-9a-f]{40}", str(code_version))):
         raise ValueError("current_conversation_job_identity_invalid")
-    if (not isinstance(author, dict) or set(author) != {"thread_id", "turn_id", "actual_model"}
-            or not all(isinstance(v, str) and v.strip() for v in author.values())):
-        raise ValueError("current_conversation_author_identity_invalid")
+    mode = current_conversation_author_mode(author)
     if selected_pipeline not in FULL_AUTHOR_PIPELINES:
         raise ValueError("current_conversation_pipeline_invalid")
     identity = dict(schema_version="chzz.current_conversation_job.v1", job_id=job_id,
-        selected_pipeline=selected_pipeline, summary_author_mode=CURRENT_CONVERSATION_MODE,
+        selected_pipeline=selected_pipeline, summary_author_mode=mode,
         admission_authority="current_conversation", external_transport_calls=0,
         code_version=code_version, video_no=video_no, work_root=str(work), run_root=str(root),
         base_revision=base_revision, author=dict(author),

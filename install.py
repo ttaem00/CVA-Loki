@@ -1,4 +1,4 @@
-"""One-command local Loki setup. Semantic writing stays with the current Codex."""
+"""One-command local Loki setup. Semantic writing stays with the selected current caller."""
 from __future__ import annotations
 
 import argparse
@@ -108,7 +108,9 @@ class Installer:
         except ValueError as exc:
             raise ValueError(stage + " did not return JSON") from exc
 
-    def install(self, mode, *, features="multimodal", model_source=None, device="auto"):
+    def install(self, mode, *, features="multimodal", model_source=None, device="auto", author_mode=None):
+        if author_mode not in {None, "current_codex", "current_chatgpt"}:
+            raise ValueError("installation_author_mode_invalid")
         here = Path(__file__).resolve().parent
         bundle = here if (here / "release-manifest.json").is_file() else None
         runtime = here / "skills/loki/runtime" if bundle else here
@@ -141,9 +143,14 @@ class Installer:
         if env_root.exists() and not owner_path.is_file():
             raise ValueError("unowned_virtual_environment_preserved")
         if not config.is_file():
-            self.command("initialize_workspace", [sys.executable, "-B", runtime / "loki.py", "init",
-                                                  "--directory", self.workspace])
-        module(runtime / "loki.py", "loki_installer_config").configuration(config)
+            initialize = [sys.executable, "-B", runtime / "loki.py", "init", "--directory", self.workspace]
+            if author_mode == "current_chatgpt":
+                initialize += ["--author-mode", author_mode]
+            self.command("initialize_workspace", initialize)
+        _, _, policy = module(runtime / "loki.py", "loki_installer_config").configuration(config)
+        selected_author_mode = policy["author_mode"]
+        if author_mode is not None and author_mode != selected_author_mode:
+            raise ValueError("installation_author_mode_mismatch")
         save(owner_path, owner)
         self.log_dir = plain_path(self.workspace / "installation-logs" / uuid.uuid4().hex[:12])
         self.log_dir.mkdir(parents=True)
@@ -289,12 +296,18 @@ class Installer:
             raise ValueError("runtime_doctor_not_ready")
         if doctor.get("version") != release["version"]:
             raise ValueError("runtime_doctor_version_mismatch")
+        if selected_author_mode == "current_chatgpt" and doctor.get("author") != selected_author_mode:
+            raise ValueError("runtime_doctor_author_mode_mismatch")
         verification = plain_path(self.workspace / "verification" / uuid.uuid4().hex[:12])
         verification.parent.mkdir(exist_ok=True)
-        check = self.command("selftest", [python, "-B", runtime / "selftest.py", "--workspace", verification],
-                             json_output=True)
+        selftest_args = [python, "-B", runtime / "selftest.py", "--workspace", verification]
+        if selected_author_mode == "current_chatgpt":
+            selftest_args += ["--author-mode", selected_author_mode]
+        check = self.command("selftest", selftest_args, json_output=True)
         if check.get("status") != "PASS" or check.get("kind") != "synthetic_contract_selftest":
             raise ValueError("selftest_not_passed")
+        if selected_author_mode == "current_chatgpt" and check.get("author_mode") != selected_author_mode:
+            raise ValueError("selftest_author_mode_mismatch")
         media_check = None
         if features in {"media", "multimodal"}:
             media_check = self.command("media_selftest", [python, "-B", runtime / "media_selftest.py",
@@ -317,8 +330,11 @@ class Installer:
                              "url": "http://127.0.0.1:8787/", "status": "available_not_started"},
                   "dependencies": dependencies, "commands": self.commands, "logs": str(self.log_dir),
                   "attempt_id": self.log_dir.name,
-                  "semantic_author": "current_Codex_required_for_real_sources",
+                  "semantic_author": ("current_ChatGPT_required_for_real_sources" if selected_author_mode == "current_chatgpt"
+                                      else "current_Codex_required_for_real_sources"),
                   "evidence_scope": "installation_and_synthetic_contract; not_model_generation_or_broadcast_quality"}
+        if selected_author_mode == "current_chatgpt":
+            result["author_mode"] = selected_author_mode
         save(self.log_dir / "result.json", result)
         save(self.workspace / "installation-result.json", result)
         return result
@@ -333,6 +349,7 @@ def main(argv=None):
     parser.add_argument("--workspace", required=True, help="New/owned user workspace; installation files remain read-only")
     parser.add_argument("--mode", choices=("skill", "plugin", "setup"), default=None)
     parser.add_argument("--features", choices=("core", "media", "multimodal"), default="multimodal")
+    parser.add_argument("--author-mode", choices=("current_codex", "current_chatgpt"), default=None)
     parser.add_argument("--model-source", help="Optional existing directory containing the pinned public model files")
     parser.add_argument("--device", choices=("auto", "cpu"), default="auto",
                         help="Detect a supported GPU before installing PyTorch; cpu explicitly disables GPU use")
@@ -345,7 +362,8 @@ def main(argv=None):
         installer = Installer(workspace)
         bundled = (Path(__file__).parent / "release-manifest.json").is_file()
         result = installer.install(args.mode or ("skill" if bundled else "setup"),
-                                   features=args.features, model_source=args.model_source, device=args.device)
+                                   features=args.features, model_source=args.model_source, device=args.device,
+                                   author_mode=args.author_mode)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:

@@ -1638,7 +1638,7 @@
     {
       "module": "pipeline.editorial_current_conversation",
       "source_path": "pipeline/editorial_current_conversation.py",
-      "source_sha256": "35e196e957cc53634c984c2eb31b4d2af3beea60d76cbaf44ee9e73e78688ceb",
+      "source_sha256": "53907764f1bf53045607ca959e73de981c08e19cc648c31578e751de52d2d946",
       "symbols": [
         "cli_result_json",
         "memory",
@@ -1677,6 +1677,7 @@
         "build_lock",
         "canonical_json",
         "cli_result_json",
+        "current_conversation_author_owner",
         "current_conversation_job_binding",
         "deepcopy",
         "digest",
@@ -1692,10 +1693,10 @@
         "remember",
         "submit"
       ],
-      "export_sha256": "00e17fb668080daad110b15597e9f794af375c02dd0893e1d586e7377c1c51b7",
+      "export_sha256": "953124375cbbd9a686be7b2ad399ddab16cbaeefe0097024baee381e4a039448",
       "overlay": false,
       "trimmed_imports": [],
-      "extracted_sha256": "3bdcd69821d8ce7a741a8b7673255e1e7ac725e20617b0db251f384e9a2136b0",
+      "extracted_sha256": "d4a9da6e77b7296affb475770ecd6feaf7815124586fa13c511ba89555e84e96",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -1787,7 +1788,7 @@
     {
       "module": "pipeline.editorial_full_author",
       "source_path": "pipeline/editorial_full_author.py",
-      "source_sha256": "9e1eb6f4cca9d86d0f735b167b844694b9d8241ef60c9f3efbf9dd7a69432a9e",
+      "source_sha256": "5d1293732d7b49e704b520a33886654a157cefdfd5e585a5b6bc70b56cde3704",
       "symbols": [
         "RESPONSE_FIELDS",
         "build_broadcast_flow_context",
@@ -1821,7 +1822,7 @@
         "validate_current_conversation_response",
         "validate_response"
       ],
-      "export_sha256": "f33da1297141f13b53b75542ba1927d981b2b622150fd42fe36f6fb89482ae3d",
+      "export_sha256": "2e1db17040641a18e81f4963352f741d870a61b9d4b28b52e8c4ce62c57c2b34",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -1829,7 +1830,7 @@
           "exported": "from .evidence_world.contracts import AssetBinding, digest"
         }
       ],
-      "extracted_sha256": "241d3118c4673da5f6b46babdf9ae50ce123079b566c0fc858b2edfda0e37732",
+      "extracted_sha256": "8202c6016042ea047ff1f71b02c2d3309ccc7501c5c78fd0cd91c27668a167f2",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -2001,7 +2002,7 @@
     {
       "module": "pipeline.editorial_media_request",
       "source_path": "pipeline/editorial_media_request.py",
-      "source_sha256": "acac594d6eddb6318f9f85e81b663cd5b89f6cab4ce53ae760a2e41e49248174",
+      "source_sha256": "d7450e7fee0ffa9dded777a47f8b296ef2ad2164f7a1bf4ba825bc9d8d170c1b",
       "symbols": [
         "current_conversation_media_session"
       ],
@@ -2025,10 +2026,10 @@
         "preserve",
         "production_media_window"
       ],
-      "export_sha256": "163ecd9f96358e4726f2dc9fa042a7c353f8a799dff7845b19027db9b8f2f26a",
+      "export_sha256": "145e5f17a4ac504815896ec9faeb1c24da6cc8e3125bfa86e0e21437015b624b",
       "overlay": false,
       "trimmed_imports": [],
-      "extracted_sha256": "d540bdf6a617c970b9c58fa765a4511deb99149f2e1f6fd42cc803b85abed2b3",
+      "extracted_sha256": "34b85cba112f2bdbe622615be56e1bca63c54bee81cf9420b814ea26154cb95c",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -2103,7 +2104,7 @@
     {
       "module": "pipeline.editorial_multimodal_search",
       "source_path": "pipeline/editorial_multimodal_search.py",
-      "source_sha256": "f8c570ec9fdf5c3d54c12ca85b454a869f3a9d4d40bb999a49214d7f5914d3e1",
+      "source_sha256": "29521a409d0d06685c4d199bccddb9e50a27bacbc4d022052f71e6c57fa10e14",
       "symbols": [
         "*",
         "_basis",
@@ -2142,11 +2143,11 @@
         "sqlite3",
         "time"
       ],
-      "export_sha256": "34ca85d1b2579c667ed8788a7c52d62b22f28a7c93e8f15f12fe767ff40acbda",
+      "export_sha256": "b4e92a4194a17a64fa16206c289afba2b7e368fc8265d71810ca036aebe96908",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "bbbd17e0bcd17c0981e49c3b106f5e02c23e5cbf9f9b6c6ea786f1fab4fff390",
-      "extracted_sha256": "3bffd5ea51cedead20aa6b6496f4b889abf318b012e73ea269c2690315fdf57b",
+      "upstream_sha256": "790d0581833a2596ff1e877607a5db54706978394df53f7f0667fd57150cabee",
+      "extracted_sha256": "ea77f107e07c753c2e11e63cb1998d96add68e0cff4c724e1168cd1a53887830",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -2190,10 +2191,11 @@
     {
       "module": "pipeline.editorial_production_job",
       "source_path": "pipeline/editorial_production_job.py",
-      "source_sha256": "89b94f028114c72e13fe9cae36f211a72b607b210e7123c2edcc1788392edf6d",
+      "source_sha256": "d04568ca756eaadf66336075b64101d1d7f44447e1222b024da9064c04c7ebe1",
       "symbols": [
-        "CURRENT_CONVERSATION_MODE",
         "bind_current_conversation_job",
+        "current_conversation_author_mode",
+        "current_conversation_author_owner",
         "current_conversation_job_binding",
         "production_media_root"
       ],
@@ -2201,6 +2203,7 @@
         "AUTHOR_BUDGET_CAPS",
         "AUTHOR_BUDGET_KEY",
         "AUTHOR_BUDGET_SCHEMA",
+        "CURRENT_CONVERSATION_CHATGPT_MODE",
         "CURRENT_CONVERSATION_MODE",
         "CurrentConversationJob",
         "FULL_AUTHOR_PIPELINES",
@@ -2216,6 +2219,8 @@
         "annotations",
         "bind_current_conversation_job",
         "canonical_json",
+        "current_conversation_author_mode",
+        "current_conversation_author_owner",
         "current_conversation_job_binding",
         "dataclass",
         "file_hash",
@@ -2224,10 +2229,10 @@
         "production_media_root",
         "re"
       ],
-      "export_sha256": "8bf787f4637fe89d6a68b0575250521340406dbfc07fef3aa73f54fdcf09e352",
+      "export_sha256": "279fdc174409222a3ec477f954dba0178f8b8081ab4ece7d0e9d9b9a7bd579ca",
       "overlay": false,
       "trimmed_imports": [],
-      "extracted_sha256": "dc7b6657c86d789f4412ddadaf177a58c82e832d1ff06e149fd58f88a8e25c86",
+      "extracted_sha256": "912891a14af939136607b03fb9b3ee8f5fed946780a717503339feb5774cbc0e",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7060,10 +7065,10 @@
     },
     {
       "source_path": "loki.py",
-      "source_sha256": "4526d1d201b0f97d7b3a3ab9170cd2a86131fd78d7f6bed6df45b7b672d213aa",
-      "export_sha256": "f8ee483359c2682a4ea02eb9768561039595eedb7cbca6c9094cffa9f0c3547c",
+      "source_sha256": "106ab344002a522d015ecdcb7c4249ebcc6a13c9beac1bcb743f9771780375ff",
+      "export_sha256": "25399fc2331ac780fb33f35eb84d3218be5cf386b3c4ad232778bc146554c15c",
       "origin": "release_support",
-      "extracted_sha256": "4526d1d201b0f97d7b3a3ab9170cd2a86131fd78d7f6bed6df45b7b672d213aa",
+      "extracted_sha256": "106ab344002a522d015ecdcb7c4249ebcc6a13c9beac1bcb743f9771780375ff",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7074,18 +7079,18 @@
     },
     {
       "source_path": "selftest.py",
-      "source_sha256": "0b41b00d15c4b5fb8dfc3252fb38d86f319613d501e7ec520f8e9adb8340cee1",
-      "export_sha256": "0b41b00d15c4b5fb8dfc3252fb38d86f319613d501e7ec520f8e9adb8340cee1",
+      "source_sha256": "f8cd68d28cba064de0fd7f857dc9f2f65b2610b2173fba719acc90631a937b98",
+      "export_sha256": "f8cd68d28cba064de0fd7f857dc9f2f65b2610b2173fba719acc90631a937b98",
       "origin": "release_support",
-      "extracted_sha256": "0b41b00d15c4b5fb8dfc3252fb38d86f319613d501e7ec520f8e9adb8340cee1",
+      "extracted_sha256": "f8cd68d28cba064de0fd7f857dc9f2f65b2610b2173fba719acc90631a937b98",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "install.py",
-      "source_sha256": "95bd981ba6718bc2cb2c7fdd1c99795e38a340b2d2147e377037b83f0319f5d4",
-      "export_sha256": "6d470f8cd56361d68e755aea2fe2de79535f47ed804d04cfe7af90d30e925005",
+      "source_sha256": "88301c62b7a7c4a7a3cc1a089c86a6526132bf7cc95838c152d5efff5f6ce0b6",
+      "export_sha256": "b3acc9d05b59b6e21bfed934780208049f48897184492020e2ca4996bfc66714",
       "origin": "release_support",
-      "extracted_sha256": "95bd981ba6718bc2cb2c7fdd1c99795e38a340b2d2147e377037b83f0319f5d4",
+      "extracted_sha256": "88301c62b7a7c4a7a3cc1a089c86a6526132bf7cc95838c152d5efff5f6ce0b6",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7146,10 +7151,10 @@
     },
     {
       "source_path": "review_store.py",
-      "source_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
-      "export_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
+      "source_sha256": "f29a26da224599f81e0445d615c9705a9eb419fc78da7bba4746fee13dd13e6c",
+      "export_sha256": "f29a26da224599f81e0445d615c9705a9eb419fc78da7bba4746fee13dd13e6c",
       "origin": "release_support",
-      "extracted_sha256": "2261901c7499a9e3027a56be628e8dbeff00212fe9eb72cb05503907b459274e",
+      "extracted_sha256": "f29a26da224599f81e0445d615c9705a9eb419fc78da7bba4746fee13dd13e6c",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7178,10 +7183,10 @@
     },
     {
       "source_path": "source_acquire.py",
-      "source_sha256": "b0125f2c48bc58b618f3258fec1f40d9a954b3d10d25eb694a590df667edcae7",
-      "export_sha256": "7a9c03541d8b19ada7fb9c321552ba6151a48405479169bb99e6c1905862935d",
+      "source_sha256": "34505ef2c883094d6510e801036f15c4799896ccca31a136370162ebe1c01eff",
+      "export_sha256": "7d19017a2b3b40662883642e0f215a42a4c06ea02c67b57cdc53c327272ec60f",
       "origin": "release_support",
-      "extracted_sha256": "b0125f2c48bc58b618f3258fec1f40d9a954b3d10d25eb694a590df667edcae7",
+      "extracted_sha256": "34505ef2c883094d6510e801036f15c4799896ccca31a136370162ebe1c01eff",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7289,6 +7294,6 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "1b3afb50e1d67ad441d8c749a07f8c21e298048a",
+  "source_commit": "5c10b7bfca4090c711d0096ff36ec87dd447cddf",
   "version": "3.0.6"
 }

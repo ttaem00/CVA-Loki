@@ -1611,7 +1611,7 @@
     {
       "module": "pipeline.editorial_current_conversation",
       "source_path": "pipeline/editorial_current_conversation.py",
-      "source_sha256": "35e196e957cc53634c984c2eb31b4d2af3beea60d76cbaf44ee9e73e78688ceb",
+      "source_sha256": "53907764f1bf53045607ca959e73de981c08e19cc648c31578e751de52d2d946",
       "symbols": [
         "cli_result_json",
         "memory",
@@ -1650,6 +1650,7 @@
         "build_lock",
         "canonical_json",
         "cli_result_json",
+        "current_conversation_author_owner",
         "current_conversation_job_binding",
         "deepcopy",
         "digest",
@@ -1665,7 +1666,7 @@
         "remember",
         "submit"
       ],
-      "export_sha256": "3bdcd69821d8ce7a741a8b7673255e1e7ac725e20617b0db251f384e9a2136b0",
+      "export_sha256": "d4a9da6e77b7296affb475770ecd6feaf7815124586fa13c511ba89555e84e96",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -1752,7 +1753,7 @@
     {
       "module": "pipeline.editorial_full_author",
       "source_path": "pipeline/editorial_full_author.py",
-      "source_sha256": "9e1eb6f4cca9d86d0f735b167b844694b9d8241ef60c9f3efbf9dd7a69432a9e",
+      "source_sha256": "5d1293732d7b49e704b520a33886654a157cefdfd5e585a5b6bc70b56cde3704",
       "symbols": [
         "RESPONSE_FIELDS",
         "build_broadcast_flow_context",
@@ -1786,7 +1787,7 @@
         "validate_current_conversation_response",
         "validate_response"
       ],
-      "export_sha256": "241d3118c4673da5f6b46babdf9ae50ce123079b566c0fc858b2edfda0e37732",
+      "export_sha256": "8202c6016042ea047ff1f71b02c2d3309ccc7501c5c78fd0cd91c27668a167f2",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -1952,7 +1953,7 @@
     {
       "module": "pipeline.editorial_media_request",
       "source_path": "pipeline/editorial_media_request.py",
-      "source_sha256": "acac594d6eddb6318f9f85e81b663cd5b89f6cab4ce53ae760a2e41e49248174",
+      "source_sha256": "d7450e7fee0ffa9dded777a47f8b296ef2ad2164f7a1bf4ba825bc9d8d170c1b",
       "symbols": [
         "current_conversation_media_session"
       ],
@@ -1976,7 +1977,7 @@
         "preserve",
         "production_media_window"
       ],
-      "export_sha256": "d540bdf6a617c970b9c58fa765a4511deb99149f2e1f6fd42cc803b85abed2b3",
+      "export_sha256": "34b85cba112f2bdbe622615be56e1bca63c54bee81cf9420b814ea26154cb95c",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -2050,7 +2051,7 @@
     {
       "module": "pipeline.editorial_multimodal_search",
       "source_path": "pipeline/editorial_multimodal_search.py",
-      "source_sha256": "f8c570ec9fdf5c3d54c12ca85b454a869f3a9d4d40bb999a49214d7f5914d3e1",
+      "source_sha256": "29521a409d0d06685c4d199bccddb9e50a27bacbc4d022052f71e6c57fa10e14",
       "symbols": [
         "*",
         "_basis",
@@ -2089,10 +2090,10 @@
         "sqlite3",
         "time"
       ],
-      "export_sha256": "3bffd5ea51cedead20aa6b6496f4b889abf318b012e73ea269c2690315fdf57b",
+      "export_sha256": "ea77f107e07c753c2e11e63cb1998d96add68e0cff4c724e1168cd1a53887830",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "bbbd17e0bcd17c0981e49c3b106f5e02c23e5cbf9f9b6c6ea786f1fab4fff390"
+      "upstream_sha256": "790d0581833a2596ff1e877607a5db54706978394df53f7f0667fd57150cabee"
     },
     {
       "module": "pipeline.editorial_multimodal_search_transport",
@@ -2133,10 +2134,11 @@
     {
       "module": "pipeline.editorial_production_job",
       "source_path": "pipeline/editorial_production_job.py",
-      "source_sha256": "89b94f028114c72e13fe9cae36f211a72b607b210e7123c2edcc1788392edf6d",
+      "source_sha256": "d04568ca756eaadf66336075b64101d1d7f44447e1222b024da9064c04c7ebe1",
       "symbols": [
-        "CURRENT_CONVERSATION_MODE",
         "bind_current_conversation_job",
+        "current_conversation_author_mode",
+        "current_conversation_author_owner",
         "current_conversation_job_binding",
         "production_media_root"
       ],
@@ -2144,6 +2146,7 @@
         "AUTHOR_BUDGET_CAPS",
         "AUTHOR_BUDGET_KEY",
         "AUTHOR_BUDGET_SCHEMA",
+        "CURRENT_CONVERSATION_CHATGPT_MODE",
         "CURRENT_CONVERSATION_MODE",
         "CurrentConversationJob",
         "FULL_AUTHOR_PIPELINES",
@@ -2159,6 +2162,8 @@
         "annotations",
         "bind_current_conversation_job",
         "canonical_json",
+        "current_conversation_author_mode",
+        "current_conversation_author_owner",
         "current_conversation_job_binding",
         "dataclass",
         "file_hash",
@@ -2167,7 +2172,7 @@
         "production_media_root",
         "re"
       ],
-      "export_sha256": "dc7b6657c86d789f4412ddadaf177a58c82e832d1ff06e149fd58f88a8e25c86",
+      "export_sha256": "912891a14af939136607b03fb9b3ee8f5fed946780a717503339feb5774cbc0e",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -6788,7 +6793,7 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "1b3afb50e1d67ad441d8c749a07f8c21e298048a",
+  "source_commit": "5c10b7bfca4090c711d0096ff36ec87dd447cddf",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",

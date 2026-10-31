@@ -1,6 +1,6 @@
-# 현재 Codex의 보고서 작성 절차
+# 현재 대화의 보고서 작성 절차
 
-현재 대화의 Codex가 원문과 실제 이미지를 읽고 보고서를 직접 작성한다.
+현재 대화의 ChatGPT 또는 Codex가 원문과 실제 이미지를 읽고 보고서를 직접 작성한다.
 Loki는 자료 준비·읽기 기록·검사·렌더를 맡는다. 단계는
 **원자료 준비 → 작업 고정 → 원문·이미지 읽기 → 작성·제출 → 검토·저장**이다.
 
@@ -26,7 +26,7 @@ Loki는 자료 준비·읽기 기록·검사·렌더를 맡는다. 단계는
 Silero VAD와 익명 F2 화자 전환 처리가 포함된다.
 
 ```text
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://chzzk.naver.com/video/<video-number>
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <video-number>
 ```
 
 사용자가 지정한 공개 VOD 한 편을 내려받고 미디어 시계를 확인한 뒤 로컬 STT를 실행한다.
@@ -43,9 +43,9 @@ Silero VAD와 익명 F2 화자 전환 처리가 포함된다.
 파일과 체크포인트는 `<work_dir>/<video_no>/source-<attempt>/`에 남는다.
 STT가 실패해도 검증된 미디어와 이전 기록은 보존하고, 최초 실패를 확인한 뒤 재개한다.
 
-결과의 `prepare_spec_path`를 연다. 템플릿의 VOD 식별·SRT·미디어·원자료 폴더·base 경로를
-보존하고 현재 대화의 실제 `author` 정보를 넣은 뒤 다음 단계에 전달한다.
-`author_required=true`는 원자료가 준비됐고 **현재 Codex의 작성은 아직 남아 있다**는 뜻이다.
+결과의 `prepare_spec_path`를 연다. 템플릿의 VOD 식별·SRT·미디어·원자료 폴더·base 경로를 보존한다.
+`current_chatgpt` 작업공간은 도구가 발급한 `author={host:chatgpt,session_id:<로컬 UUID>,actual_model:unknown,identity_basis:workspace_local}`를 그대로 사용한다. 이 UUID는 플랫폼 계정·대화 ID가 아니며 Codex 신원이 필요하지 않다. 재개할 때 새 ID를 만들거나 기존 작성자를 바꾸지 않는다.
+기존 `current_codex` 작업공간은 확인한 `thread_id/turn_id/actual_model`을 넣는다. `author_required`는 추가 identity 입력이 필요한지 나타내며, 어느 값이든 현재 대화의 실제 내용 작성은 아직 남아 있다.
 전사 기록의 실제 모델·장치·F2 결과를 확인한다. 모델 자산 준비나 전사 성공을 작성자의
 청취·시청 기록으로 바꾸지 않는다.
 

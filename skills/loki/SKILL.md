@@ -1,11 +1,11 @@
 ---
 name: loki
-description: 공개 치지직 다시보기 한 편이나 같은 방송의 로컬 자료를 읽고, 현재 대화의 Codex가 요약·타임라인·Point·Story·Highlight와 선택 이미지를 직접 작성한 뒤 검토·저장한다.
+description: 공개 치지직 다시보기 번호나 같은 방송의 로컬 자료를 읽고, 현재 대화의 ChatGPT 또는 Codex가 요약·타임라인·Point·Story·Highlight와 선택 이미지를 직접 작성한 뒤 검토·저장한다.
 ---
 
 # Loki로 직접 작성하기
 
-현재 대화의 Codex가 동봉 런타임으로 실제 원문과 이미지를 읽고 편집 판단을 내려
+현재 대화의 ChatGPT 또는 Codex가 동봉 런타임으로 실제 원문과 이미지를 읽고 편집 판단을 내려
 새 보고서를 작성한다. 다른 Codex/Claude CLI·API 모델·에이전트 브리지나 이전 생성
 보고서에 의미 작성을 맡기지 않는다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색,
 스크립트는 준비·기록·검사·렌더를 맡는다.
@@ -32,6 +32,7 @@ description: 공개 치지직 다시보기 한 편이나 같은 방송의 로컬
 
 설치가 필요하면 `python <skill>/runtime/install.py --workspace <new-user-workspace> --mode setup`을
 사용한다. 기본값은 전체 기능 `--features multimodal`과 GPU 자동 선택 `--device auto`다.
+ChatGPT 자체 Linux에서는 설치 명령에 `--author-mode current_chatgpt`를 명시한다. 스킬 또는 setup 모드는 별도 Codex 작성자를 실행하지 않는다. 실제 셸·허용된 네트워크·저장공간·모델 자원을 먼저 확인한다.
 Node/npm·FFmpeg·장치별 PyTorch·EmbeddingGemma 2·Whisper·Silero·익명 F2를 준비한다.
 호환 GPU가 없으면 CPU를 선택하며, 감지된 GPU의 실행 실패를 CPU 성공으로 숨기지 않는다.
 호스트 드라이버·Docker GPU 노출은 먼저 준비돼 있어야 한다. 설치로 이를 변경하지 않는다.
@@ -41,7 +42,7 @@ Node/npm·FFmpeg·장치별 PyTorch·EmbeddingGemma 2·Whisper·Silero·익명 F
 합성 검사도 새 보고서 작성이나 방송 편집 품질의 증거가 아니다. 자세한 설치·F2·VAD·캐시
 기준은 설정 안내를 따른다. `media`·`core`는 사용자 요청 범위에 맞을 때만 선택한다.
 
-공개 치지직 VOD URL 한 개 또는 같은 방송의 SRT·확인된 식별/시각 정보와 선택적 로컬
+공개 치지직 VOD 번호 또는 URL 한 개, 같은 방송의 SRT·확인된 식별/시각 정보와 선택적 로컬
 영상으로 시작한다. 공개 자료 취득은 별도의 온라인 준비 단계이며 로컬 STT와 작성 도구는
 오프라인을 유지한다. 쿠키·로그인 프로필을 수집하지 않는다. 원자료 준비 결과는 작성 완료가 아니다.
 
@@ -69,7 +70,7 @@ Node/npm·FFmpeg·장치별 PyTorch·EmbeddingGemma 2·Whisper·Silero·익명 F
 
 설치 결과의 `review.command`·`review.url` 또는 설치된 Python의
 `runtime/review.py --config <workspace>/loki.json --port 8787`을 사용한다.
-출력된 loopback URL을 현재 Codex 앱이나 사용자 브라우저에서 연다. 동봉한 기존
+출력된 loopback URL은 해당 환경에 실제 브라우저 접근이 있을 때 연다. 동봉한 기존
 Report Admin의 목록·영상 작업실·상세 편집기에서 확인한다.
 
 수정안은 미리보기 → 명시적 저장 → 재열기로 확인하고, 필요하면 저장 이력을 비교·복원한다.
@@ -78,7 +79,7 @@ Report Admin의 목록·영상 작업실·상세 편집기에서 확인한다.
 
 ## 지켜야 할 실행·출처 조건
 
-- `author_mode=current_codex`, `network=deny`를 유지한다. 작업을 끝내기 위해 provider를
+- 선택한 `author_mode=current_codex` 또는 `current_chatgpt`와 `network=deny`를 유지한다. 작업을 끝내기 위해 provider를
   바꾸거나 API 키를 요청하거나 실행 정책을 우회하지 않는다.
 - 실제로 전달받고 확인하지 않은 자료를 들었거나 봤다고 기록하지 않는다. 시각·원문의
   의미를 임의로 바꾸지 않는다. 도구 실행 기록은 검사 성공을 보여주며 편집 품질을 보증하지 않는다.
