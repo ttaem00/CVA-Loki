@@ -1,0 +1,22 @@
+services:
+  review:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["review"]
+    entrypoint:
+      - /workspace/.venv/bin/python
+      - -B
+      - /opt/loki/skills/loki/runtime/review.py
+      - --config
+      - /workspace/loki.json
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8787"
+    command: []
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - "${LOKI_WORKSPACE:-loki_workspace}:/workspace"
+      - loki_home:/home/loki

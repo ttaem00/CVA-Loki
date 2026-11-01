@@ -1,0 +1,4 @@
+services:
+  loki:
+    gpus: !reset []
+    command: ["--mode", "skill", "--device", "cpu"]

@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Report Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="/static/shared-viewer/viewer.css">
+  <link rel="stylesheet" href="/static/admin/report.css">
+  <link rel="stylesheet" href="/static/admin/report_navigation.css">
+</head>
+<body>
+  <nav id="reportRoleSwitch" class="report-role-switch" aria-label="Report Admin 역할 보기">
+    <strong>VOD 작업 역할</strong>
+    <button type="button" data-report-page-role="manager" aria-pressed="true">관리자</button>
+    <button type="button" data-report-page-role="editor" aria-pressed="false">편집자</button>
+    <button type="button" data-report-page-role="viewer" aria-pressed="false">시청자</button>
+  </nav>
+  <main id="viewerRoleSurface" class="report-role-viewer" aria-label="시청자용 방송 요약" hidden></main>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <section id="reportSourcePane" aria-label="전체본문 직접 편집">
+      <section class="editor-decision-panel" aria-label="편집 판단 요약">
+        <h2>지금 결정할 일</h2>
+        <p id="editorDecisionState" class="editor-decision-state">리포트를 불러오는 중입니다.</p>
+        <p id="editorialCompletionNotice" class="editor-decision-state" role="status" aria-live="polite" hidden></p>
+        <div class="editor-decision-grid">
+          <div class="editor-decision-card">
+            <span>검토</span>
+            <strong>본문을 읽고 미리보기로 화면을 확인합니다.</strong>
+          </div>
+          <div class="editor-decision-card">
+            <span>로컬 저장</span>
+            <strong>저장은 이 PC의 수정본만 바꿉니다.</strong>
+          </div>
+          <div class="editor-decision-card risk">
+            <span>공개 반영</span>
+            <strong>별도 공개 버튼과 확인을 거쳐야만 공개 사이트가 바뀝니다.</strong>
+          </div>
+        </div>
+      </section>
+      <label class="muted" for="mdEditor" style="display:block;margin-top:16px;">원본 요약 마크다운</label>
+      <textarea id="mdEditor" spellcheck="false"></textarea>
+      <section id="managerOutlineEditor" aria-labelledby="managerOutlineHeading" hidden>
+        <div class="manager-outline-heading-row">
+          <h2 id="managerOutlineHeading">방송 목차 편집</h2>
+          <span class="manager-outline-local-chip">로컬 수정본 · 공개 안 됨</span>
+        </div>
+        <p class="manager-outline-lead">원하는 장면을 더 빨리 찾도록 제목과 시간을 바로잡으세요.</p>
+        <section class="manager-outline-timeline-panel" aria-labelledby="managerOutlineTimelineHeading">
+          <div class="manager-outline-timeline-head"><h3 id="managerOutlineTimelineHeading">방송 타임라인</h3><p id="managerOutlineDragStatus" role="status" aria-live="polite">막대나 Point를 선택하면 오른쪽에서 정확한 시간을 편집할 수 있어요.</p></div>
+          <div id="managerOutlineTimeline" class="manager-outline-timeline"><div class="manager-outline-timeline-controls"><label for="managerOutlineTimelineZoom">시간축 확대 <input id="managerOutlineTimelineZoom" type="range" min="1" max="8" step="1" value="1" aria-describedby="managerOutlineTimelineZoomReadout"></label><span class="manager-outline-zoom-help">Ctrl+휠: 포인터 위치를 기준으로 확대·축소</span><output id="managerOutlineTimelineZoomReadout" class="manager-outline-zoom-readout" aria-live="polite">1×</output><button id="managerOutlineTimelineFullView" type="button">전체 보기</button></div><div id="managerOutlineTimelineViewport" class="manager-outline-timeline-viewport"><div id="managerOutlineTimelineCanvas" class="manager-outline-timeline-canvas"></div></div></div>
+          <div id="managerOutlineTimelineTooltip" class="manager-outline-tooltip" role="tooltip" hidden></div>
+        </section>
+        <div class="manager-outline-workspace">
+          <section class="manager-outline-navigator" aria-labelledby="managerOutlineNavigatorHeading">
+            <div class="manager-outline-list-head"><h3 id="managerOutlineNavigatorHeading">목차 항목</h3><div class="manager-outline-toolbar" aria-label="목차 구조 편집">
+              <button id="managerOutlineAddBtn" class="primary manager-outline-add-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="managerOutlineAddMenu">새 항목 추가</button>
+              <div id="managerOutlineAddMenu" class="manager-outline-add-menu" role="menu" aria-label="추가할 항목 종류" hidden>
+                <button type="button" class="manager-outline-add-option" role="menuitem" data-outline-add="D1"><strong>D1 구간 추가 — 방송의 큰 활동</strong></button>
+                <button type="button" class="manager-outline-add-option" role="menuitem" data-outline-add="D2"><strong>D2 하위 구간 추가 — 선택한 D1 안</strong><span class="manager-outline-add-reason" data-outline-add-reason="D2"></span></button>
+                <button type="button" class="manager-outline-add-option" role="menuitem" data-outline-add="point"><strong>Point 추가 — 정확한 한 시각</strong></button>
+              </div>
+              <button id="managerOutlineUndoBtn" type="button" disabled>되돌리기</button>
+            </div></div>
+            <div id="managerOutlineGroupTabs" class="manager-outline-segments" role="tablist" aria-label="목차 항목 종류"></div>
+            <div id="managerOutlineRows" class="manager-outline-rows" role="tree" aria-label="선택할 목차 항목"></div>
+          </section>
+          <section class="manager-outline-inspector" aria-labelledby="managerOutlineInspectorHeading">
+            <div class="manager-outline-inspector-head">
+              <h3 id="managerOutlineInspectorHeading">선택 항목 편집</h3>
+              <p id="managerOutlineBreadcrumb" class="manager-outline-breadcrumb">왼쪽에서 항목을 선택하세요.</p>
+            </div>
+            <div id="managerOutlineInspector" aria-live="polite"></div>
+          </section>
+        </div>
+        <section id="collaborationPeriodsEditor" hidden aria-labelledby="collaborationPeriodsHeading">
+          <h3 id="collaborationPeriodsHeading">시점별 합방 멤버</h3>
+          <details class="manager-outline-field-help">
+            <summary>ⓘ 입력 방법</summary>
+          <label for="collaborationPeriodsInput">한 줄에 시작 | 끝 | 멤버 이름 | 다시보기 번호를 입력하세요.</label>
+          <p id="collaborationPeriodsHelp">예: 00:10:00 | 01:20:00 | 멤버1, 멤버2 | 멤버1=15395196. 마지막 칸은 생략할 수 있으며 번호가 없는 멤버는 방송 시점으로 검색합니다. 시각은 이 기준 영상의 경과시간입니다. 끝 시각은 포함하지 않으며 빈 멤버 칸은 합방 멤버 없음, 구간 사이 공백은 미확인입니다. 미리보기는 연속된 같은 멤버를 묶어 표시합니다. 이 입력란은 다시보기 연결이 달라지는 시간 범위를 보존하므로 같은 멤버가 여러 줄에 남을 수 있습니다. 수정 후 미리보기에서 확인하고 수정본 저장을 누르세요.</p>
+          </details>
+          <textarea id="collaborationPeriodsInput" rows="4" spellcheck="false" aria-labelledby="collaborationPeriodsHeading" aria-describedby="collaborationPeriodsHelp" placeholder="00:10:00 | 01:20:00 | 멤버 이름"></textarea>
+        </section>
+        <details class="manager-outline-secondary">
+          <summary id="managerOutlineEvidenceHeading">읽기 전용 근거와 실행 정보</summary>
+          <section id="managerOutlineReadOnly" class="manager-outline-readonly" aria-labelledby="managerOutlineEvidenceHeading">
+            <div data-outline-readonly="broadcast_understanding"><h4>방송 전체 이해</h4><pre></pre></div>
+            <div data-outline-readonly="short_summary"><h4>짧은 요약</h4><pre></pre></div>
+            <div data-outline-readonly="unknown_or_missing"><h4>불확실하거나 빠진 부분</h4><pre></pre></div>
+            <div data-outline-readonly="used_signals"><h4>실제 사용한 정보</h4><pre></pre></div>
+            <div data-outline-readonly="content_info_usage"><h4>사용한 콘텐츠 정보</h4><pre></pre></div>
+            <div data-outline-readonly="model_calls"><h4>모델/호출</h4><pre></pre></div>
+          </section>
+        </details>
+        <details class="manager-outline-secondary"><summary id="managerOutlineHistorySummary">이전 버전 0개</summary><div id="managerOutlineHistory" class="manager-outline-readonly"></div></details>
+      </section>
+      <div class="row save-row">
+        <button id="saveBtn" class="primary" type="button">저장</button>
+        <button id="previewBtn" type="button" class="ghost">미리보기 갱신</button>
+        <button id="reloadBtn" type="button" class="ghost" title="저장하지 않은 화면 입력을 버리고 마지막 저장본을 다시 엽니다.">저장본 다시 열기</button>
+      </div>
+      </section>
+      <section id="reportSharePane" aria-label="공개·공유 준비">
+      <div id="publishRow" class="publish-row">
+        <button id="publishBtn" class="danger" type="button">공개 사이트에 반영</button>
+        <span id="publishHint" class="publish-hint">저장과 별도 행동입니다. 누른 뒤 공개 확인과 권한 검사를 통과해야 공개됩니다.</span>
+      </div>
+      <div id="ctToggleRow" class="ct-toggle-row">
+        <label class="checkbox"><input id="ctEnabledCheckbox" type="checkbox" checked> 챕터 인덱스 포함</label>
+        <span id="ctHint" class="ct-hint">끄면 챕터 인덱스 카드와 댓글 복사에서 제외됩니다.</span>
+      </div>
+      <section class="naver-post-panel" aria-labelledby="naverCafeTitle" data-testid="naver-cafe-post-panel">
+        <div class="naver-post-head">
+          <div>
+            <div id="naverCafeTitle" class="naver-post-title">게시/댓글 내보내기</div>
+            <p class="naver-post-lead">요약 페이지 본문에는 넣지 않는 관리자 전용 도구입니다. 현재 수정본 기준으로 카페 글과 CHZZK 댓글 초안을 만듭니다.</p>
+          </div>
+          <span class="naver-post-badge">관리자 전용</span>
+        </div>
+        <div class="naver-action-group cafe-publish-module">
+          <div class="naver-action-title">네이버 카페 글</div>
+          <p class="naver-action-copy">현재 편집 내용을 사용합니다. 저장 전 수정도 포함됩니다.</p>
+          <div id="naverCafeDestination" class="naver-post-destination" aria-live="polite">
+            <strong>게시 대상 확인 중</strong><span>현재 리포트의 채널 설정을 불러옵니다.</span>
+          </div>
+          <div class="naver-post-actions cafe-draft-actions">
+            <button id="naverCafePreviewBtn" type="button">초안 보기</button>
+            <button id="naverCafeCopyBtn" type="button">HTML 복사</button>
+            <button id="naverCafeFillDraftBtn" class="cafe-wide" type="button">작성창에 채우기</button>
+            <button id="naverCafePostBtn" class="primary cafe-wide" type="button" disabled>게시 내용 확인</button>
+          </div>
+          <p class="naver-action-copy">미리보기·복사·작성창 채움은 게시가 아닙니다.</p>
+          <p id="naverCafeCapability" class="naver-action-copy"></p>
+          <div id="naverCafeSubmission" class="cafe-submission" role="status" aria-live="polite" tabindex="-1">현재 게시 기록을 확인합니다.</div>
+          <p id="naverCafeObservation" class="naver-action-copy"></p>
+          <details id="naverCafeHistory" class="cafe-submission-history" hidden>
+            <summary id="naverCafeHistorySummary">이전 제출 기록</summary>
+            <ol id="naverCafeHistoryList"></ol>
+          </details>
+          <div class="cafe-recovery-actions">
+            <button id="naverCafeReadCurrentBtn" type="button">현재 기록 확인</button>
+            <a id="naverCafeLastPostLink" target="_blank" rel="noopener" hidden>마지막 확인 글 열기 ↗</a>
+            <button id="naverCafeNewIntentBtn" type="button" hidden>별도 새 요청 준비</button>
+          </div>
+        </div>
+        <div id="naverCafeStatus" class="naver-post-status" aria-live="polite">초안을 미리 보거나 복사해 사용하세요.</div>
+        <dialog id="naverCafeConfirm" class="report-save-confirm" aria-labelledby="naverCafeConfirmTitle">
+          <h2 id="naverCafeConfirmTitle">카페에 현재 내용을 반영할까요?</h2>
+          <div class="cafe-confirm-body">
+          <p>저장 전 수정 내용을 포함합니다. 이 확인은 사이트 공개·리포트 저장과 별개입니다.</p>
+          <dl class="cafe-confirm-summary">
+            <dt>대상</dt><dd id="naverCafeConfirmDestination"></dd>
+            <dt>내용</dt><dd id="naverCafeConfirmContent"></dd>
+            <dt>방식</dt><dd id="naverCafeConfirmMode"></dd>
+          </dl>
+          <details id="naverCafeConfirmPreview" class="naver-post-preview">
+            <summary>반영할 초안 보기</summary>
+            <div id="naverCafeConfirmPreviewBody" class="naver-post-preview-body"></div>
+          </details>
+          <p>수정 화면을 제출 전에 준비할 수 없는 경우에만 새 글로 게시할 수 있습니다. 제출 결과가 불명확하면 자동으로 다시 게시하지 않습니다.</p>
+          <label id="naverCafeConfirmUnknown" class="cafe-unknown-check" hidden>
+            <input id="naverCafeConfirmUnknownCheck" type="checkbox">
+            이전 요청은 미확정입니다. 카페 글을 직접 확인했고, 중복될 수 있는 별도 새 요청을 진행합니다.
+          </label>
+          </div>
+          <div class="cafe-confirm-actions">
+            <button id="naverCafeConfirmCancel" type="button" autofocus>취소</button>
+            <button id="naverCafeConfirmSubmit" class="primary" type="button">카페에 게시</button>
+          </div>
+        </dialog>
+        <details id="naverCafePreviewBox" class="naver-post-preview">
+          <summary>카페 글 초안 보기</summary>
+          <div id="naverCafePreviewBody" class="naver-post-preview-body">미리보기를 누르면 현재 본문 기준 초안이 표시됩니다.</div>
+        </details>
+        <div class="naver-action-group chzzk-comment-group" data-testid="chzzk-comment-group">
+          <div>
+            <div class="naver-action-title">복붙용 댓글</div>
+          </div>
+          <div class="naver-post-actions">
+            <button id="chzzkCommentCopyBtn" type="button">댓글 복사</button>
+            <button id="chzzkCommentPreviewBtn" type="button">새로고침</button>
+            <details class="manager-outline-field-help"><summary>ⓘ</summary>
+              <p>TTaempad에서 읽을 수 있는 구간·Point·Highlight 댓글입니다. 현재 편집 내용을 복사하며 댓글 등록은 직접 합니다.</p>
+              <button id="chzzkCommentFillBtn" type="button">CHZZK 댓글창에 채우기</button>
+            </details>
+          </div>
+          <div id="chzzkCommentStatus" class="naver-post-status" aria-live="polite"></div>
+          <pre id="chzzkCommentPreview" class="chzzk-comment-admin-preview" hidden></pre>
+          <div id="chzzkCommentDraftList" class="tool-list"></div>
+        </div>
+        <div id="naverCafeClipboardSandbox" class="clipboard-sandbox" aria-hidden="true"></div>
+      </section>
+      <details class="section youtube-section">
+        <summary>
+          <span class="summary-title">유튜브 댓글 만들기</span>
+          <span class="summary-hint">타임스탬프 정렬 — 클릭해서 펼치기</span>
+        </summary>
+        <ol class="steps">
+          <li><span class="num">1</span><div>YouTube URL 을 붙여넣고 <em>미리보기 생성</em> 을 누릅니다.</div></li>
+          <li><span class="num">2</span><div>아래에 뜨는 추천 앵커 칸 2개 이상에 <strong>유튜브 시각</strong>(예: 01:24:57) 을 입력합니다.</div></li>
+          <li><span class="num">3</span><div><em>미리보기 생성</em> 을 다시 눌러 결과를 확인하고, <em>텍스트 복사</em> 또는 <em>정렬 설정 저장</em>.</div></li>
+        </ol>
+        <div class="field">
+          <label for="youtubeUrl">YouTube URL</label>
+          <input id="youtubeUrl" type="text" placeholder="https://www.youtube.com/watch?v=...">
+        </div>
+        <div class="row">
+          <button id="youtubePreviewBtn" type="button">유튜브 미리보기 생성</button>
+          <button id="youtubeCopyBtn" type="button" disabled>텍스트 복사</button>
+          <button id="youtubeSaveBtn" type="button" class="ghost">정렬 설정 저장</button>
+        </div>
+        <div id="youtubeMeta" class="meta-note">아직 생성되지 않음</div>
+        <div id="anchorGrid" class="anchor-grid"></div>
+        <div id="youtubePreview" class="preview-box">유튜브 미리보기를 생성하면 여기에 댓글용 텍스트가 표시됩니다.</div>
+      </details>
+      </section>
+    </aside>
+    <div class="resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" tabindex="0" title="드래그해서 사이드바 폭 조절 (Ctrl+더블클릭 = 기본값 복원)"></div>
+    <main class="main">
+      <div class="preview-bar">
+        <div class="report-heading">
+      <h1 id="title"><span class="dirty-dot" title="저장하지 않은 변경 사항이 있습니다"></span><span id="titleText">리포트 불러오는 중...</span></h1>
+      <div id="meta" class="muted"></div>
+          <div id="previewTitle" class="preview-title" hidden>미리보기</div>
+          <div id="previewInfo" class="muted" hidden></div>
+          <p id="managerOutlineStatus" role="status" aria-live="polite"></p>
+        </div>
+        <button type="button" class="ghost" id="splitViewToggle" aria-pressed="false" disabled
+          title="타임라인 카드를 누르면 위쪽 플레이어가 그 장면으로 이동합니다">영상 함께 보기</button>
+        <div class="report-surfaces" role="group" aria-label="작업면 선택">
+          <button type="button" class="ghost" id="reportReadButton" aria-pressed="true" hidden>읽기·장면</button>
+          <button type="button" class="ghost" id="reportSourceToggle" aria-controls="reportSourcePane" aria-expanded="false" hidden>전체본문 직접 편집</button>
+          <button type="button" class="ghost" id="reportShareToggle" aria-controls="reportSharePane" aria-expanded="false" hidden>공개·공유 준비</button>
+        </div>
+        <button id="managerOutlineSaveBtn" class="primary" type="button" hidden>수정본 저장</button>
+      </div>
+      <section class="report-context-strip" aria-label="현재 요약과 저장 상태">
+      <nav class="topbar report-context-navigation" aria-label="현재 방송의 자료와 복귀">
+        <a href="/reports">← 리포트 목록으로</a>
+        <a id="sourceManifestLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 자막/채팅/커뮤니티/클립/맥락 재료 수집 상태를 한눈에 확인합니다 (관리자 전용, LLM 호출 없음)">재료 상태</a>
+        <a id="workEvidenceLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 로컬 work 폴더 산출물을 내용 노출 없이 확인합니다 (관리자 전용)">작업자료·ZIP</a>
+        <button id="revisionHistoryBtn" class="link-button" type="button" title="저장/공개 반영 시점의 본문과 화면 기록을 확인합니다">저장·공개 이력</button>
+        <a id="editorBriefLink" href="#" target="_blank" rel="noopener">편집 브리프</a>
+        <a id="vodOutputsLink" href="#" target="_blank" rel="noopener">결과 모음</a>
+        <a id="publicLink" href="#" target="_blank" rel="noopener">공개 리포트 열기</a>
+      </nav>
+        <div class="report-context-row">
+          <nav id="reportVersions" aria-label="요약 버전"></nav>
+          <a id="reportWorkspaceLink" href="/report-workspace" title="현재 요약 버전과 선택 장면을 장면 편집 화면에서 엽니다.">장면 편집 화면 열기</a>
+        </div>
+        <div id="canonicalConflictBanner" class="canonical-conflict-banner" data-testid="canonical-report-conflict" role="status" hidden></div>
+        <div class="report-save-feedback">
+          <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+          <button id="reportSaveCheckBtn" class="ghost" type="button" hidden>저장 결과 확인</button>
+          <button id="reportSaveAdoptBtn" class="ghost" type="button" hidden>확인한 저장본으로 열기</button>
+        </div>
+      </section>
+      <div class="split-player-pane" id="splitPlayerPane">
+        <div class="split-player-note">
+          <span id="splitPlayerStatus">타임라인 카드를 누르면 여기서 그 장면이 재생됩니다.</span>
+          <a id="splitPlayerNewTab" href="#" target="_blank" rel="noopener">새 탭에서 열기 ↗</a>
+        </div>
+        <iframe id="splitPlayerFrame" title="CHZZK 플레이어" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+      <div class="split-player-resizer" id="splitPlayerResizer" role="separator" aria-orientation="horizontal" tabindex="0" title="드래그해서 장면 플레이어 높이 조절 (Ctrl+더블클릭 = 기본값 복원)"></div>
+      <iframe id="previewFrame" title="preview"></iframe>
+    </main>
+    <div class="resizer admin-resizer" id="adminPanelResizer" role="separator" aria-orientation="vertical" tabindex="0" title="드래그해서 편집 조종석 폭 조절 (Ctrl+더블클릭 = 기본값 복원)"></div>
+    <aside class="admin-panel" id="adminPanel">
+      <h2>편집 조종석</h2>
+      <p class="admin-caption">장면을 찾고, 근거를 확인하고, 요약 후보를 미리 본 뒤 본문에 넣는 관리자 전용 작업창입니다.</p>
+      <div id="adminPanelSummary" class="admin-tool"></div>
+      <div class="cockpit-flow admin-tool">
+        <section class="cockpit-section" id="signalTimelineSection">
+          <h3>1. 장면 찾기</h3>
+          <p class="section-lead">채팅 급증, 웃음/놀람, 긴 자막, 시청자 클립, 오디오 피크, 기존 요약 구간을 시간축으로 봅니다.</p>
+          <div id="signalTimelineBody" class="meta-note">시그널 타임라인 데이터가 없습니다.</div>
+        </section>
+        <section class="cockpit-section" id="bundleAlignmentSection" style="display:none">
+          <h3>번들 정렬 근거</h3>
+          <p class="section-lead">번들에 포함된 VOD의 유튜브 편집본 정렬 후보입니다. 검토 완료만 근거로 보고, 자동 후보와 실패 기록은 확인 대상으로 표시합니다.</p>
+          <div id="bundleAlignmentBody" class="meta-note">번들 정렬 근거가 없습니다.</div>
+        </section>
+        <section class="cockpit-section" id="bundleMembershipSection" style="display:none" data-testid="bundle-membership-edit">
+          <h3>번들 구성 바꾸기</h3>
+          <p class="section-lead">VOD 번호를 줄마다 하나씩 정리해 미리보기로 변경점을 확인합니다. 저장 전에는 번들 파일이 바뀌지 않습니다.</p>
+          <textarea id="bundleMembershipInput" placeholder="예: 12345678&#10;12345679"></textarea>
+          <div class="tool-actions">
+            <button type="button" class="primary" id="bundleMembershipPreviewBtn">변경 미리보기</button>
+            <button type="button" class="ghost" id="bundleMembershipSaveBtn" disabled>구성 저장</button>
+            <button type="button" class="ghost" id="bundleMembershipCancelBtn">되돌리기</button>
+          </div>
+          <div id="bundleMembershipPreview" class="candidate-preview">VOD 번호를 조정한 뒤 미리보기를 누르세요.</div>
+        </section>
+        <section class="cockpit-section" id="selectedEvidenceSection">
+          <h3>2. 선택한 시각의 근거</h3>
+          <p class="section-lead">선택한 장면 주변 자막, 채팅, 기존 요약 맥락을 확인하고 필요하면 시각을 직접 고칩니다.</p>
+          <div class="timecode-row">
+            <label class="field-label"><span>타임코드</span><input id="cockpitTimecode" type="text" inputmode="text" placeholder="1:23 또는 00:01:23"></label>
+            <button type="button" class="ghost" id="inspectTimecodeBtn">근거 보기</button>
+            <button type="button" class="ghost" id="saveCurrentTimeBtn">판단 저장</button>
+          </div>
+          <div id="signalEvidenceBody" class="meta-note">시간축을 클릭하거나 타임코드를 입력하세요.</div>
+        </section>
+        <section class="cockpit-section" id="summaryCandidateSection">
+          <h3>3. 요약에 추가하기</h3>
+          <p class="section-lead">선택한 시각과 위 근거를 바탕으로 `### 📍 타임라인 상세 요약`에 넣을 후보 1개만 만듭니다.</p>
+          <label class="scene-context-field" for="timelineSceneContextInput">
+            <span>장면 메모</span>
+            <textarea id="timelineSceneContextInput" maxlength="600" placeholder="선택 사항: 이 장면에서 관리자가 이미 아는 맥락을 1~2줄로 적습니다."></textarea>
+            <span class="field-help">미리보기 전용입니다. 메모만으로 사실을 만들지 않고 주변 자막/채팅 근거와 함께 확인합니다.</span>
+          </label>
+          <div class="tool-actions">
+            <button type="button" class="primary" id="draftTimelineCandidateBtn">이 시각으로 한 줄 요약 만들기</button>
+            <button type="button" class="ghost" id="insertTimelineCandidateBtn" disabled>본문에 넣기</button>
+          </div>
+          <div id="timelineCandidatePreview" class="candidate-preview">후보를 만들면 여기에 미리보기가 표시됩니다.</div>
+        </section>
+        <section class="cockpit-section" id="savedDecisionsSection">
+          <h3>4. 내가 표시한 장면</h3>
+          <p class="section-lead">장면 찾기에서 중요/제외/추가 검토로 남긴 판단이 모입니다. 요약 본문을 고칠 때 다시 볼 개인 체크리스트입니다.</p>
+          <div id="signalDraftControls"></div>
+          <div id="signalDraftRanges" class="tool-list"></div>
+        </section>
+        <section class="cockpit-section" id="commentUsefulnessSection" data-testid="comment-usefulness-ablation">
+          <h3>댓글 보조 장면 검증</h3>
+          <p class="section-lead">같은 관리자 편집 기록에서 댓글 보조 장면을 넣었을 때와 뺐을 때의 수정 부담을 비교합니다. 댓글은 장면의 정답이 아니라 보조 신호로만 봅니다.</p>
+          <div id="commentUsefulnessBody" class="meta-note" aria-live="polite">검증 결과를 불러오는 중입니다.</div>
+        </section>
+        <section class="cockpit-section" id="managerNoteSection">
+          <h3>5. 메모를 작업 초안으로 보기</h3>
+          <p class="section-lead">제목, 장면 제외, 단어 후보, 근거 확인처럼 큰 메모를 저장 없이 초안 카드로만 확인합니다.</p>
+          <textarea id="managerNoteInput" placeholder="예: 제목 너무 과장돼 / 이 구간은 빼줘 / 근거 확인해줘"></textarea>
+          <div class="tool-actions">
+            <button type="button" class="primary" id="managerNotePreviewBtn">초안 보기</button>
+            <button type="button" class="ghost" id="managerNoteClearBtn">지우기</button>
+          </div>
+          <div id="managerNotePreview" class="candidate-preview">메모를 입력하면 저장 없이 작업 초안만 표시됩니다.</div>
+        </section>
+        <section class="cockpit-section" id="approvalInboxSection">
+          <h3>6. 승인함</h3>
+          <p class="section-lead">요청의 위험·효과·출처를 읽고 승인하거나 거절합니다. 승인 기록과 단어 사전 적용 결과는 따로 표시하며, 여기서 처리해도 편집 중인 본문은 유지됩니다.</p>
+          <div id="approvalInboxBody" class="meta-note">승인 요청을 불러오는 중입니다.</div>
+        </section>
+        <details class="section admin-tool" id="editorToolsSection">
+          <summary>
+            <span class="summary-title">편집 프로그램용 컷 목록</span>
+            <span class="summary-hint">필요할 때만</span>
+          </summary>
+          <div id="editorToolsBody" class="meta-note">영상 편집 프로그램이나 외부 도구로 컷 목록을 복사할 때만 쓰는 보조 자료입니다.</div>
+        </details>
+        <details class="section admin-tool" id="diagnosticsSection">
+          <summary>
+            <span class="summary-title">저장 전 자동 경고</span>
+            <span class="summary-hint">문제 있을 때만</span>
+          </summary>
+          <div id="diagnosticsBody" class="meta-note">챕터 시간, 근거 누락, 구간 경계처럼 저장 전에 한 번 볼 경고가 있을 때 표시됩니다.</div>
+        </details>
+        <details class="section admin-tool" id="contextVocabSection">
+          <summary>
+            <span class="summary-title">반복 이름 후보</span>
+            <span class="summary-hint">단어 사전 보조</span>
+          </summary>
+          <p class="section-lead">여러 context.md에 반복 등장한 이름/용어입니다. 표기·고유명사·배경 힌트일 뿐, 특정 장면이 실제로 있었다는 근거는 아닙니다.</p>
+          <div id="contextVocabBody" class="meta-note">반복 후보를 불러오는 중입니다.</div>
+        </details>
+      </div>
+    </aside>
+  </div>
+  <section id="revisionPanel" class="revision-panel" aria-labelledby="revisionTitle" data-testid="publish-revision-panel" aria-hidden="true">
+    <div class="revision-dialog" role="dialog" aria-modal="true" aria-describedby="revisionLead">
+      <div class="revision-head">
+        <div>
+          <div id="revisionTitle" class="revision-title">되돌리기 기록</div>
+          <p id="revisionLead" class="revision-lead">저장/공개 반영 시점의 본문과 화면을 봅니다. 이전 버전을 불러와도 저장 전까지 파일과 공개 사이트는 바뀌지 않습니다.</p>
+        </div>
+        <button id="revisionCloseBtn" class="revision-close ghost" type="button">닫기</button>
+      </div>
+      <span class="revision-badge">복구 안전망</span>
+      <div class="revision-state-legend" data-testid="revision-state-legend" aria-label="버전 출처 구분">
+        <div><strong>AI 원본</strong>AI가 처음 만든 기준본입니다. 공개 대상 아님.</div>
+        <div><strong>사람 수정</strong>관리자가 저장하거나 불러온 편집본입니다. 공개 대상 아님.</div>
+        <div><strong>공개 미리보기</strong>승인 기록이 있는 현재 공개본 화면입니다.</div>
+      </div>
+      <div id="revisionList" class="revision-list" aria-live="polite">
+        <div class="revision-empty">기록을 불러오는 중입니다.</div>
+      </div>
+    </div>
+  </section>
+  <div id="busyOverlay" class="busy-overlay" role="dialog" aria-modal="true" aria-labelledby="busyTitle" aria-describedby="busyMessage" aria-hidden="true" tabindex="-1">
+    <div class="busy-dialog">
+      <span class="busy-spinner" aria-hidden="true"></span>
+      <strong id="busyTitle">처리 중입니다</strong>
+      <p id="busyMessage" role="status" aria-live="polite" aria-atomic="true">잠시만 기다려 주세요.</p>
+      <p id="publishBusyElapsed" class="busy-elapsed" hidden></p>
+      <p id="publishBusyNote" class="busy-note" hidden>페이지를 닫아도 서버에서 계속 진행됩니다.</p>
+      <button id="publishBusyReturn" type="button" class="ghost" hidden>편집 화면으로 돌아가기</button>
+    </div>
+  </div>
+  <dialog id="reportSaveConfirmDialog" class="report-save-confirm" aria-labelledby="reportSaveConfirmTitle" aria-describedby="reportSaveConfirmMessage">
+    <form method="dialog">
+      <h2 id="reportSaveConfirmTitle">저장본 변경 확인</h2>
+      <p id="reportSaveConfirmMessage"></p>
+      <div class="report-save-confirm-actions">
+        <button type="submit" value="cancel" autofocus>편집 유지</button>
+        <button id="reportSaveConfirmAction" class="primary" type="submit" value="confirm">확인한 변경 실행</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/static/admin/report_navigation.js"></script>
+  <script src="/static/admin/report_lifecycle.js"></script>
+  <script src="/static/admin/report_adaptive_context.js"></script>
+  <script src="/static/admin/report_signal_timeline.js"></script>
+  <script src="/static/admin/report_manager_outline.js"></script>
+  <script src="/static/admin/report_scene_cockpit.js"></script>
+  <script src="/static/admin/approval_state.js"></script>
+  <script src="/static/admin/report_review_panels.js"></script>
+  <script src="/static/admin/report_distribution.js"></script>
+  <script src="/static/admin/report_timeline_candidate.js"></script>
+  <script src="/static/shared-viewer/viewer.js"></script>
+  <script src="/static/admin/report_versions.js"></script>
+  <script src="/static/admin/report.js"></script>
+</body>
+</html>

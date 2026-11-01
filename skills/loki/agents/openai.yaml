@@ -1,0 +1,4 @@
+interface:
+  display_name: "CVA-Loki"
+  short_description: "치지직 원문과 장면을 직접 읽고 요약·편집하기"
+  default_prompt: "$loki로 이 치지직 다시보기의 원문과 추출 이미지를 직접 읽고, 요약·타임라인·Point·Story·Highlight를 작성한 뒤 검토 화면을 열어줘."

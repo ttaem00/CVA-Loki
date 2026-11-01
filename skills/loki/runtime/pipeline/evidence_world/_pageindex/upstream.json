@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/VectifyAI/PageIndex",
+  "revision": "6d23caf416858f2ca136840305d1f479a86f6ef7",
+  "source_path": "pageindex/page_index_md.py",
+  "source_sha256": "62c8d3acfb51476e7dc1226f4346fec201a31cb64c47fe922593c06b4dc30b27",
+  "exported_functions": [
+    "extract_nodes_from_markdown",
+    "extract_node_text_content",
+    "build_tree_from_nodes"
+  ],
+  "local_delta": "Only three original pure functions and re import; trailing whitespace normalized. Function ASTs match upstream exactly. No SDK, PDF, dotenv, providers or model calls.",
+  "function_ast_sha256": {
+    "extract_nodes_from_markdown": "aa605d250a36589746ce01c7c996ac06035ae9445522cf3ab62c0d180d861ff9",
+    "extract_node_text_content": "164eb674f1bef73176897e2106617dd6d6c8c7d036aaa0c218d2bae0d93c60f7",
+    "build_tree_from_nodes": "df35f02c126104a62cb7cb73b858dc09acd134887fbf32d934fc0e021db2fa1f"
+  }
+}

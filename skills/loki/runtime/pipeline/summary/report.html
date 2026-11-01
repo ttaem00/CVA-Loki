@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@@REPORT_TITLE@@ — 방송 분석 리포트</title>
+@@OG_META@@
+@@CHART_SCRIPT@@
+<style>
+  /* Self-hosted assets: no external CDN. Fonts use OS-installed fallbacks. */
+  :root {
+    --bg:          #1a1b26;
+    --surface:     #24283b;
+    --surface-2:   #2a2f43;
+    --border:      #363b54;
+    --border-soft: #2e3248;
+    --text:        #c0caf5;
+    --text-strong: #e8ebf3;
+    --muted:       #7982a9;
+    --faint:       #565c7e;
+    --tc:          #7aa2f7;
+    --mood-hot:    #f7768e;
+    --mood-funny:  #e0af68;
+    --mood-game:   #7aa2f7;
+    --mood-chat:   #bb9af7;
+    --mood-warm:   #f2a6c8;
+    --mood-tense:  #ff9e64;
+    --mood-spicy:  #db4b4b;
+    --mood-chill:  #7dcfff;
+    --accent:      #9ece6a;
+    --accent-warm: #e0af68;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height: 100vh; line-height: 1.7; font-size: 15px; }
+
+  /* Centered Layout */
+  .bleed-inner { max-width: 960px; margin: 0 auto; padding: 0 40px; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(ellipse at top left, rgba(122,162,247,0.08), transparent 60%), var(--bg);
+  }
+  header .bleed-inner { padding: 36px 40px 28px; }
+  header .crumb { font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace; color: var(--muted); font-size: 12px;
+                   letter-spacing: 0.5px; margin-bottom: 10px; }
+  header h1 { font-size: 26px; font-weight: 700; color: var(--text-strong); line-height: 1.35; letter-spacing: -0.3px; }
+  header .meta { color: var(--muted); margin-top: 10px; font-size: 13px; font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace; }
+  header .meta span + span::before { content: "·"; margin: 0 10px; color: var(--faint); }
+  .collaboration-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 8px; font-size: 12px; line-height: 1.5; }
+  .collaboration-chips-label { color: var(--muted); margin-right: 3px; }
+  .collaboration-chip { padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); background: var(--surface); overflow-wrap: anywhere; max-width: 100%; }
+@@TOP_VOD_CSS@@
+
+  .hero { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .hero .bleed-inner { padding: 28px 40px; }
+  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tag {
+    display: inline-block; padding: 6px 14px;
+    background: rgba(158,206,106,0.12); color: var(--accent);
+    border: 1px solid rgba(158,206,106,0.28); border-radius: 999px;
+    font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+  }
+  .quote {
+    font-size: 17px; color: var(--text-strong); font-weight: 500; line-height: 1.55;
+    padding-left: 16px; border-left: 3px solid var(--accent-warm); font-style: italic;
+  }
+
+  .export-help { color: var(--muted); margin-bottom: 14px; }
+  .export-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .export-btn {
+    appearance: none; border: 1px solid rgba(122,162,247,0.35); cursor: pointer;
+    background: rgba(122,162,247,0.12); color: var(--text-strong);
+    padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  }
+  .export-btn:hover { background: rgba(122,162,247,0.18); }
+  .export-status { color: var(--muted); font-size: 13px; }
+  .export-preview summary {
+    cursor: pointer; color: var(--muted); font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 13px;
+  }
+  .naver-preview {
+    margin-top: 14px; background: var(--surface-2); border: 1px solid var(--border-soft);
+    border-radius: 12px; padding: 18px; color: var(--text-strong);
+  }
+  .naver-preview h2 { font-size: 21px; margin: 0 0 10px; color: var(--text-strong); }
+  .naver-preview p { margin: 0 0 10px; }
+  .naver-preview blockquote {
+    margin: 0; padding: 12px 16px; border-left: 3px solid var(--accent-warm);
+    background: rgba(224,175,104,0.08); color: var(--text-strong);
+  }
+  .naver-preview hr {
+    border: 0; border-top: 1px solid var(--border); margin: 18px 0;
+  }
+  .naver-preview a { color: var(--accent); word-break: break-all; }
+  .clipboard-sandbox {
+    position: fixed; left: -9999px; top: 0; opacity: 0; pointer-events: none;
+  }
+  .chzzk-comment-preview {
+    margin: 0; background: var(--surface-2); border: 1px solid var(--border-soft);
+    border-radius: 12px; padding: 16px 18px; color: var(--text-strong);
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+    max-height: 420px; overflow: auto;
+  }
+  .chapter-readiness { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chapter-readiness-status {
+    display: inline-block; min-width: 54px; text-align: center; padding: 3px 8px;
+    border-radius: 4px; font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 12px; font-weight: 700; letter-spacing: 0;
+  }
+  .chapter-readiness-status.pass { color: #9ece6a; background: rgba(158,206,106,0.12); border: 1px solid rgba(158,206,106,0.35); }
+  .chapter-readiness-status.fail { color: #f7768e; background: rgba(247,118,142,0.12); border: 1px solid rgba(247,118,142,0.35); }
+  .chapter-readiness-meta { color: var(--muted); font-size: 13px; }
+  .chapter-readiness-list { color: var(--text); font-size: 13px; line-height: 1.7; padding-left: 18px; }
+  .chapter-readiness-list code { color: var(--accent-warm); }
+
+  .stats-wrap { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .stats-wrap .bleed-inner { padding: 0; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border-soft); }
+  .stat { background: var(--surface); padding: 18px 24px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                 letter-spacing: 1.2px; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace; color: var(--text-strong); }
+  .stat-value.accent { color: var(--tc); }
+
+  .main { padding-top: 32px; padding-bottom: 60px; display: flex; flex-direction: column; gap: 28px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .card-head { padding: 18px 24px; border-bottom: 1px solid var(--border-soft);
+                display: flex; align-items: center; justify-content: space-between; }
+  .card-head h2 { font-size: 13px; color: var(--muted); text-transform: uppercase;
+                    letter-spacing: 1.5px; font-weight: 600; }
+  .card-body { padding: 24px; }
+  .chart-wrap { height: 220px; position: relative; }
+
+  .timeline { display: flex; flex-direction: column; gap: 12px; }
+  .t-item {
+    padding: 16px 20px 16px 18px; background: var(--surface-2); border-radius: 8px;
+    border-left: 3px solid var(--border); transition: background 0.15s; cursor: pointer;
+  }
+  .t-item:hover { background: #2e334b; }
+  .t-item.mood-hot { border-left-color: var(--mood-hot); }
+  .t-item.mood-funny { border-left-color: var(--mood-funny); }
+  .t-item.mood-game { border-left-color: var(--mood-game); }
+  .t-item.mood-chat { border-left-color: var(--mood-chat); }
+  .t-item.mood-warm { border-left-color: var(--mood-warm); }
+  .t-item.mood-tense { border-left-color: var(--mood-tense); }
+  .t-item.mood-spicy { border-left-color: var(--mood-spicy); }
+  .t-item.mood-chill { border-left-color: var(--mood-chill); }
+  .t-item.mood-veryhot { border-left-color: var(--mood-hot); border-left-width: 5px;
+                          box-shadow: inset 3px 0 0 var(--mood-hot); }
+  .t-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .tc {
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace; font-size: 12px; font-weight: 600;
+    color: var(--tc); background: rgba(122,162,247,0.12);
+    padding: 3px 9px; border-radius: 4px; letter-spacing: 0.3px;
+  }
+  a.tc { text-decoration: none; transition: background 0.12s, color 0.12s; }
+  a.tc:hover { background: rgba(122,162,247,0.28); color: var(--text-strong); text-decoration: none; }
+  .inline-tc {
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 0.85em; font-weight: 600; color: var(--tc);
+    background: rgba(122,162,247,0.10); padding: 1px 6px; border-radius: 3px;
+    text-decoration: none; white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
+  }
+  .inline-tc:hover { background: rgba(122,162,247,0.25); color: var(--text-strong); text-decoration: none; }
+  .t-title { font-size: 15px; font-weight: 600; color: var(--text-strong); }
+  .mood { font-size: 14px; margin-left: auto; }
+  .t-body { color: var(--text); font-size: 14px; line-height: 1.65; }
+  .t-evidence {
+    margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-soft);
+    color: var(--faint); font-size: 12px; line-height: 1.55;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace; display: none;
+  }
+  .t-item[data-open="1"] .t-evidence { display: block; }
+
+  .t-toggle {
+    font-size: 11px; color: var(--muted); cursor: pointer; user-select: none;
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px;
+    background: transparent; font-family: inherit;
+  }
+  .t-toggle:hover { color: var(--text); border-color: var(--muted); }
+
+  .hl-list { display: flex; flex-direction: column; gap: 12px; counter-reset: hl; }
+  .hl-note { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .hl { display: flex; gap: 16px; padding: 16px 20px; background: var(--surface-2);
+         border-radius: 8px; counter-increment: hl; }
+  .hl::before {
+    content: counter(hl); font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    font-size: 22px; font-weight: 700; color: var(--accent-warm); min-width: 28px;
+  }
+  .hl-body { flex: 1; }
+  .hl-title { font-weight: 600; color: var(--text-strong); margin-bottom: 4px; }
+  .hl-reason { color: var(--muted); font-size: 13px; }
+
+  
+  .injected-badge {
+    display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 4px;
+    background: rgba(255,209,102,0.18); color: #e0af68; border: 1px solid rgba(255,209,102,0.4);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.2px; vertical-align: middle;
+  }
+  .audio-peak-badge {
+    display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 4px;
+    background: rgba(125,207,255,0.14); color: #7dcfff; border: 1px solid rgba(125,207,255,0.45);
+    font-size: 11px; font-weight: 600; letter-spacing: 0; vertical-align: middle;
+  }
+  .t-item.is-injected, .hl.is-injected { border-left: 3px solid #e0af68; padding-left: 14px; }
+
+  .ct-list { display: flex; flex-direction: column; gap: 6px; }
+  .ct-item { display: flex; gap: 12px; align-items: baseline; padding: 6px 0;
+              border-bottom: 1px solid var(--border-soft); }
+  .ct-item:last-child { border-bottom: none; }
+  .ct-tc { font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+            font-size: 13px; color: var(--accent); white-space: nowrap; }
+  .ct-range { color: var(--muted); }
+  .ct-title { font-size: 14px; color: var(--text-strong); }
+
+  /* viewer-clips CSS — VIEWER_CLIPS_CSS 모듈 상수에서 직접 삽입 */
+@@VIEWER_CLIPS_CSS@@
+
+@@EDITORIAL_HIGHLIGHT_CARD_CSS@@
+
+  .notes { color: var(--text); font-size: 14.5px; line-height: 1.85; }
+  .notes p { margin-bottom: 14px; }
+  .notes p:last-child { margin-bottom: 0; }
+  .notes strong { color: var(--text-strong); font-weight: 600; }
+  .broadcast-summary { min-width: 0; }
+  .broadcast-summary .notes { overflow-wrap: anywhere; }
+  code { font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace; font-size: 0.92em;
+          background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--accent); }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  @media (max-width: 720px) {
+    .bleed-inner { padding-left: 20px; padding-right: 20px; }
+    header .bleed-inner { padding: 28px 20px 20px; }
+    .hero .bleed-inner { padding: 22px 20px; }
+    header h1 { font-size: 22px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+/* viewer-editor-tools-css:start */
+@@VIEWER_TOOLS_CSS@@
+/* viewer-editor-tools-css:end */
+</style>
+</head>
+<body data-default-editor-mode="companion">
+
+<header><div class="bleed-inner">
+  <div class="crumb">@@CHANNEL_NAME@@ · VOD @@VOD_ID@@</div>
+  <h1>@@DISPLAY_TITLE@@</h1>
+  <div class="meta">
+    <span>@@PUBLISHED_AT@@</span>
+    <span>@@DURATION@@</span>
+    @@CATEGORY_META@@
+    @@TOP_VOD_LINK@@
+  </div>
+  @@COLLABORATION_CHIPS@@
+  @@EDITOR_JUMP@@
+</div></header>
+
+@@HERO_HTML@@
+
+<div class="stats-wrap"><div class="bleed-inner"><div class="stats">
+  <div class="stat"><div class="stat-label">총 채팅</div><div class="stat-value accent">@@CHAT_COUNT@@</div></div>
+  <div class="stat"><div class="stat-label">방송 길이</div><div class="stat-value">@@DURATION_STAT@@</div></div>
+  <div class="stat"><div class="stat-label">신호 장면</div><div class="stat-value accent">@@SIGNAL_SCENE_COUNT@@</div></div>
+  @@EDITORIAL_HIGHLIGHT_STAT@@
+</div></div></div>
+
+<div class="main bleed-inner">
+
+  @@BROADCAST_SUMMARY_HTML@@
+
+  <div class="card">
+    <div class="card-head"><h2>채팅 밀도 시각화</h2></div>
+    <div class="card-body">@@CHAT_CHART_STATE@@<div class="chart-wrap"><canvas id="chatChart"></canvas></div></div>
+  </div>
+
+  @@TIMELINE_HTML@@
+  @@EDITORIAL_REVIEW_HTML@@
+  @@HIGHLIGHTS_HTML@@
+  @@INJECTION_WARNING_HTML@@
+  @@COMMENT_TIMELINE_HTML@@
+  @@USER_CLIPS_HTML@@
+  @@COMMUNITY_REACTION_HTML@@
+  @@NOTES_HTML@@
+  @@VIEWER_TOOLS_HTML@@
+  @@FALLBACK_HTML@@
+
+</div>
+
+<script>
+const labels = @@CHART_LABELS@@;
+const counts = @@CHART_COUNTS@@;
+const bucketSecs = @@CHART_BUCKET_SECS@@;
+const peakSecs = @@PEAK_SECS@@;
+const audioPeakSecs = @@AUDIO_PEAK_SECS@@;
+const vodVideoNo = @@VOD_VIDEO_NO@@;
+const windowSec = @@WINDOW_SEC@@;
+// chat-chart-bucket-mapping:start
+const peakBucketIndex = (seconds) => Number.isFinite(seconds)
+  ? bucketSecs.findIndex((start, index) => seconds >= start
+    && (index + 1 === bucketSecs.length || seconds < bucketSecs[index + 1]))
+  : -1;
+const peakSet = new Set(peakSecs.map(peakBucketIndex).filter(index => index >= 0));
+const audioPeakSet = new Set(audioPeakSecs.map(peakBucketIndex).filter(index => index >= 0));
+const bgColors = labels.map((_, i) =>
+  audioPeakSet.has(i) ? 'rgba(224,175,104,0.85)' :
+  peakSet.has(i) ? 'rgba(247,118,142,0.75)' : 'rgba(122,162,247,0.35)'
+);
+const audioPeakMarkers = labels.map((_, i) =>
+  audioPeakSet.has(i) ? Math.max(counts[i] || 0, 1) : null
+);
+// chat-chart-bucket-mapping:end
+if (labels.length > 0) {
+  new Chart(document.getElementById('chatChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: '채팅 밀도', data: counts, backgroundColor: bgColors, borderWidth: 0, borderRadius: 2 },
+      {
+        type: 'line',
+        label: '오디오 피크',
+        data: audioPeakMarkers,
+        showLine: false,
+        pointStyle: 'triangle',
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        borderColor: 'rgba(224,175,104,1)',
+        backgroundColor: 'rgba(224,175,104,1)'
+      }
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: audioPeakSecs.length > 0, labels: { color: '#a9b1d6' } }, tooltip: {
+        backgroundColor: '#24283b', borderColor: '#363b54', borderWidth: 1,
+        titleColor: '#c0caf5', bodyColor: '#c0caf5'
+      }},
+      onClick: (_event, elements) => {
+        if (!elements.length) return;
+        const sec = bucketSecs[elements[0].index];
+        if (typeof sec !== 'number') return;
+        const report = document.getElementById('viewerEditorToolsData')?.chzzResultPayload;
+        const source = report?.source_vods?.find((row) =>
+          sec >= Number(row.offset_sec) && sec < Number(row.offset_sec) + Number(row.duration_sec));
+        const videoNo = source ? String(source.video_no || '') : vodVideoNo;
+        if (!videoNo) return;
+        const seekSec = source ? sec - Number(source.offset_sec) : sec;
+        const url = `https://chzzk.naver.com/video/${videoNo}?currentTime=${Math.max(0, Math.floor(seekSec))}`;
+        if (typeof navigateChzzkCompanion === 'function') {
+          navigateChzzkCompanion(url);
+        } else {
+          window.open(url, '_blank', 'noopener');
+        }
+      },
+      onHover: (event, elements) => {
+        if (event.native && event.native.target) {
+          event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#565c7e', font: { size: 10 }, maxTicksLimit: 12 } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#565c7e', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// 타임라인 아이템 클릭 시 근거 토글
+document.querySelectorAll('.t-item').forEach(item => {
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('a, button')) return;
+    const open = item.getAttribute('data-open') === '1';
+    item.setAttribute('data-open', open ? '0' : '1');
+  });
+});
+function toggleAll(btn) {
+  const items = document.querySelectorAll('.t-item');
+  const anyClosed = Array.from(items).some(i => i.getAttribute('data-open') !== '1');
+  items.forEach(i => i.setAttribute('data-open', anyClosed ? '1' : '0'));
+  btn.textContent = anyClosed ? '근거 모두 접기' : '근거 모두 펼치기';
+}
+
+async function copyNaverCafeHtml(btn) {
+  const template = document.getElementById('naverCafeTemplate');
+  const status = document.getElementById('naverCafeCopyStatus');
+  const sandbox = document.getElementById('naverCafeClipboard');
+  if (!template || !status || !sandbox) return;
+
+  const html = template.innerHTML.trim();
+  const text = (template.content.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\n\s*\n\s*\n+/g, '\n\n')
+    .trim();
+
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' })
+        })
+      ]);
+    } else {
+      sandbox.innerHTML = html;
+      const range = document.createRange();
+      range.selectNodeContents(sandbox);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const ok = document.execCommand('copy');
+      selection.removeAllRanges();
+      sandbox.innerHTML = '';
+      if (!ok) throw new Error('execCommand copy failed');
+    }
+    status.textContent = '복사됨. 네이버 카페 글쓰기 창에 바로 붙여넣으세요.';
+    btn.blur();
+  } catch (err) {
+    status.textContent = '브라우저가 HTML 복사를 막았습니다. 미리보기 내용을 직접 복사해 주세요.';
+  }
+}
+
+async function copyChzzkCommentText(btn) {
+  const pre = document.getElementById('chzzkCommentPreview');
+  const status = document.getElementById('chzzkCommentCopyStatus');
+  if (!pre || !status) return;
+  const text = pre.textContent || '';
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const ok = document.execCommand('copy');
+      selection.removeAllRanges();
+      if (!ok) throw new Error('execCommand copy failed');
+    }
+    status.textContent = '복사됨. 치지직 다시보기 댓글창에 바로 붙여넣으세요.';
+    btn.blur();
+  } catch (err) {
+    status.textContent = '브라우저가 복사를 막았습니다. 미리보기 내용을 직접 복사해 주세요.';
+  }
+  }
+</script>
+
+<script id="viewerEditorToolsScript">
+@@VIEWER_JS@@
+</script>
+
+</body>
+</html>
