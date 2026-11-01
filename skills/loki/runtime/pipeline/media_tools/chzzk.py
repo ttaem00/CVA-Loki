@@ -209,6 +209,15 @@ def read_chzzk_preview_frames(catalog: Mapping[str, Any], start_sec: float, dura
     indices = [i for i in range(math.ceil(start_sec / interval),
                                min(preview["totalPieceSize"], math.ceil(end / interval)))
                if min((i + 1) * interval, duration) <= end]
+    coverage = "contained"
+    if not indices and end > start_sec:
+
+
+
+
+        indices = [i for i in range(math.floor(start_sec / interval),
+                                   min(preview["totalPieceSize"], math.ceil(end / interval)))]
+        coverage = "overlapping"
     if len(indices) > max_frames:
         indices = ([indices[len(indices) // 2]] if max_frames == 1 else
                    [indices[round(i * (len(indices) - 1) / (max_frames - 1))] for i in range(max_frames)])
@@ -265,6 +274,7 @@ def read_chzzk_preview_frames(catalog: Mapping[str, Any], start_sec: float, dura
             source_interval = [index * interval, min((index + 1) * interval, duration)]
             frames.append(dict(path=str(path), sha256=hashlib.sha256(data).hexdigest(), bytes=len(data),
                 mime_type="image/png", source_sec=source_interval[0], source_interval_sec=source_interval,
+                piece_coverage=coverage,
                 frame_index=index, delivered_dimensions=[preview["width"], preview["height"]],
                 source_height=preview["height"], tile=dict(page_index=page, crop_box=box, sprite_sha256=sprite_sha),
                 time_binding=dict(clock_basis="provider_seeking_thumbnail", actual_frame_pts_verified=False,

@@ -303,7 +303,13 @@ def prepare(spec):
         retrieval=spec.get('retrieval')
         if retrieval is None and multimodal_runtime is not None:
             from .editorial_embedding_index import prepare_optional
-            retrieval=prepare_optional(service,source_dir=source_dir,runtime=multimodal_runtime)
+            from .editorial_multimodal_navigation import _local_runtime_assets
+
+
+
+            _, missing_asset = _local_runtime_assets(multimodal_runtime)
+            retrieval=prepare_optional(service,source_dir=source_dir,runtime=multimodal_runtime,
+                                       cached_only=missing_asset is not None)
         service.configure_retrieval(retrieval, search_mode=search_mode)
         if multimodal_runtime is not None:
             multimodal_context = LocalNavigationSession(source=source, service=service, media_ref=media,

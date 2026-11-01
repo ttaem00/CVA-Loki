@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.6 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.7 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.6</h1>
+<h1 align="center">CVA-Loki 3.0.7</h1>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.6" src="https://img.shields.io/badge/버전-3.0.6-8B5CF6?style=flat-square" /></a>
+  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.7" src="https://img.shields.io/badge/버전-3.0.7-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
   <a href="#codex-integration"><img alt="코덱스 플러그인과 스킬" src="https://img.shields.io/badge/코덱스-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
   <a href="#docker-install"><img alt="도커 한 명령 설치" src="https://img.shields.io/badge/도커-한%20명령%20설치-2496ED?style=flat-square" /></a>
@@ -79,9 +79,9 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 ### 1. 배포 폴더를 준비하세요
 
-CVA-Loki 3.0.6은 정식 요약 메커니즘 Loki 3.0.6을 포함한 후속 소프트웨어 배포본입니다. [3.0.6 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.6)의 `CVA-Loki-3.0.6.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+CVA-Loki 3.0.7은 정식 요약 메커니즘 Loki 3.0.7을 포함한 후속 소프트웨어 패치입니다. [3.0.7 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.7)의 `CVA-Loki-3.0.7.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
 
-배포·플러그인·스킬·요약 메커니즘 버전은 모두 **3.0.6**이며, 새 작업의 `latest`도 **Loki 3.0.6**을 선택합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 보존합니다. 이미 설치한 이전 버전의 작업공간을 덮어쓰지 말고 새 배포본은 새 작업공간에 설치하세요.
+배포·플러그인·스킬·요약 메커니즘 버전은 모두 **3.0.7**이며, 새 작업의 `latest`도 **Loki 3.0.7**을 선택합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 보존합니다. 이미 설치한 이전 버전의 작업공간을 덮어쓰지 말고 새 배포본은 새 작업공간에 설치하세요.
 
 ```sh
 git clone https://github.com/ttaem00/CVA-Loki.git
@@ -140,7 +140,7 @@ VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함�
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 요약 메커니즘 3.0.6 동작 |
+| 기능 | 요약 메커니즘 3.0.7 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
@@ -336,8 +336,8 @@ python install.py --workspace ../loki-plugin-workspace --mode plugin
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.6` |
-| 요약 메커니즘 | `3.0.6` · `latest`는 `loki_3_0_6` 선택 |
+| 배포 버전 | `3.0.7` |
+| 요약 메커니즘 | `3.0.7` · `latest`는 `loki_3_0_7` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
 | skill | `loki` / 명시 호출 `$loki` |
@@ -664,9 +664,9 @@ ChatGPT Linux에서의 별도 실험은 [실험 계획](docs/chatgpt-linux-exper
 <a id="release-version-policy"></a>
 ### 정식 공개 전 후보 수정
 
-3.0.5는 이미 정식 공개했으며 태그·ZIP·해시를 보존합니다. 현재 출시 대상은 별도로
-승인된 후속 소프트웨어 패치 **3.0.6**입니다. 정식 공개 전에 발견한 코드·설치·검사·
-운영 오류는 3.0.6 후보 안에서 고칩니다. 오류·재시도·재빌드를 이유로 자동 증분하거나
+3.0.5와 3.0.6은 이미 정식 공개했으며 태그·ZIP·해시를 보존합니다. 현재 출시 대상은 별도로
+승인된 후속 소프트웨어 패치 **3.0.7**입니다. 정식 공개 전에 발견한 코드·설치·검사·
+운영 오류는 3.0.7 후보 안에서 고칩니다. 오류·재시도·재빌드를 이유로 자동 증분하거나
 미완료를 다음 버전으로 넘기지 않습니다. 후보 차이는 기존 커밋·빌드·
 파일 해시로 구분하며, 필요할 때만 기존 사전 공개 표기를 사용합니다.
 이미 정식 공개한 태그·ZIP은 덮어쓰지 않으며, 공개 후 수정은 별도 후속 패치 절차를
@@ -680,7 +680,7 @@ ChatGPT Linux에서의 별도 실험은 [실험 계획](docs/chatgpt-linux-exper
 
 3.0.5는 제품·배포·플러그인·스킬·새 작업의 정식 메커니즘을 같은 버전으로 맞춘 배포본입니다. 당시 검증 범위는 [3.0.5 배포 안내](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.5)에 남겨 두며, 공개 태그·ZIP·해시와 기존 작업의 버전·원자료·보고서를 그대로 보존합니다.
 
-3.0.6은 별도로 승인된 소프트웨어 패치입니다. 이번 배포 검증에서는 관리자 지시에 따라 새 요약을 생성하지 않습니다. 기존 원시 응답·평가·예산을 보존하고, 코드·바이트·조건이 같은 기존 근거만 재사용합니다. 합성 계약·설치 검사는 프롬프트 품질, 실제 방송의 새 요약 품질 또는 10–15분 작성 시간의 증거가 아닙니다. 새 생성·의미 품질은 미검증이며, 진행 중인 전체 품질 개선 과제가 끝났다는 뜻도 아닙니다.
+3.0.7은 3.0.6 다음의 별도 승인 소프트웨어 패치입니다. 작성 경로를 막던 네 가지 오류(공개 다시보기 길이의 1초 차이로 미리보기 격자와 원본 이미지가 거부되던 문제, 60초 미리보기 조각보다 짧은 창에 격자가 비던 문제, 새 작업에 Gemma 문장 색인이 준비되지 않던 문제, 멀티모달 저장 검색과 5분 요약 힌트가 '없음'으로 읽히던 안내 부재)를 고쳤습니다. 3.0.6은 별도로 승인된 소프트웨어 패치였습니다. 이번 배포 검증에서는 관리자 지시에 따라 새 요약을 생성하지 않습니다. 기존 원시 응답·평가·예산을 보존하고, 코드·바이트·조건이 같은 기존 근거만 재사용합니다. 합성 계약·설치 검사는 프롬프트 품질, 실제 방송의 새 요약 품질 또는 10–15분 작성 시간의 증거가 아닙니다. 새 생성·의미 품질은 미검증이며, 진행 중인 전체 품질 개선 과제가 끝났다는 뜻도 아닙니다.
 
 **기본 설치는 전체 기능과 GPU 자동 선택입니다.** `core` 검사 성공을 전체 모델 준비·GPU 추론·실제 VOD 전사 성공으로 해석하지 않습니다. 사용 중인 환경의 실제 결과는 설치 후 생성되는 `installation-result.json`에서 확인하세요.
 

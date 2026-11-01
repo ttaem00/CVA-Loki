@@ -14,6 +14,14 @@ from .editorial_visual_input import owned_images, PROFILE
 
 SCHEMA = "editorial.media-request.v1"
 
+MEDIA_CLOCK_TOLERANCE_SEC = 1.0
+
+def same_media_clock(observed_sec, expected_sec):
+    """True when two public duration readings describe the same source within rounding."""
+    return (type(observed_sec) in (int, float) and type(expected_sec) in (int, float)
+            and math.isfinite(observed_sec) and math.isfinite(expected_sec)
+            and abs(float(observed_sec) - float(expected_sec)) <= MEDIA_CLOCK_TOLERANCE_SEC)
+
 def original_media_scope(*, video_no, duration_sec):
     """Bind the existing bounded downloader to the current VOD, without URLs."""
     from .media_tools.chzzk import resolve_chzzk_source
@@ -22,7 +30,7 @@ def original_media_scope(*, video_no, duration_sec):
         source = resolve_chzzk_source(str(video_no), target_height=720, public_only=True)
     except MediaToolError as exc:
         return dict(original_source_error=exc.code)
-    if source.duration_sec != duration_sec:
+    if not same_media_clock(source.duration_sec, duration_sec):
         return dict(original_source_error="source_clock_mismatch")
     return dict(original_source=dict(profile="chzzk_bounded_v1",
         source_revision_sha256=source.source_revision, duration_sec=source.duration_sec))
@@ -451,7 +459,7 @@ class AuthorMediaSession:
             try:
                 preview = resolve_chzzk_preview_catalog(str(self.catalog["video_no"]))
                 scope = self.catalog.get("timeline_preview") or self.catalog.get("original_source")
-                if scope and preview["duration_sec"] != scope["duration_sec"]:
+                if scope and not same_media_clock(preview["duration_sec"], scope["duration_sec"]):
                     return self._pending(action, "editorial_media_source_changed")
                 if request.start_sec + request.duration_sec > preview["duration_sec"]:
                     return self._pending(action, "window_out_of_range")
@@ -467,11 +475,13 @@ class AuthorMediaSession:
                 window = dict(kind="timeline_preview", path=image["path"], sha=image["sha256"],
                     start=row["source_interval_sec"][0], end=row["source_interval_sec"][1],
                     saved_height=row["source_height"])
+                coverage = row.get("piece_coverage", "contained")
                 frames[ref] = dict(image=image, source_sec=row["source_sec"],
                     source_interval_sec=row["source_interval_sec"], delivered_dimensions=row["delivered_dimensions"],
                     source_height=row["source_height"], media=window, receipt=dict(path=str(path)),
-                    time_binding=row["time_binding"], tile=row["tile"],
-                    uncertainty=["single_frame", "audio_not_listened", "provider_preview_not_verified_pts"])
+                    time_binding=row["time_binding"], tile=row["tile"], piece_coverage=coverage,
+                    uncertainty=["single_frame", "audio_not_listened", "provider_preview_not_verified_pts"]
+                    + (["provider_piece_overlaps_requested_window"] if coverage == "overlapping" else []))
             body = dict(manifest=self.spec["manifest"], source_id=self.catalog["source_id"],
                 source_revision=self.catalog["source_revision"], request=request.canonical_payload(),
                 frames=frames, preview_source={k:v for k,v in preview.items() if k != "seeking_thumbnail"})

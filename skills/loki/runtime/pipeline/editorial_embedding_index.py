@@ -202,7 +202,9 @@ def prepare_optional(service,*,source_dir,runtime,cached_only=True):
     root=native_path(source_dir)/'embedding-index'
     try:
         result=prepare(service,source_dir=source_dir,runtime=runtime,cached_only=cached_only)
-    except (ImportError,OSError,ValueError,RuntimeError) as exc:
+    except Exception as exc:
+
+
         atomic_json(root/'preparation-status.json',dict(status='unavailable',
             reason=type(exc).__name__,original_search_available=True))
         return None

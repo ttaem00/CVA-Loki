@@ -105,7 +105,8 @@ class EvidenceWorldService:
                if self.search_mode != 'lexical' else {}),
             **({"summary_hints":dict(profile='loom_summary_hints_v1',view='hints',
                 index_page_size=10,current_validation=True,original_read=False,
-                clock_domain='utc_epoch_ms',vod_seek_verified=False)}
+                clock_domain='utc_epoch_ms',vod_seek_verified=False,
+                guidance="browse_evidence view:hints returns one producer page: its index rows may be empty while ready_index lists ready five-minute summaries; open an item through its next_action (report_id, report_revision) for the detail and originals. online_status stale/context_ttl_expired describes the historical background snapshot, not the hints.")}
                 if getattr(self,'summary_hints_config',None) else {}),
             **({"hierarchy": {"profile": self.hierarchy["profile"],
                 "projection_hash": self.hierarchy["projection_hash"], "provider_calls": 0,
