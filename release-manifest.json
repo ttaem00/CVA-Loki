@@ -1,9 +1,9 @@
 {
   "schema_version": "loki.release.v1",
   "version": "3.0.7",
-  "source_commit": "221045261aa1279217c9f42d3980fe254438295a",
+  "source_commit": "d9ada34868284015bbd00acb1f2b346001db5b70",
   "source_recipe": "skills/loki/runtime/source-recipe.json",
-  "source_recipe_sha256": "2ab0af8f3fa7f93ba385a165816a3bf5182a317aaf3b9f655fc9842a8a47d7f3",
+  "source_recipe_sha256": "8c74c8d614d823e659d8384531339ade0c938384bc396453d06e89656149ab42",
   "files": [
     {
       "path": ".agents/plugins/marketplace.json",
@@ -137,8 +137,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "37e5e64c145b8b0bc3830de9a01a231a20a4d89999c8a8ffe8a00b7af991022c",
-      "bytes": 68071
+      "sha256": "4c0c423e1c98a74bef89c40c2246dc84562da13216eddec5cfa7e03b6470a0e6",
+      "bytes": 68150
     },
     {
       "path": "SECURITY.md",
@@ -1447,12 +1447,12 @@
     },
     {
       "path": "skills/loki/runtime/source-manifest.json",
-      "sha256": "24af539a0ab60ca1dad19415877b487a9b34ca9e3c3208050509f0379cb0c83b",
+      "sha256": "2cd2caa4abdf5207a1bc89c12bec4c0bc151b6a61d6d31ce43db67786429b737",
       "bytes": 262637
     },
     {
       "path": "skills/loki/runtime/source-recipe.json",
-      "sha256": "2ab0af8f3fa7f93ba385a165816a3bf5182a317aaf3b9f655fc9842a8a47d7f3",
+      "sha256": "8c74c8d614d823e659d8384531339ade0c938384bc396453d06e89656149ab42",
       "bytes": 232363
     },
     {

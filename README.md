@@ -30,8 +30,8 @@
 <table align="center">
   <tr>
     <td align="center"><a href="https://chzzk.naver.com/"><img src="docs/assets/chzzk-logo-ko.png" height="100" alt="치지직 공식 한글 로고" /></a></td>
-    <td align="center"><a href="https://www.youtube.com/"><img src="docs/assets/youtube-logo.png#gh-light-mode-only" height="100" alt="YouTube 공식 로고" /><img src="docs/assets/youtube-logo-dark.png#gh-dark-mode-only" height="100" alt="YouTube 공식 로고" /></a></td>
-    <td align="center"><a href="https://www.sooplive.com/"><img src="docs/assets/soop-logo.svg#gh-light-mode-only" height="100" alt="SOOP 공식 로고" /><img src="docs/assets/soop-logo-dark.svg#gh-dark-mode-only" height="100" alt="SOOP 공식 로고" /></a></td>
+    <td align="center"><a href="https://www.youtube.com/#gh-light-mode-only"><img src="docs/assets/youtube-logo.png" height="100" alt="YouTube 공식 로고" /></a><a href="https://www.youtube.com/#gh-dark-mode-only"><img src="docs/assets/youtube-logo-dark.png" height="100" alt="YouTube 공식 로고" /></a></td>
+    <td align="center"><a href="https://www.sooplive.com/#gh-light-mode-only"><img src="docs/assets/soop-logo.svg" height="100" alt="SOOP 공식 로고" /></a><a href="https://www.sooplive.com/#gh-dark-mode-only"><img src="docs/assets/soop-logo-dark.svg" height="100" alt="SOOP 공식 로고" /></a></td>
   </tr>
   <tr>
     <td align="center"><strong>CHZZK 메인</strong></td>
