@@ -55,7 +55,8 @@ def bind_current_conversation_job(*, work_root, run_root, video_no, source_asset
     """Mint after checking prepared originals; serialized handles have no authority."""
     work, root = native_path(work_root).resolve(), native_path(run_root).resolve()
     video_no = str(video_no)
-    if (not video_no.isdigit() or root == work / video_no
+    from .source_platforms import valid_work_id
+    if (not (video_no.isdigit() or valid_work_id(video_no)) or root == work / video_no
             or not root.is_relative_to(work / video_no)
             or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", str(job_id))
             or not re.fullmatch(r"[0-9a-f]{64}", str(base_revision))

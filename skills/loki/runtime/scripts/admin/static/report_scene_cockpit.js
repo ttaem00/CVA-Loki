@@ -168,14 +168,21 @@
       if (!raw) return target;
       try {
         const url = new URL(raw, window.location.href);
-        const currentTime = url.searchParams.get('currentTime');
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        const videoIndex = pathParts.indexOf('video');
-        if (videoIndex >= 0 && pathParts[videoIndex + 1]) {
-          target.videoNo = decodeURIComponent(pathParts[videoIndex + 1]);
+        if (/^https?:\/\//i.test(raw) && (url.protocol !== 'https:' || url.port || url.username || url.password)) return target;
+        let clock = null;
+        if (url.hostname === 'chzzk.naver.com' && /^\/video\/\d{1,16}\/?$/.test(url.pathname)) {
+          target.videoNo = url.pathname.split('/')[2];
+          clock = url.searchParams.get('currentTime');
+        } else if (['www.youtube.com', 'youtube.com'].includes(url.hostname) && url.pathname === '/watch'
+                   && /^[A-Za-z0-9_-]{11}$/.test(url.searchParams.get('v') || '')) {
+          target.videoNo = 'youtube-' + url.searchParams.get('v');
+          clock = url.searchParams.get('t')?.replace(/s$/, '');
+        } else if (url.hostname === 'vod.sooplive.com' && /^\/player\/\d{1,16}\/?$/.test(url.pathname)) {
+          target.videoNo = 'soop-' + url.pathname.split('/')[2];
+          clock = url.searchParams.get('change_second');
         }
-        if (currentTime !== null) {
-          const sec = Number(currentTime);
+        if (target.videoNo && clock != null && /^\d+(?:\.\d+)?$/.test(clock)) {
+          const sec = Number(clock);
           if (Number.isFinite(sec)) {
             target.sec = Math.max(0, sec);
             return target;
@@ -278,9 +285,7 @@
     // seek는 iframe src 를 ?currentTime=초 로 교체하는 방식만 동작한다.
     function splitPlayerUrl(sec) {
       if (!splitVideoNo) return '';
-      const url = `https://chzzk.naver.com/video/${encodeURIComponent(splitVideoNo)}`;
-      if (!Number.isFinite(sec)) return url;
-      return `${url}?currentTime=${Math.max(0, Math.floor(sec))}`;
+      return window.ReportNavigation.sourceUrl({video_no: splitVideoNo, source_platform: 'chzzk'}, sec);
     }
 
     function setSplitView(on, opts) {
@@ -604,7 +609,10 @@
       if (!videoNo) return '';
       const seek = row && row.seek_sec != null ? Number(row.seek_sec) : Number(fallbackSec);
       if (!Number.isFinite(seek)) return '';
-      return `https://chzzk.naver.com/video/${encodeURIComponent(videoNo)}?currentTime=${Math.max(0, Math.floor(seek))}`;
+      const report = reportLastConfirmed || {};
+      const source = videoNo === String(report.video_no || '') ? {...report, ...row} : {...row};
+      source.video_no = videoNo;
+      return window.ReportNavigation.sourceUrl(source, seek);
     }
 
     function timeLink(row, fallbackSec) {

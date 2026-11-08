@@ -61,13 +61,15 @@ plugin 모드에서 필요한 경우 npm으로 설치하는 [OpenAI Codex CLI](h
 방송 영상·자막·채팅·닉네임·썸네일과 사용자 결과에 대한 권리는 이 코드 라이선스가
 부여하지 않습니다. 배포본에는 실제 방송 원자료나 사용자의 결과물을 포함하지 않습니다.
 
-## CVA와 치지직 로고
+## CVA 로고
 
 TTaem CVA 로고 `docs/assets/cva-logo.svg`는
 [기존 공개판의 원본 벡터](https://github.com/ttaem00/ttaem-CVA-loki-2.9.4.2/blob/codex/initial-public-loki/assets/branding/TTaem_CVA_logo.svg)를
 변경 없이 동봉한 권리자 소유 로고입니다. 이 배포본의 출처 표시를 위한 사용을
 허용합니다. 로고, 읽을 수 있는 `ttaem.com` 및 원본 저장소 고지는
 [LICENSE](../LICENSE)와 [브랜드 안내](BRANDING.md)를 따릅니다.
+
+## 플랫폼 로고
 
 치지직 한글 로고 `docs/assets/chzzk-logo-ko.png`의 권리는 NAVER에 있습니다.
 [치지직 공식 로고 사용 안내](https://help.naver.com/service/23946/contents/23364?lang=ko&osType=COMMONOS)의
@@ -76,3 +78,18 @@ TTaem CVA 로고 `docs/assets/cva-logo.svg`는
 제휴·협력·지원으로 오인시키거나 상업적 목적으로 사용하지 않습니다. CVA 코드의
 이용허락이 이 로고의 별도 사용 조건을 확대하지 않습니다. CVA-Loki는 네이버·치지직의
 공식 프로젝트가 아니며 제휴·후원·보증 관계가 없습니다.
+
+YouTube 로고 `docs/assets/youtube-logo.png`의 권리는 Google LLC에 있습니다.
+[YouTube 공식 브랜드 자료](https://brand.youtube/youtube-logo/)가 제공하는
+[Core YouTube logo ZIP](https://www.gstatic.com/marketing-cms/52/7d/637fef5a4788a97747e6feabc4aa/youtube-logo.zip)의
+`YouTube_Logo/Digital/01 Full Color/yt_logo_fullcolor_almostblack_digital.png`를
+변환·수정 없이 파일명만 바꿔 동봉합니다. 공식 브랜드 안내의 색상·형태·비율,
+최소 크기와 여백 조건을 유지합니다. 이 로고에 CVA의 소스 이용허락을 적용하거나
+Google·YouTube의 제휴·후원·보증을 주장하지 않습니다.
+
+SOOP 로고 `docs/assets/soop-logo.svg`의 권리는 SOOP에 있습니다.
+[SOOP 공식 서비스](https://www.sooplive.com/)에서 사용하는
+[공식 SVG 원본](https://res.sooplive.com/images/svg/soop_logo.svg)을 변경 없이 동봉합니다.
+형태·색상·비율을 유지하며 대상 플랫폼을 안내하는 용도로 표시합니다. 공식 원본의
+공개 접근을 별도 오픈소스 이용허락으로 해석하지 않으며, CVA 코드의 이용허락이
+이 로고에 관한 권리를 확대하지 않습니다. SOOP의 제휴·후원·보증을 주장하지 않습니다.

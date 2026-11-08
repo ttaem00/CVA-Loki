@@ -36,6 +36,8 @@ from ..models import VODInfo
 
 from ..models import UserClipsBundle
 
+from ..source_platforms import source_from_fields
+
 from ..user_clips_filter import is_eligible_in_vod_clip
 
 from ..utils import sec_to_hms
@@ -1393,14 +1395,14 @@ def _build_chzzk_vod_url(video_no: str = "") -> str:
     return f"https://chzzk.naver.com/video/{video_no}"
 
 def _build_source_vod_url(vod_info: VODInfo) -> str:
-    source_id = _source_id(vod_info)
-    if not source_id:
+    try:
+        return source_from_fields(
+            str(vod_info.video_no or ""), _source_platform(vod_info),
+            str(getattr(vod_info, "source_id", "") or ""),
+            str(getattr(vod_info, "source_url", "") or ""),
+        ).url
+    except ValueError:
         return ""
-    if _source_platform(vod_info) == "youtube":
-        if not re.fullmatch(r"[A-Za-z0-9_-]{11}", source_id):
-            return ""
-        return f"https://www.youtube.com/watch?v={source_id}"
-    return _build_chzzk_vod_url(source_id)
 
 def _build_user_clips_block(
     bundle: Optional[UserClipsBundle],
@@ -1779,7 +1781,7 @@ def _render_community_reaction_md(md_fragment: str) -> str:
     return f"<div>{escaped}</div>"
 
 def _render_tc_anchor_html(video_no: str, tc_text: str, css_class: str = "tc") -> str:
-    """`<a class="tc" href="chzzk.../currentTime=...">tc</a>` 또는 link 없을 때 `<span>`.
+    """원본 시점 링크 또는 link 없을 때 같은 스타일의 `<span>`.
 
     css_class 는 시각적 스타일을 그대로 유지하기 위해 동일하게 적용.
     inline style 로 underline 제거 — 백필되는 구 리포트(.tc CSS rule 만 있고
@@ -1793,18 +1795,19 @@ def _render_tc_anchor_html(video_no: str, tc_text: str, css_class: str = "tc") -
         f'<a class="{css_class}" href="{_html_escape(url)}" '
         f'target="_blank" rel="noopener" '
         f'style="text-decoration:none" '
-        f'title="치지직 다시보기에서 이 시점부터 재생">{safe_text}</a>'
+        f'title="원본 영상에서 이 시점부터 재생">{safe_text}</a>'
     )
 
 def _render_top_vod_link_html(video_no: str = "") -> str:
-    url = _build_chzzk_vod_url(video_no)
-    if not url:
+    try:
+        url = source_from_fields(str(video_no or "").strip()).url
+    except ValueError:
         return ""
     safe_url = _html_escape(url)
     return (
         '<span class="top-vod-link-row">'
         f'<a class="top-vod-link" href="{safe_url}" target="_blank" rel="noopener" '
-        'title="치지직에서 원본 방송을 새 탭으로 엽니다">원본 방송 보기</a>'
+        'title="원본 방송을 새 탭으로 엽니다">원본 방송 보기</a>'
         '</span>'
     )
 
@@ -1919,11 +1922,17 @@ def _safe_thumb_url(url: str) -> str:
     return url if lowered.startswith(_SAFE_THUMB_SCHEMES) else ""
 
 def _source_id(vod_info: VODInfo) -> str:
-    return str(getattr(vod_info, "source_id", "") or vod_info.video_no or "").strip()
+    source_id = str(getattr(vod_info, "source_id", "") or "").strip()
+    if source_id:
+        return source_id
+    try:
+        return source_from_fields(str(vod_info.video_no or ""), _source_platform(vod_info)).native_id
+    except ValueError:
+        return str(vod_info.video_no or "").strip()
 
 def _source_platform(vod_info: VODInfo) -> str:
     platform = str(getattr(vod_info, "source_platform", "") or "chzzk").strip().lower()
-    return platform if platform in {"chzzk", "youtube"} else "chzzk"
+    return platform if platform in {"chzzk", "youtube", "soop"} else "chzzk"
 
 def _strip_inline_md(s: str) -> str:
     """Plain text 용: **bold** / `code` / [text](url) 마커를 걷어내고 본문만 남긴다."""

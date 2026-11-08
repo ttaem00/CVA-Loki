@@ -10,7 +10,7 @@ from ..config import LOKI_LABEL
 from .parse import _parse_summary_sections
 from .render import _build_viewer_editor_tools_payload, _inject_summary_pipeline_identity_html, _viewer_editor_json, _viewer_outline_projection_rows
 from .report import _attach_segment_metadata, _build_report_projection_snapshot, _generate_html, _strip_community_reaction_sections
-from .viewer_editor import _project_public_viewer_editor_tools_payload
+from .viewer_editor import _project_public_viewer_editor_tools_payload, _source_platform
 logger = logging.getLogger('pipeline')
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ def render_summary_report_html(request: ReportHtmlRenderRequest) -> ReportHtmlRe
         metadata_sec['collaboration_candidates'] = copy.deepcopy(candidates)
         viewer_editor_tools_payload['collaboration_candidates'] = candidates
     from ..collaboration_replays import load_replays
-    replays = load_replays(str(r.vod_info.video_no), duration_sec=r.vod_info.duration, channel_id=r.vod_info.channel_id)
+    replays = load_replays(str(r.vod_info.video_no), duration_sec=r.vod_info.duration, channel_id=r.vod_info.channel_id) if _source_platform(r.vod_info) == 'chzzk' else None
     if replays:
         metadata_sec['collaboration_replays'] = replays
         viewer_editor_tools_payload['collaboration_replays'] = copy.deepcopy(replays)

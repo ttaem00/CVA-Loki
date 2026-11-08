@@ -164,8 +164,17 @@
 
   function updateSourceLink(seconds) {
     try {
-      const href = S.sourceSceneUrl(state && state.report, seconds);
-      if (href === null) return false;
+      let href = S.sourceSceneUrl(state && state.report, seconds);
+      if (href === null) {
+        if (!state || (player && !player.failed)) return false;
+        href = window.ReportNavigation.sourceUrl(state.report, seconds);
+        if (!href) return false;
+        el('originalLink').href = href;
+        el('originalLink').removeAttribute('aria-disabled');
+        el('originalLink').textContent = '원본 영상에서 선택 시각 보기';
+        el('playbackState').textContent = Number.isFinite(seconds) ? '원본 영상 ' + S.hms(seconds) : '원본으로 확인';
+        return true;
+      }
       el('originalLink').href = href;
       el('originalLink').removeAttribute('aria-disabled');
       el('originalLink').textContent = '선택 시각의 영상·전사 보기';
@@ -893,12 +902,17 @@
     }
     el('video').hidden = false;
     el('video').style.display = '';
-    el('originalLink').textContent = 'CHZZK 원본';
+    el('originalLink').textContent = '원본 영상';
+    el('originalLink').href = window.ReportNavigation.sourceUrl(state.report);
     el('originalLink').removeAttribute('aria-disabled');
     player = new window.ReportPlayer(el('video'), (kind, message) => {
       el('playbackState').textContent = message;
       el('videoEmpty').hidden = kind !== 'error';
-      if(kind==='error')stopBoundary(message);
+      if(kind==='error') {
+        stopBoundary(message);
+        const item = S.selected(state);
+        updateSourceLink(item ? S.itemStart(state.selection.type, item, state.selection.spanIndex) : NaN);
+      }
       updatePlaybackActions();
     });
     try {
@@ -909,9 +923,11 @@
       el('reconnectButton').disabled = false;
       el('pipButton').disabled = !(document.pictureInPictureEnabled && typeof el('video').requestPictureInPicture === 'function');
     } catch (error) {
+      player.destroy();
       el('playbackState').textContent = error.code === 'auth_required' ? '로그인 필요' : '원본으로 확인';
       el('videoEmpty').hidden = false;
-      el('originalLink').href = `https://chzzk.naver.com/video/${encodeURIComponent(videoNo)}`;
+      const item = S.selected(state);
+      updateSourceLink(item ? S.itemStart(state.selection.type, item, state.selection.spanIndex) : NaN);
     }
   }
 

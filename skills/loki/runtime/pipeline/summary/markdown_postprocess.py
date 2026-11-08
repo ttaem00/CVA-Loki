@@ -14,6 +14,8 @@ from ..models import VODInfo
 
 from ..models import UserClipsBundle
 
+from ..source_platforms import resolve_source, source_url_at
+
 from ..utils import sec_to_hms
 
 from .parse import _SRT_XVAL_THRESHOLD_SEC, _hms_to_sec
@@ -96,9 +98,8 @@ def _source_video_url_at(vod_info: VODInfo, tc_or_range: str) -> str:
     source_url = _build_source_vod_url(vod_info)
     if seconds is None or not source_url:
         return ""
-    if _source_platform(vod_info) == "youtube":
-        return f"{source_url}&t={seconds}s"
-    return f"{source_url}?currentTime={seconds}"
+    source = resolve_source(source_url)
+    return source_url_at(source.platform, source.native_id, seconds)
 
 def _build_header_links_md(vod_info: VODInfo, public_url_base: str) -> str:
     """요약 .md 의 "## 방송 분석 리포트:" 바로 아래에 주입할 공유용 링크 블록.
@@ -112,7 +113,8 @@ def _build_header_links_md(vod_info: VODInfo, public_url_base: str) -> str:
         lines.append(f"- **🔗 요약 웹페이지:** [{report_url}]({report_url})")
     source_url = _build_source_vod_url(vod_info)
     if source_url:
-        source_label = "YouTube 원본 영상" if _source_platform(vod_info) == "youtube" else "치지직 다시보기"
+        source_label = {"youtube": "YouTube 원본 영상", "soop": "SOOP 다시보기"}.get(
+            _source_platform(vod_info), "치지직 다시보기")
         lines.append(f"- **▶️ {source_label}:** [{source_url}]({source_url})")
     return "\n".join(lines)
 
@@ -218,7 +220,11 @@ def _inject_source_timestamp_links(md: str, vod_info: VODInfo) -> str:
         if existing_url and not (
             _is_youtube_video_url(existing_url) or _is_chzzk_vod_url(existing_url)
         ):
-            return match.group(0)
+            try:
+                if resolve_source(existing_url).platform != "soop":
+                    return match.group(0)
+            except ValueError:
+                return match.group(0)
         return f"[{tc}]({new_url})"
 
     parts = _MD_CODE_SPAN_RE.split(md)
@@ -802,12 +808,12 @@ def _project_editorial_review_markdown(packet: dict, *, video_no: str) -> str:
         if len(spans) == 1:
             rows.append(
                 f"- [연속 구간 {sec_to_hms(start)}–{sec_to_hms(end)} 보기]"
-                f"(https://chzzk.naver.com/video/{video_no}?currentTime={start})"
+                f"({_chzzk_video_url_at(video_no, sec_to_hms(start))})"
             )
         else:
             rows.extend([
                 f"- [첫 장면부터 보기]"
-                f"(https://chzzk.naver.com/video/{video_no}?currentTime={start})",
+                f"({_chzzk_video_url_at(video_no, sec_to_hms(start))})",
                 f"- 연결 장면 {len(spans)}개 · 실제 사용 {_editorial_duration_label(used_duration)}"
                 + (
                     f" · 중간 {_editorial_duration_label(excluded_duration)} 제외"
@@ -832,11 +838,10 @@ def _project_editorial_review_markdown(packet: dict, *, video_no: str) -> str:
         point_rows = []
         for point_ref in point_refs:
             point = points_by_id.get(point_ref)
-            point_start = _hms_to_seconds(str(point.get("timestamp") or ""))
             story = stories_by_ref[str(point.get("story_ref") or "")]
             point_rows.append(
                 f"  - [{point.get('timestamp')} {point.get('title') or ''}]"
-                f"(https://chzzk.naver.com/video/{video_no}?currentTime={point_start})\n"
+                f"({_chzzk_video_url_at(video_no, point['timestamp'])})\n"
                 f"    - 근거: {story.get('why_notable') or '-'}"
             )
         if point_rows:
@@ -858,11 +863,10 @@ def _project_editorial_review_markdown(packet: dict, *, video_no: str) -> str:
     if standalone:
         rows.extend([f"### 나머지 주요 장면 {len(standalone)}개", ""])
         for point in standalone:
-            point_start = _hms_to_seconds(str(point.get("timestamp") or ""))
             story = stories_by_ref[str(point.get("story_ref") or "")]
             rows.append(
                 f"- [{point.get('timestamp')} {point.get('title') or ''}]"
-                f"(https://chzzk.naver.com/video/{video_no}?currentTime={point_start})\n"
+                f"({_chzzk_video_url_at(video_no, point['timestamp'])})\n"
                 f"  - 근거: {story.get('why_notable') or '-'}"
             )
     return "\n".join(rows).rstrip() + "\n"

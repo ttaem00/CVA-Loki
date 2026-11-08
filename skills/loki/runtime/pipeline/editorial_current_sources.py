@@ -14,6 +14,41 @@ from .evidence_world.contracts import file_hash, native_path
 
 NAVIGATION_PROFILE = 'source_bound_navigation_v1'
 
+def prepare_local_source_files(*, vod, spec, source_dir, root):
+    """Bind acquired local originals and copy only available support snapshots."""
+    import shutil
+    from .chunker import chunk_srt
+    from .editorial_source_timing import prepare_source_timing
+    from .live_vod_chat import is_bound_chat, descriptor_status
+    from .source_platforms import source_from_fields
+
+    reference = source_from_fields(str(vod.video_no), vod.source_platform, vod.source_id, vod.source_url)
+    media_path = spec.get('media_path')
+    if media_path:
+        media = native_path(media_path).resolve()
+        if not media.is_relative_to(source_dir):
+            raise ValueError('current_conversation_media_outside_source')
+        from .downloader import _is_valid_media_file
+        if not media.is_file() or not _is_valid_media_file(str(media), expected_duration_sec=vod.duration):
+            raise ValueError('source_unavailable_before_summary:media')
+    chunks = chunk_srt(str(native_path(spec['srt_path'])))
+    source = prepare_source_timing(video_no=reference.work_id, duration_sec=vod.duration,
+        work_dir=source_dir, chunks=chunks, srt_path=spec['srt_path'],
+        source_platform=reference.platform, source_native_id=reference.native_id)
+    if source['asset'].get('clock_authority', {}).get('kind') == 'live':
+        raise ValueError('current_conversation_requires_confirmed_vod_clock')
+    chat_path = source_dir / f'{reference.work_id}_chat.log.json'
+    if chat_path.is_file() and is_bound_chat(chat_path):
+        descriptor_status(chat_path)
+    comment_dir, clip_dir = root / 'comment-source', root / 'clip-source'
+    for directory, filename in ((comment_dir, 'timeline_comments.json'), (clip_dir, 'user_clips.json')):
+        directory.mkdir(parents=True, exist_ok=True)
+        previous = source_dir / filename
+        if previous.is_file() and not (directory / filename).exists():
+            shutil.copyfile(previous, directory / filename)
+    return (chunks, source, media_path, chat_path if chat_path.is_file() else None,
+            comment_dir, clip_dir / 'user_clips.json')
+
 def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
                                 retrieval=None, hierarchy=None, read_index_root=None):
     """Prepare one new owner's navigation without writing retained source caches."""
@@ -191,6 +226,10 @@ def prepare_sources(*, service, source_dir, vod, base_path, chunks, comment_sour
     from .evidence_world.signal_view import browse_signals, PROFILE
 
     video = str(vod.video_no)
+    source_url = f'https://chzzk.naver.com/video/{video}'
+    if getattr(vod, 'source_platform', 'chzzk') in {'youtube', 'soop'}:
+        from .source_platforms import source_from_fields
+        source_url = source_from_fields(video, vod.source_platform, vod.source_id, vod.source_url).url
     frozen = []
     assets = {a.family: a for a in service.assets.values()}
     chats = list(chat_analysis_rows(service)) if assets['chat'].availability in {'present', 'partial'} else []
@@ -224,7 +263,7 @@ def prepare_sources(*, service, source_dir, vod, base_path, chunks, comment_sour
         available = path.is_file()
         if family == 'timeline_comments' and available:
             available = load_timeline_comment_bundle(video, path.parent, cache_ttl_hours=0,
-                expected_source_url=f'https://chzzk.naver.com/video/{video}') is not None
+                expected_source_url=source_url) is not None
         availability[family] = 'available' if available else 'not_collected'
         if available:
             row = dict(family=family, path=str(path), sha256=file_hash(path))
