@@ -157,7 +157,7 @@ def _audio_peak_editor_label(labels: list[Any]) -> str:
     if "chat_audio_overlap" in normalized:
         return "소리와 채팅이 함께 튄 구간"
     if "voice_reaction_candidate" in normalized:
-        return "목소리 리액션이 커진 구간"
+        return "음량·자막 변화 후보"
     if "clipping_or_limiter_diagnostic" in normalized:
         return "음량이 갑자기 거칠어진 구간"
     if "audio_energy_peak" in normalized:
@@ -528,12 +528,15 @@ def _parse_srt_segments_lenient(srt_text: str) -> list[dict[str, Any]]:
         )
     return rows
 
-def _load_chat_messages(video_no: str, work_dir: Path | None) -> list[dict[str, Any]]:
+def _load_chat_messages(video_no: str, work_dir: Path | None) -> list[dict[str, Any]] | None:
     if not video_no or work_dir is None:
-        return []
+        return None
     path = work_dir / str(video_no) / f"{video_no}_chat.log.json"
     data = _load_json(path)
-    return [row for row in data if isinstance(row, dict)] if isinstance(data, list) else []
+    if not isinstance(data, list):
+        return None
+    rows = [row for row in data if isinstance(row, dict)]
+    return rows if rows or not data else None
 
 def _load_manager_chat_density_buckets(
     video_no: str,
@@ -890,12 +893,30 @@ def _spread_sample(rows: list[dict[str, Any]], limit: int, time_key: str) -> lis
     )
     if len(ordered) <= limit:
         return ordered
-    if limit == 1:
-        return [ordered[len(ordered) // 2]]
-    return [
-        ordered[round(index * (len(ordered) - 1) / (limit - 1))]
-        for index in range(limit)
-    ]
+
+    def spread_indices(indices: list[int], count: int) -> list[int]:
+        if len(indices) <= count:
+            return indices
+        if count == 1:
+            return [indices[len(indices) // 2]]
+        return [indices[round(index * (len(indices) - 1) / (count - 1))]
+                for index in range(count)]
+
+
+
+
+    representatives: dict[tuple[str, str | int], int] = {}
+    for index, row in enumerate(ordered):
+        identity = row.get("source_identity_key")
+        key = ("occurrence", str(identity)) if identity and row.get("source_identity_confidence") == "high" else ("row", index)
+        representatives.setdefault(key, index)
+    selected = set(spread_indices(list(representatives.values()), limit))
+    remaining = limit - len(selected)
+    if remaining:
+        selected.update(spread_indices(
+            [index for index in range(len(ordered)) if index not in selected], remaining,
+        ))
+    return [row for index, row in enumerate(ordered) if index in selected]
 
 def _comment_hint_id(value: Any, prefix: str) -> str:
     text = str(value or "").strip()
@@ -1982,10 +2003,7 @@ def _visual_scene_event_rows(rows: list[dict[str, Any]], *, max_rows: int = _MAX
             continue
         seen_buckets.add(bucket)
         selected.append(row)
-        if len(selected) >= max_rows:
-            break
-    selected.sort(key=lambda row: (_sort_time_or_missing(row.get("start_sec")), str(row.get("signal_type") or "")))
-    return selected
+    return _spread_sample(selected, max_rows, "start_sec")
 
 def _sort_time_or_missing(value: Any, missing: float = 999999999.0) -> float:
     number = _safe_float(value)
@@ -2082,7 +2100,26 @@ def _chat_samples(
 def _chat_events(meta: dict[str, Any], chats: list[dict[str, Any]]) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     sample_index = None
-    for row in meta.get("highlights") or []:
+    observations = []
+    family_names = {"chat_density": "density", "laughter_burst": "laughter",
+                    "reaction_surprise": "surprise", "reaction_question": "question",
+                    "keyword_score": "keyword"}
+    for peak in meta.get("highlights") or []:
+        if not isinstance(peak, dict):
+            continue
+        if not peak.get("family_peaks"):
+            observations.append(peak)
+            continue
+        for signal, member in peak["family_peaks"].items():
+            if signal not in family_names:
+                continue
+            observations.append({**member, "source_signals": ["chat", signal],
+                "laughter_burst": signal == "laughter_burst",
+                "reaction_families": [family_names[signal]] if signal.startswith("reaction_") else [],
+                "_signal_family": family_names[signal],
+                "_peak_seconds": list(peak.get("peak_seconds") or []),
+                "_producer_run_ref": peak.get("producer_run_ref", "")})
+    for row in observations:
         if not isinstance(row, dict):
             continue
         sec = row.get("sec")
@@ -2115,32 +2152,55 @@ def _chat_events(meta: dict[str, Any], chats: list[dict[str, Any]]) -> list[dict
             lane = "chat_laughter"
         else:
             lane = "chat_surprise"
-        events.append(
-            _event(
-                lane,
-                start_sec=sec,
-                label=sample_blob or f"chat peak count={row.get('count', '')}",
-                role="supporting",
-                confidence="medium",
-                evidence=[
-                    {
-                        "type": "chat",
-                        "label": "채팅 반응 묶음",
-                        "text": sample_blob,
-                    }
-                ],
-                risk_flags=["chat_peak_supporting_signal"],
-                source_refs=[{"type": "metadata.highlights"}],
-            )
-        )
+
+
+        lanes = [lane]
+        if lane == "chat_laughter" and "chat_density" in source_signals:
+            lanes.append("chat_surprise")
+        for lane in lanes:
+            event = _event(
+                    lane,
+                    start_sec=sec,
+                    label=sample_blob or f"chat peak count={row.get('count', '')}",
+                    role="supporting",
+                    confidence="medium",
+                    evidence=[
+                        {
+                            "type": "chat",
+                            "label": "채팅 반응 묶음",
+                            "text": sample_blob,
+                        }
+                    ],
+                    risk_flags=["chat_peak_supporting_signal"],
+                    source_refs=[{"type": "metadata.highlights", **(
+                        {"peak_seconds": row["_peak_seconds"], "producer_run_ref": row["_producer_run_ref"]}
+                        if "_peak_seconds" in row else {})}],
+                )
+            if family := row.get("_signal_family"):
+                event["event_id"] = _event_id(lane, event["start_sec"], event["end_sec"], sample_blob or f"chat peak count={row.get('count', '')}", family)
+                metric = {"density": "count", "laughter": "laughter_count", "surprise": "surprise_count",
+                          "question": "question_count", "keyword": "raw_score"}[family]
+                event["signal_family"] = family
+                event["signal_measurement"] = dict(kind=metric, value=row.get(metric),
+                    unit="weighted_keyword_score" if family == "keyword" else "messages",
+                    window_sec=10, scope="detector_family_peak", increase_proven=False)
+                if meta.get("video_no"):
+                    event["source_identity_key"] = _stable_source_identity_key(
+                        "chat_peak", meta["video_no"], row["_producer_run_ref"], sec, float(sec) + 10)
+                    event["source_identity_kind"] = "chat_peak_bucket"
+                    event["source_identity_confidence"] = "high"
+                    event["source_clock_ref"] = f"chzzk-vod-{meta['video_no']}"
+                    event["source_interval_sec"] = [float(sec), float(sec) + 10]
+            events.append(event)
     return events
 
-def _chat_context_index(chats: list[dict[str, Any]], *, bucket_sec: int = 30, max_buckets: int = 2400) -> list[dict[str, Any]]:
+def _chat_context_index(chats: list[dict[str, Any]], *, bucket_sec: int = 30, max_buckets: int | None = 2400) -> list[dict[str, Any]]:
+    from .chat_analyzer import _is_command_message, is_laughter_message, is_surprise_message, is_question_message
     buckets: dict[int, dict[str, Any]] = {}
     for item in chats:
         sec = _chat_message_sec(item)
         text = _chat_message_text(item)
-        if sec is None:
+        if sec is None or _is_command_message(text):
             continue
         bucket_start = int(sec // bucket_sec) * bucket_sec
         bucket = buckets.setdefault(
@@ -2151,134 +2211,74 @@ def _chat_context_index(chats: list[dict[str, Any]], *, bucket_sec: int = 30, ma
                 "count": 0,
                 "laughter_count": 0,
                 "surprise_count": 0,
+                "question_count": 0,
                 "samples": [],
             },
         )
         bucket["count"] += 1
-        lowered = text.lower()
-        if "ㅋ" in text or "웃" in text or "개웃" in lowered:
+        if is_laughter_message(text):
             bucket["laughter_count"] += 1
-        if any(token in text for token in ("뭐야", "헐", "와", "미친", "대박", "?")):
+        if is_surprise_message(text):
             bucket["surprise_count"] += 1
+        if is_question_message(text):
+            bucket["question_count"] += 1
         if text and len(bucket["samples"]) < 4:
             bucket["samples"].append({"sec": round(sec, 3), "text": text})
     rows = sorted(buckets.values(), key=lambda row: row["start_sec"])
-    return rows[:max_buckets]
+    return rows if max_buckets is None else _spread_sample(rows, max_buckets, "start_sec")
 
 def _chat_bucket_reaction_events(
     chat_buckets: list[dict[str, Any]],
     *,
     window_sec: int = 1800,
     max_windows: int = 24,
+    source_video_id: str = "",
 ) -> list[dict[str, Any]]:
-    """Promote time-balanced chat markers for long VOD admin review.
-
-    The main chat peak list is intentionally selective. The scene finder has a
-    different job: keep later reviewable moments visible even when the strongest
-    global peaks all happened early.
-    """
-
-    if not chat_buckets:
-        return []
+    """Select eligible family observations before choosing representatives."""
     grouped: dict[int, list[dict[str, Any]]] = {}
     for row in chat_buckets:
         start = _safe_float(row.get("start_sec"))
-        if start is None:
-            continue
-        grouped.setdefault(int(start // window_sec), []).append(row)
-
-    events: list[dict[str, Any]] = []
-    for _, rows in sorted(grouped.items())[:max_windows]:
-        selected_reaction_start: float | None = None
-        best_reaction = max(
-            rows,
-            key=lambda row: (
-                int(row.get("laughter_count") or 0),
-                int(row.get("surprise_count") or 0),
-                int(row.get("count") or 0),
-                -(_safe_float(row.get("start_sec"), 0.0) or 0.0),
-            ),
-        )
-        laughter_count = int(best_reaction.get("laughter_count") or 0)
-        surprise_count = int(best_reaction.get("surprise_count") or 0)
-        if laughter_count >= 3 or surprise_count >= 2:
-            selected_reaction_start = _safe_float(best_reaction.get("start_sec"))
-            samples = [
-                str(sample.get("text") or "")
-                for sample in (best_reaction.get("samples") or [])
-                if isinstance(sample, dict) and sample.get("text")
-            ]
-            reaction_label = []
-            if laughter_count:
-                reaction_label.append(f"웃음 {laughter_count}개")
-            if surprise_count:
-                reaction_label.append(f"놀람/질문 {surprise_count}개")
-            label = " / ".join(samples[:3]) or ", ".join(reaction_label) or "웃음/놀람 채팅"
-            events.append(
-                _event(
-                    "chat_laughter",
-                    start_sec=best_reaction.get("start_sec"),
-                    end_sec=best_reaction.get("end_sec"),
-                    label=label,
-                    role="supporting",
-                    confidence="medium",
-                    evidence=[
-                        {
-                            "type": "chat_bucket",
-                            "label": "시간대 대표 웃음/놀람",
-                            "text": _clip_text(label),
-                        }
-                    ],
-                    risk_flags=["chat_bucket_supporting_signal"],
-                    source_refs=[{"type": "work.chat_bucket_context", "selection": "balanced_laughter_surprise"}],
-                )
-            )
-
-        density_rows = rows
-        if selected_reaction_start is not None:
-            density_rows = [
-                row for row in rows
-                if _safe_float(row.get("start_sec")) != selected_reaction_start
-            ]
-        if not density_rows:
-            continue
-        best_density = max(
-            density_rows,
-            key=lambda row: (
-                int(row.get("count") or 0),
-                int(row.get("surprise_count") or 0),
-                int(row.get("laughter_count") or 0),
-                -(_safe_float(row.get("start_sec"), 0.0) or 0.0),
-            ),
-        )
-        count = int(best_density.get("count") or 0)
-        surprise_count = int(best_density.get("surprise_count") or 0)
-        if count >= 20:
-            samples = [
-                str(sample.get("text") or "")
-                for sample in (best_density.get("samples") or [])
-                if isinstance(sample, dict) and sample.get("text")
-            ]
-            label = " / ".join(samples[:3]) or f"채팅 {count}개"
-            events.append(
-                _event(
-                    "chat_surprise",
-                    start_sec=best_density.get("start_sec"),
-                    end_sec=best_density.get("end_sec"),
-                    label=label,
-                    role="supporting",
-                    confidence="medium",
-                    evidence=[
-                        {
-                            "type": "chat_bucket",
-                            "label": "시간대 대표 채팅 급증",
-                            "text": _clip_text(f"{count}개" + (f", 놀람/질문 {surprise_count}개" if surprise_count else "")),
-                        }
-                    ],
-                    risk_flags=["chat_bucket_supporting_signal"],
-                    source_refs=[{"type": "work.chat_bucket_context", "selection": "balanced_density"}],
-                )
-            )
+        if start is not None:
+            grouped.setdefault(int(start // window_sec), []).append(row)
+    events = []
+    families = (("laughter", 3, "chat_laughter", "웃음"),
+                ("surprise", 2, "chat_laughter", "놀람"),
+                ("question", 2, "chat_laughter", "의문 표현"),
+                ("density", 20, "chat_surprise", "고채팅량"))
+    for family, minimum, lane, title in families:
+        family_events = []
+        for _, rows in sorted(grouped.items()):
+            metric = "count" if family == "density" else f"{family}_count"
+            eligible = [row for row in rows if int(row.get(metric) or 0) >= minimum]
+            if not eligible:
+                continue
+            best = max(eligible, key=lambda row: (int(row[metric]), int(row.get("count") or 0),
+                                                  -float(row["start_sec"])))
+            value = int(best[metric])
+            samples = [str(sample.get("text") or "") for sample in best.get("samples") or []
+                       if isinstance(sample, dict) and sample.get("text")]
+            label = " / ".join(samples[:3]) or f"{title} {value}개"
+            event = _event(lane, start_sec=best["start_sec"], end_sec=best.get("end_sec"),
+                label=label, role="supporting", confidence="medium",
+                evidence=[dict(type="chat_bucket", label=f"시간대 대표 {title}",
+                               text=f"{value}개", start_sec=best["start_sec"], end_sec=best.get("end_sec"))],
+                risk_flags=["chat_bucket_supporting_signal"],
+                source_refs=[dict(type="work.chat_bucket_context", selection=f"balanced_{family}")])
+            event["signal_family"] = family
+            event["event_id"] = _event_id(lane, event["start_sec"], event["end_sec"], label, family)
+            event["signal_measurement"] = dict(kind=metric, value=value, unit="messages",
+                window_sec=float(best.get("end_sec", best["start_sec"] + 30)) - float(best["start_sec"]),
+                scope="time_window_representative", increase_proven=False)
+            if source_video_id:
+                event["source_identity_key"] = _stable_source_identity_key(
+                    "chat_bucket", source_video_id, best["start_sec"], best.get("end_sec"))
+                event["source_identity_kind"] = "chat_context_bucket"
+                event["source_identity_confidence"] = "high"
+                event["source_clock_ref"] = f"chzzk-vod-{source_video_id}"
+                event["source_interval_sec"] = [float(best["start_sec"]), float(best.get("end_sec", best["start_sec"] + 30))]
+            family_events.append(event)
+        events.extend(_spread_sample(family_events, max_windows, "start_sec"))
+    events.sort(key=lambda row: (row["start_sec"], row["signal_family"]))
     return events
 
 def _emoticon_reaction_events(
@@ -2307,7 +2307,7 @@ def _emoticon_reaction_events(
         grouped.setdefault(int(window.start_sec // balance_window_sec), []).append((window, mode))
 
     events: list[dict[str, Any]] = []
-    for _, rows in sorted(grouped.items())[:max_windows]:
+    for _, rows in sorted(grouped.items()):
         window, mode = max(
             rows,
             key=lambda item: (
@@ -2346,7 +2346,7 @@ def _emoticon_reaction_events(
                 ],
             )
         )
-    return events
+    return _spread_sample(events, max_windows, "start_sec")
 
 def _chat_coverage_summary(chats: list[dict[str, Any]], duration_sec: float) -> dict[str, Any]:
     seconds = [
@@ -2405,7 +2405,7 @@ def _load_asr_segments(video_no: str, work_dir: Path | None) -> list[dict[str, A
 
 def _subtitle_context_index(segments: list[dict[str, Any]], *, max_segments: int = 5000) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for row in segments[:max_segments]:
+    for row in segments:
         if not isinstance(row, dict):
             continue
         start = _safe_float(row.get("start_sec"))
@@ -2421,7 +2421,7 @@ def _subtitle_context_index(segments: list[dict[str, Any]], *, max_segments: int
                 "index": _safe_int(row.get("index"), 0) or 0,
             }
         )
-    return rows
+    return _spread_sample(rows, max_segments, "start_sec")
 
 def _subtitle_events_from_segments(segments: list[dict[str, Any]], *, video_no: str = "") -> list[dict[str, Any]]:
     if not segments:
@@ -2475,7 +2475,7 @@ def _subtitle_balanced_events_from_segments(
         grouped.setdefault(int(start // window_sec), []).append(row)
 
     events: list[dict[str, Any]] = []
-    for _, rows in sorted(grouped.items())[:max_windows]:
+    for _, rows in sorted(grouped.items()):
         best = max(
             rows,
             key=lambda row: (
@@ -2502,7 +2502,7 @@ def _subtitle_balanced_events_from_segments(
                 source_refs=[{"type": "work.asr_segments_or_srt", "video_no": video_no, "selection": "balanced_window"}],
             )
         )
-    return events
+    return _spread_sample(events, max_windows, "start_sec")
 
 def _estimate_duration_sec(meta: dict[str, Any], events: list[dict[str, Any]], subtitles: list[dict[str, Any]], chat_buckets: list[dict[str, Any]]) -> float:
     candidates: list[float] = []
@@ -2604,7 +2604,7 @@ def _sort_events(events: list[dict[str, Any]], max_events: int) -> list[dict[str
             str(event.get("label") or ""),
         ),
     )
-    return rows[:max_events]
+    return _spread_sample(rows, max_events, "start_sec")
 
 def validate_signal_timeline_lane_contract(workbench: dict[str, Any]) -> dict[str, Any]:
     """Return compact diagnostics for the scene-finder lane contract."""
@@ -2642,14 +2642,17 @@ def build_signal_timeline_workbench(
     max_events: int = 180,
     include_manager_comment_hints: bool = False,
     include_manager_context_shadow: bool = False,
+    chats: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     video_no = str(meta.get("video_no") or "").strip() if isinstance(meta, dict) else ""
     work_path = Path(work_dir) if work_dir is not None else None
-    chats = _load_chat_messages(video_no, work_path)
+    resolved_chats = chats if chats is not None else _load_chat_messages(video_no, work_path)
+    chats = resolved_chats if resolved_chats is not None else []
     live_context_rows = _load_live_context_rows(meta if isinstance(meta, dict) else {}, video_no, work_path)
     asr_segments = _load_asr_segments(video_no, work_path)
     subtitles = _subtitle_context_index(asr_segments)
-    raw_chat_buckets = _chat_context_index(chats)
+
+    raw_chat_buckets = _chat_context_index(chats, max_buckets=None)
     density_buckets, density_summary = (
         _load_manager_chat_density_buckets(video_no, work_path)
         if include_manager_comment_hints or include_manager_context_shadow
@@ -2682,7 +2685,7 @@ def build_signal_timeline_workbench(
             if id(row) not in private_timetable_row_ids
         ],
         *_chat_events(meta if isinstance(meta, dict) else {}, chats),
-        *_chat_bucket_reaction_events(chat_buckets),
+        *_chat_bucket_reaction_events(chat_buckets, source_video_id=video_no),
         *_emoticon_reaction_events(chats),
         *_subtitle_events_from_segments(asr_segments, video_no=video_no),
     ]
@@ -2813,13 +2816,11 @@ def build_signal_timeline_workbench(
         _MAX_VISUAL_SCENE_EVENTS,
         max(1, max_events // 5),
     )
-    core_events = _sort_events([*base_events, *live_context_events], max_events=max_events)
-    visual_scene_slots = max(0, max_events - len(core_events))
     visual_scene_events = _visual_scene_events(
         visual_scene_rows,
-        max_rows=min(visual_scene_max_events, visual_scene_slots),
+        max_rows=visual_scene_max_events,
     )
-    events = _sort_events([*core_events, *visual_scene_events], max_events=max_events)
+    events = _sort_events([*base_events, *live_context_events, *visual_scene_events], max_events=max_events)
     manager_only_events = [*comment_hint_events, *context_shadow_events]
     if manager_only_events:
         retained = _spread_sample(
@@ -2898,6 +2899,8 @@ def build_signal_timeline_workbench(
                 },
             }
     chat_coverage = _chat_coverage_summary(chats, duration_sec)
+    if resolved_chats is not None and not chats:
+        chat_coverage = {"status": "present", "message_count": 0}
     audio_waveform = duration_meta.get("audio_waveform")
     draft = (
         load_selected_ranges_draft(draft_dir, base)
@@ -2932,7 +2935,7 @@ def build_signal_timeline_workbench(
         "events": events,
         "context_index": {
             "subtitles": subtitles,
-            "chat_buckets": chat_buckets,
+            "chat_buckets": _spread_sample(chat_buckets, 2400, "start_sec"),
             **(
                 {"chat_density_signal": density_summary}
                 if include_manager_comment_hints or include_manager_context_shadow

@@ -43,6 +43,12 @@ def select_new_pipeline(value: str) -> str:
         raise ValueError("loki_new_pipeline_not_selectable")
     return normalize_pipeline(value)
 
+def new_job_defaults(value: str) -> dict[str, str]:
+    """Resolve optional defaults without changing historical version rows."""
+    normalized = normalize_pipeline(value)
+    row = load_loki_version_policy()['pipelines'].get(normalized, {}) if isinstance(normalized, str) else {}
+    return dict(row.get('new_job_defaults', {}))
+
 def pipeline_identity(value: str) -> dict[str, str]:
     policy = load_loki_version_policy()
     normalized = normalize_pipeline(value)

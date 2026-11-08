@@ -16,6 +16,8 @@ PEAK_MERGE_SEC = 30
 
 Z_THRESHOLD = 2.0
 
+CHAT_PEAK_POLICY_REVISION = "chat-peaks.v2-known-identities-family-members"
+
 _COMMAND_PREFIX_PATTERN = re.compile(r'^!\s*[\w가-힣]')
 
 _LAUGHTER_PATTERNS = [
@@ -90,10 +92,6 @@ def is_question_message(msg: str) -> bool:
     """물음표/뭐야 계열 질문 반응 여부."""
     return "question" in _reaction_families_for_message(msg)
 
-def _chat_user_key(chat: dict, index: int) -> str:
-    """도배 방지용 유저 키. uid가 없으면 nick, 둘 다 없으면 행 위치로 fallback."""
-    return str(chat.get("uid") or chat.get("user") or chat.get("nick") or f"row:{index}")
-
 KEYWORD_WEIGHTS = {
     r'ㅋ{2,}':          1.0,
     r'ㅎ{2,}':          0.8,
@@ -140,6 +138,7 @@ def build_time_series(chats: list[dict], window_sec: int = WINDOW_SEC) -> dict:
         "reaction_counts": Counter(),
         "reaction_users": defaultdict(set),
         "donation_count": 0,
+        "unidentified_user_count": 0,
     })
 
     duration_ms = max(c["ms"] for c in (chats or donation_rows))
@@ -150,17 +149,24 @@ def build_time_series(chats: list[dict], window_sec: int = WINDOW_SEC) -> dict:
         buckets[bucket]["count"] += 1
         msg = chat.get("msg", "")
         buckets[bucket]["score"] += score_message(msg)
-        user_key = _chat_user_key(chat, index)
+
+        user_key = next((str(chat[key]).strip() for key in ("uid", "user", "nick")
+                         if chat.get(key) is not None and str(chat[key]).strip()), None)
+        if user_key is None:
+            buckets[bucket]["unidentified_user_count"] += 1
         if is_laughter_message(msg):
             normalized = normalize_laughter_message(msg)
             buckets[bucket]["laughter_count"] += 1
-            buckets[bucket]["laughter_users"].add(user_key)
+            if user_key is not None:
+                buckets[bucket]["laughter_users"].add(user_key)
             if normalized:
                 buckets[bucket]["laughter_norm_counts"][normalized] += 1
-                buckets[bucket]["laughter_norm_users"][normalized].add(user_key)
+                if user_key is not None:
+                    buckets[bucket]["laughter_norm_users"][normalized].add(user_key)
         for family in _reaction_families_for_message(msg):
             buckets[bucket]["reaction_counts"][family] += 1
-            buckets[bucket]["reaction_users"][family].add(user_key)
+            if user_key is not None:
+                buckets[bucket]["reaction_users"][family].add(user_key)
 
 
 
@@ -190,6 +196,11 @@ def build_time_series(chats: list[dict], window_sec: int = WINDOW_SEC) -> dict:
             "laughter_ratio": data["laughter_count"] / count,
             "laughter_echo_max": echo_user_max,
             "laughter_echo_text": echo_text,
+            "unidentified_user_count": data["unidentified_user_count"],
+            "user_count_status": (
+                "missing" if data["unidentified_user_count"] == data["count"] and data["count"]
+                else "partial" if data["unidentified_user_count"] else "observed"
+            ),
             **(
                 {"donation_count": data["donation_count"]}
                 if data["donation_count"] > 0
@@ -349,6 +360,8 @@ def z_score_peaks(
                 "laughter_ratio": round(laughter_ratio, 4),
                 "laughter_echo_max": laughter_echo_max,
                 "laughter_echo_text": bucket.get("laughter_echo_text", ""),
+                "user_count_status": bucket.get("user_count_status", "unverified"),
+                "unidentified_user_count": bucket.get("unidentified_user_count"),
                 **(
                     {
                         "donation_burst": donation_burst,
@@ -370,14 +383,27 @@ def merge_peaks(peaks: list[dict], merge_sec: int = PEAK_MERGE_SEC) -> list[dict
         return []
 
     def finalize(group: list[dict]) -> dict:
-        best = max(
+        best = dict(max(
             group,
             key=lambda p: (
                 p.get("composite", 0),
                 bool(p.get("laughter_burst")),
                 bool(p.get("reaction_families")),
             ),
-        )
+        ))
+        members = [dict(member) for peak in group
+                   for member in (peak.get("peak_members") or [peak])]
+        best["peak_members"] = members
+        family_metrics = {
+            "chat_density": "count", "keyword_score": "raw_score",
+            "laughter_burst": "laughter_count", "donation_density": "donation_count",
+            **{signal: f"{family}_count" for family, signal in _REACTION_SIGNAL_KEYS.items()},
+        }
+        best["family_peaks"] = {
+            family: dict(max(eligible, key=lambda p: (p.get(metric, 0), -p["sec"])))
+            for family, metric in family_metrics.items()
+            if (eligible := [p for p in members if family in (p.get("source_signals") or [])])
+        }
         best["cluster_count"] = len(group)
 
 
@@ -385,6 +411,12 @@ def merge_peaks(peaks: list[dict], merge_sec: int = PEAK_MERGE_SEC) -> list[dict
         best["end_sec"] = max(p["sec"] + WINDOW_SEC for p in group)
         best["peak_seconds"] = [p["sec"] for p in group]
         best["peak_count_sum"] = sum(p["count"] for p in group)
+        statuses = {p.get("user_count_status", "unverified") for p in members}
+        best["user_count_status"] = next(iter(statuses)) if len(statuses) == 1 else "partial"
+        best["unidentified_user_count"] = (
+            sum(p["unidentified_user_count"] for p in members)
+            if all(isinstance(p.get("unidentified_user_count"), int) for p in members) else None
+        )
         best["laughter_burst"] = any(p.get("laughter_burst") for p in group)
         best["laughter_count_sum"] = sum(p.get("laughter_count", 0) for p in group)
         best["laughter_user_peak"] = max((p.get("laughter_user_count", 0) for p in group), default=0)

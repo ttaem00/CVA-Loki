@@ -148,7 +148,7 @@ def run(runtime, workspace):
 
     media = source / "fixture.mp4"
     generated = subprocess.run([str(ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin", "-n",
-        "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=10", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=16000",
+        "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=10", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=16000",
         "-t", "20", "-c:v", "mpeg4", "-q:v", "5", "-pix_fmt", "yuv420p", "-c:a", "aac", str(media)],
         text=True, encoding="utf-8", capture_output=True, timeout=120)
     require(generated.returncode == 0 and media.is_file(), "media_selftest_fixture_failed: " + generated.stderr)

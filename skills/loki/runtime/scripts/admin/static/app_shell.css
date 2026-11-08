@@ -240,6 +240,7 @@
 #app-shell-notice-count[hidden] { display: none; }
 .app-shell-notice-panel { right: 0; left: auto; width: min(500px, calc(100vw - 36px)); padding: 16px; gap: 12px; }
 .app-shell-notice-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.app-shell-notice-actions > a { display:inline-flex;align-items:center;width:auto;white-space:nowrap;gap:6px;padding:8px; }
 .app-shell-notice-preferences { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 16px; margin-block: 8px; }
 .app-shell-notice-preferences label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; cursor: pointer; }
 .app-shell-notice-preferences input { width: 18px; height: 18px; margin: 0; accent-color: var(--shell-accent); }
@@ -275,5 +276,13 @@
 .app-shell-notice-item-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 12px; }
 .app-shell-notice-item-foot time { color: var(--shell-muted); font-variant-numeric: tabular-nums; }
 .app-shell-notice-item-foot span { color: var(--shell-accent); }
-.app-shell-notice-items [data-unread="true"] strong::after { content: ' · 새 상태'; color: var(--shell-accent); font-size: 11px; }
+.app-shell-notice-item-foot span { padding: 5px 9px; border: 1px solid var(--shell-border); border-radius: 6px; font-weight: 600; }
+.app-shell-notice-items li { margin-block: 5px; border: 1px solid var(--shell-border); border-radius: 10px; background: var(--shell-bg); }
+.app-shell-notice-items .app-shell-notice-kind { display: inline-flex; align-items: center; gap: 7px; }
+/* Reuse the pinned Elio/Lucide check and x geometry; visible words carry the meaning. */
+.app-shell-notice-kind::before { content:''; display:inline-block; width:16px; height:16px; flex:0 0 auto; background:currentColor; mask:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+[data-category="attention"] .app-shell-notice-kind::before { mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E"); }
+[data-category="result"] .app-shell-notice-kind::before { mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E"); }
+[data-category="progress"] .app-shell-notice-kind::before { background:none; mask:none; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; box-sizing:border-box; }
+.app-shell-notice-items [data-unread="true"] strong::after { content:'';display:inline-block;width:6px;height:6px;margin-inline-start:8px;border-radius:50%;background:var(--shell-accent);vertical-align:middle; }
 @media (max-width: 760px) { .app-shell-notice-panel { width: auto; right: 10px; left: 10px; } }

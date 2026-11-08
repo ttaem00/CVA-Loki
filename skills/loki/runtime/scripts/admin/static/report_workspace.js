@@ -298,7 +298,7 @@
     el('deleteItemButton').hidden = !item || state.selection.type === 'Highlight';
     if (!item) return;
     const type = state.selection.type;
-    let html = field('제목', 'title', item.title);
+    let html = field('제목', 'title', item.title) + sceneReasons(item, type);
     if (type === 'D1' || type === 'D2') {
       html += `${timeEditGuide()}<div class="time-grid">${timeField('시작', 'start', item.start)}${timeField('끝', 'end', item.end)}</div>`;
       html += field('장면 설명','content',item.content,'textarea');
@@ -316,6 +316,34 @@
     html += `<div class="boundary-actions" aria-label="컷 경계 확인">${boundaries.map(index=>`<button type="button" data-boundary="start" data-boundary-span="${index}">${type==='Highlight'?`${index+1}번 `:''}시작 주변 6초</button>${type==='Point'?'':`<button type="button" data-boundary="end" data-boundary-span="${index}">${type==='Highlight'?`${index+1}번 `:''}끝 주변 6초</button>`}`).join('')}</div>`;
     el('editorFields').innerHTML = html;
     bindEditor(item, type);
+  }
+
+  function sceneReasons(item, type) {
+    const rows = sceneReasonRows(item, type);
+    return '<details class="scene-reasons"' + (rows ? '' : ' hidden') + '><summary>선정 근거와 합방 맥락</summary><dl>'
+      + rows + '</dl><p>읽기 전용 근거입니다. 중요도는 목록 순서나 원본 구간을 바꾸지 않습니다.</p></details>';
+  }
+
+  function sceneReasonRows(item, type) {
+    const rows = [];
+    if (type === 'Highlight' && typeof item.selection_reason === 'string' && item.selection_reason.trim())
+      rows.push(['볼 이유', item.selection_reason]);
+    const priority = S.editorialPriority(item);
+    if (priority) rows.push([`검토 중요도 · ${priority.label} · ${priority.basisLabel}`, priority.reason]);
+    for (const period of S.collaborationPeriodsForItem(state, type, item))
+      rows.push([`${S.hms(period.start_sec)}–${S.hms(period.end_sec)} 합방 맥락`
+        + (period.support_status === 'provisional' ? ' · 미확인' : ' · 기록된 구간'),
+      period.members.join(', ') || '합방 멤버 없음']);
+    return rows.map(([label, text]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(text)}</dd>`).join('');
+  }
+
+  function updateSceneReasons() {
+    const panel = el('editorFields').querySelector('.scene-reasons');
+    if (!panel) return;
+    const selected = S.selected(state);
+    const rows = selected ? sceneReasonRows(selected, state.selection.type) : '';
+    panel.querySelector('dl').innerHTML = rows;
+    panel.hidden = !rows;
   }
 
   function bindEditor(item, type) {
@@ -388,6 +416,7 @@
       ? `${state.activeType} · ${timeLabel(state.activeType, selected)}`
       : 'D1 · D2 · Point · Highlight를 같은 데이터로 탐색합니다.';
     el('taskSelection').textContent=selected ? `${selected.title || state.activeType} · ${timeLabel(state.activeType,selected)}` : '장면을 선택하세요';
+    updateSceneReasons();
     if (state.report.source_clock !== undefined && state.report.source_clock !== null)
       updateSourceLink(selected ? S.itemStart(state.selection.type, selected, state.selection.spanIndex) : NaN);
   }

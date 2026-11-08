@@ -1152,6 +1152,14 @@
     .manager-shared-scene-finder .viewer-editor-panel.evidence-panel {
       display: none;
     }
+    .manager-shared-scene-finder .evidence-panel:has([data-signal-measurement]) {
+      display: block;
+      margin-top: 10px;
+    }
+    .manager-shared-scene-finder #viewerEditorEvidence > :not(.viewer-editor-selected-card),
+    .manager-shared-scene-finder .viewer-editor-selected-card > :not(.viewer-editor-measurement):not(.viewer-editor-selected-meta) {
+      display: none;
+    }
     .manager-shared-scene-finder .viewer-editor-grid {
       display: block;
     }

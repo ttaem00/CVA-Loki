@@ -71,7 +71,9 @@
       const label = type === 'Highlight' ? `H${rowIndex + 1}.${spanIndex + 1}` : type;
       const time = type === 'Point' ? S.hms(start) : `${S.hms(start)}–${S.hms(end)}`;
       if (type === 'Point') {
-        return `<button type="button" class="timeline-point${selected ? ' selected' : ''}" style="left:${left}%" data-timeline-item data-type="Point" data-id="${escapeHtml(item.id || '')}" data-span-index="0" aria-pressed="${selected ? 'true' : 'false'}" aria-label="Point ${escapeHtml(time)} ${escapeHtml(item.title || '')}. 좌우 화살표로 이동"><span>${escapeHtml(item.title || 'Point')}</span></button>`;
+        const priority = S.editorialPriority(item);
+        const priorityLabel = priority ? priority.label : '미지정';
+        return `<button type="button" class="timeline-point${selected ? ' selected' : ''}" style="left:${left}%" data-priority="${priority ? priority.tier : 'unspecified'}" data-timeline-item data-type="Point" data-id="${escapeHtml(item.id || '')}" data-span-index="0" aria-pressed="${selected ? 'true' : 'false'}" aria-label="Point ${escapeHtml(time)} ${escapeHtml(item.title || '')} · ${priorityLabel}. 좌우 화살표로 이동"><span>${escapeHtml(item.title || 'Point')}</span><small class="timeline-point-priority">${priorityLabel}</small></button>`;
       }
       const handles = selected
         ? '<span class="timeline-handle start" data-timeline-handle="start" aria-hidden="true"></span><span class="timeline-handle end" data-timeline-handle="end" aria-hidden="true"></span>'
@@ -95,6 +97,9 @@
     render() {
       const model = this.options.getModel();
       if (!model) return;
+      const focused = this.canvas.contains(document.activeElement)
+        ? document.activeElement.closest('[data-timeline-item]') : null;
+      const focusKey = focused ? {...focused.dataset} : null;
       const ranges = model.outline.ranges || [];
       const selectedItem = S.selected(model);
       const parentId = model.selection && model.selection.type === 'D1'
@@ -115,6 +120,12 @@
       this.canvas.style.width = `${this.zoom * 100}%`;
       this.setPlayhead(this.playhead);
       this.updateHandleLayout();
+      if (focusKey) {
+        const replacement = Array.from(this.canvas.querySelectorAll('[data-timeline-item]')).find(item =>
+          item.dataset.type === focusKey.type && item.dataset.id === focusKey.id
+          && item.dataset.spanIndex === focusKey.spanIndex);
+        replacement?.focus({preventScroll: true});
+      }
     }
 
     onClick(event) {

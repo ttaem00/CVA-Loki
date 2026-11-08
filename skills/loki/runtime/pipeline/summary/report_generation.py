@@ -445,6 +445,28 @@ def _commit_generated_report_artifacts(
     source_ready(vod_info, "summary", meta_path)
     return md_path, html_path, meta_path
 
+def _highlight_peak_evidence_metadata(highlight: dict[str, Any]) -> dict[str, Any]:
+    """Keep native observation clocks/measurements without raw chat or identities."""
+    fields = (
+        "sec", "start_sec", "end_sec", "count", "composite", "source_signals",
+        "laughter_burst", "laughter_count", "laughter_user_count", "user_count",
+        "user_count_status", "unidentified_user_count", "raw_score",
+        "surprise_count", "question_count", "reaction_families", "producer_run_ref",
+    )
+    result = {key: copy.deepcopy(highlight[key]) for key in fields if key in highlight}
+    for key in ("peak_seconds", "family_peaks", "peak_members"):
+        if key not in highlight:
+            continue
+        if key == "peak_seconds":
+            result[key] = copy.deepcopy(highlight[key])
+        elif key == "family_peaks":
+            result[key] = {name: {field: copy.deepcopy(row[field]) for field in fields if field in row}
+                           for name, row in highlight[key].items() if isinstance(row, dict)}
+        else:
+            result[key] = [{field: copy.deepcopy(row[field]) for field in fields if field in row}
+                           for row in highlight[key] if isinstance(row, dict)]
+    return result
+
 def generate_reports(
     summary: str,
     vod_info: VODInfo,
@@ -890,6 +912,7 @@ def generate_reports(
         ),
         "highlights": [
             {
+                **_highlight_peak_evidence_metadata(h),
                 "sec": h.get("sec"),
                 "composite": h.get("composite"),
                 "count": h.get("count"),

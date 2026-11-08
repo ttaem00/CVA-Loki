@@ -14,6 +14,8 @@ from .editorial_visual_input import owned_images, PROFILE
 
 SCHEMA = "editorial.media-request.v1"
 
+ACQUISITION_REVISION_UNAVAILABLE = "acquisition_source_revision_unavailable"
+
 MEDIA_CLOCK_TOLERANCE_SEC = 1.0
 
 def same_media_clock(observed_sec, expected_sec):
@@ -49,8 +51,21 @@ def production_media_window(*, video_path, video_no, work_dir, duration_sec):
         raise ValueError("production_media_outside_vod")
     if type(duration_sec) not in (int, float) or not math.isfinite(duration_sec) or duration_sec <= 0:
         raise ValueError("production_media_clock_invalid")
-    _, ffprobe = _tool_paths()
-    observed = _probe_duration(path, ffprobe)
+    ffmpeg, ffprobe = _tool_paths()
+    if any(path.parent.glob(f"{path.stem}.seekable-*.mp4")):
+        path = _seekable_media_copy(path, ffmpeg=ffmpeg)
+    try:
+        observed = _probe_duration(path, ffprobe)
+    except Exception as exc:
+        from .media_tools.contracts import MediaToolError
+        if (not isinstance(exc, MediaToolError) or exc.code != "media_probe_failed"
+                or not isinstance(exc.__cause__, subprocess.TimeoutExpired)):
+            raise
+
+
+
+        path = _seekable_media_copy(path, ffmpeg=ffmpeg)
+        observed = _probe_duration(path, ffprobe)
     probe = subprocess.run([ffprobe, "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=height", "-of", "json", str(path)],
         capture_output=True, text=True, timeout=60, check=False)
@@ -59,6 +74,74 @@ def production_media_window(*, video_path, video_no, work_dir, duration_sec):
         raise ValueError("production_media_video_unverified")
     return dict(path=str(path), sha=file_hash(path), start=0,
         end=min(float(duration_sec), observed), saved_height=streams[0]["height"])
+
+def _seekable_media_copy(source, *, ffmpeg):
+    import os
+    from .media_tools.executor import _run
+
+
+    with source.open("rb") as handle:
+        header = handle.read(65536)
+    if source.suffix.lower() != ".mp4" or header[4:8] != b"ftyp" or b"mvex" not in header or b"moof" not in header:
+        raise ValueError("production_media_probe_failed_preserved")
+    original_sha = file_hash(source)
+    output = source.with_name(f"{source.stem}.seekable-{original_sha[:16]}.mp4")
+    receipt_path = output.with_suffix(".remux.json")
+    binding = dict(schema_version="editorial.seekable-media.v1", source_sha256=original_sha,
+                   recipe="ffmpeg-ignidx-stream-copy-faststart-v1")
+    if output.exists() or receipt_path.exists() or output.is_symlink() or receipt_path.is_symlink():
+        if output.is_symlink() or receipt_path.is_symlink() or not output.is_file() or not receipt_path.is_file():
+            raise ValueError("production_media_remux_incomplete_preserved")
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        if receipt != dict(binding, output_sha256=file_hash(output)):
+            raise ValueError("production_media_remux_changed_preserved")
+        return output
+    pending = output.with_suffix(".partial.mp4")
+
+
+    with pending.open("xb"):
+        pass
+    _run([ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+          "-fflags", "+ignidx", "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?",
+          "-c", "copy", "-movflags", "+faststart", str(pending)],
+         timeout_sec=max(180, min(1800, int(source.stat().st_size / 1_000_000) + 180)))
+    if file_hash(source) != original_sha:
+        raise ValueError("production_media_source_changed")
+
+
+
+
+    os.link(pending, output)
+    pending.unlink()
+    with receipt_path.open("x", encoding="utf-8") as handle:
+        json.dump(dict(binding, output_sha256=file_hash(output)), handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    return output
+
+def _collected_production_window(*, source, media_ref, output_dir):
+    """Probe a bounded capture while retaining the frozen original media identity."""
+    import subprocess
+    from .collected_vod_media import resolve_collected_media, collected_media_window, assert_collected_media_fresh
+    from .media_tools.executor import _tool_paths, _probe_duration
+    selected = resolve_collected_media(source=source, media_ref=media_ref, output_dir=output_dir)
+    if selected is None:
+        return None
+    probe_root = native_path(output_dir) / 'probe'
+    probe_root.mkdir(parents=True, exist_ok=True)
+    probe_window = dict(start=selected['start'], duration=min(1.,selected['end']-selected['start']))
+    path, offset = collected_media_window(selected['path'], probe_window, probe_root)
+    _, ffprobe = _tool_paths()
+    if _probe_duration(path,ffprobe) + .05 < offset + probe_window['duration']:
+        raise ValueError('production_media_collected_coverage_unverified')
+    probe = subprocess.run([ffprobe,'-v','error','-select_streams','v:0',
+        '-show_entries','stream=height','-of','json',str(path)],
+        capture_output=True,text=True,timeout=60,check=False)
+    streams = json.loads(probe.stdout).get('streams',[]) if probe.returncode == 0 else []
+    if len(streams)!=1 or type(streams[0].get('height')) is not int or streams[0]['height']<2:
+        raise ValueError('production_media_video_unverified')
+    assert_collected_media_fresh(path)
+    return dict(path=selected['path'],sha=selected['sha256'],start=selected['start'],end=selected['end'],
+        saved_height=streams[0]['height'],kind=selected['kind'],original_media=selected['original_media'])
 
 def current_conversation_media_session(*, root, prepared):
     """Bind the existing media reader to this local writer's immutable source."""
@@ -75,18 +158,26 @@ def current_conversation_media_session(*, root, prepared):
         windows = []
         media = prepared.get("media_source")
         if media and native_path(media["path"]).suffix.lower() in {".mp4", ".mkv", ".webm", ".mov"}:
-            window = production_media_window(video_path=media["path"],
-                video_no=prepared["identity"]["video_no"],
-                work_dir=native_path(prepared["identity"]["work_root"]) / prepared["identity"]["video_no"],
-                duration_sec=prepared["vod_info"]["duration"])
-            if window["sha"] != media["sha256"]:
+            work_dir = native_path(prepared['identity']['work_root']) / prepared['identity']['video_no']
+            if not native_path(media['path']).resolve().is_relative_to(work_dir.resolve()):
+                raise ValueError('production_media_outside_vod')
+            window = _collected_production_window(source=source,media_ref=media,
+                output_dir=root/'collected-media')
+            if window is None:
+                window = production_media_window(video_path=media["path"],
+                    video_no=prepared["identity"]["video_no"],work_dir=work_dir,
+                    duration_sec=prepared["vod_info"]["duration"])
+            if window.get('original_media',dict(sha256=window['sha']))['sha256'] != media['sha256']:
                 raise ValueError("editorial_media_source_changed")
             windows.append(window)
+        from .editorial_current_sources import NAVIGATION_PROFILE
+        preserved_preview = prepared.get('feature_profile') == NAVIGATION_PROFILE
         preserve(path, dict(schema_version=SCHEMA, source_id=source["asset"]["source_id"],
             source_revision=source["asset"]["bytes_sha256"], video_no=prepared["identity"]["video_no"],
-            windows=windows, timeline_preview=dict(duration_sec=prepared["vod_info"]["duration"]),
-            **original_media_scope(video_no=prepared["identity"]["video_no"],
-                                   duration_sec=prepared["vod_info"]["duration"])))
+            windows=windows, timeline_preview=dict(duration_sec=prepared["vod_info"]["duration"],
+                **(dict(profile='preserved_windows_v1') if preserved_preview else {})),
+            **({} if preserved_preview else original_media_scope(video_no=prepared["identity"]["video_no"],
+                                   duration_sec=prepared["vod_info"]["duration"]))))
     cfg = dict(candidate_output_dir=str(root), codex_cli_required_runtime_root=str(root),
         summary_author_mode=mode, editorial_context_visual_input=PROFILE,
         editorial_context_media_requests=dict(manifest=dict(path=str(path), sha256=file_hash(path)),
@@ -169,7 +260,7 @@ def media_scope(cfg, source=None, *, owner_root=None, _verify_window_bytes=True)
             raise ValueError("editorial_media_source_changed")
     return deepcopy(spec), catalog
 
-def _validate_window(window, catalog, folder):
+def _validate_window(window, catalog, folder, *, _fresh_acquisition=False):
     """Bind newly acquired bytes to this source and the existing tool's receipt."""
     if window.get("kind") == "timeline_preview":
         saved = json.loads((native_path(folder) / "receipt.json").read_text(encoding="utf-8"))
@@ -184,6 +275,22 @@ def _validate_window(window, catalog, folder):
     if window in catalog["windows"]:
         if file_hash(window["path"]) != window["sha"]:
             raise ValueError("editorial_media_source_changed")
+        if window.get('kind') == 'collected_vod_v1':
+            original = window['original_media']
+            if file_hash(original['path']) != original['sha256']:
+                raise ValueError('editorial_media_source_changed')
+            from .collected_vod_media import assert_collected_media_fresh
+            assert_collected_media_fresh(window['path'],intervals=[])
+            receipt = native_path(folder)/'receipt.json'
+            if receipt.is_file():
+                body = json.loads(receipt.read_text(encoding='utf8'))['payload']
+                selected = body['decode_receipt']['effective_media']
+                path = native_path(selected['path']).resolve()
+                if (not path.is_relative_to(native_path(folder).resolve())
+                        or file_hash(path)!=selected['sha256']
+                        or selected['source_playlist']!=dict(path=window['path'],sha256=window['sha'])):
+                    raise ValueError('editorial_media_source_changed')
+                assert_collected_media_fresh(path)
         return
     scope = catalog.get("original_source")
     if not scope:
@@ -196,9 +303,11 @@ def _validate_window(window, catalog, folder):
         raise ValueError("editorial_media_acquisition_receipt_changed")
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     rows = [r for r in receipt.get("artifacts", []) if r.get("kind") == "video"]
+    revision = receipt.get("source_revision_sha256")
     if (receipt.get("status") != "ok" or receipt.get("action") != "video"
             or str(receipt.get("video_no")) != str(catalog["video_no"])
-            or receipt.get("source_revision_sha256") != scope["source_revision_sha256"] or len(rows) != 1):
+            or not isinstance(revision, str) or len(revision) != 64
+            or any(c not in "0123456789abcdef" for c in revision) or len(rows) != 1):
         raise ValueError("editorial_media_acquisition_source_changed")
     asset_path = (native_path(folder) / "acquisition" / rows[0]["relative_path"]).resolve()
     if (not asset_path.is_relative_to(native_path(folder).resolve() / "acquisition")
@@ -208,6 +317,11 @@ def _validate_window(window, catalog, folder):
             or window["end"] != window["start"] + receipt["actual_window"]["duration_sec"]
             or window["saved_height"] != receipt["selected_height"]):
         raise ValueError("editorial_media_acquisition_bytes_or_clock_changed")
+    if revision != scope["source_revision_sha256"]:
+        if _fresh_acquisition:
+            from .media_tools.contracts import MediaToolError
+            raise MediaToolError(ACQUISITION_REVISION_UNAVAILABLE, "bounded source acquisition revision differs")
+        raise ValueError("editorial_media_acquisition_source_changed")
 
 def _acquire_window(request, catalog, folder):
     from .media_tools import execute_tool_call
@@ -220,6 +334,8 @@ def _acquire_window(request, catalog, folder):
         receipt = execute_tool_call(dict(action="video", video_no=catalog["video_no"],
             start_sec=request.start_sec, duration_sec=request.duration_sec), acquisition_root)
         preserve(path, receipt)
+    if receipt.get("status") not in {"ok", "error"}:
+        raise ValueError("editorial_media_acquisition_source_changed")
     if receipt.get("status") != "ok":
         raise MediaToolError((receipt.get("error") or {}).get("code", "source_unavailable"),
                              "bounded source acquisition failed")
@@ -230,7 +346,10 @@ def _acquire_window(request, catalog, folder):
         start=receipt["actual_window"]["start_sec"],
         end=receipt["actual_window"]["start_sec"] + receipt["actual_window"]["duration_sec"],
         saved_height=receipt["selected_height"], acquisition_receipt=dict(path=str(path),sha256=file_hash(path)))
-    _validate_window(window,catalog,folder)
+    if (receipt.get("source_revision_sha256") != catalog["original_source"]["source_revision_sha256"]
+            and (window["start"] != request.start_sec or window["end"] != request.start_sec + request.duration_sec)):
+        raise ValueError("editorial_media_acquisition_bytes_or_clock_changed")
+    _validate_window(window,catalog,folder,_fresh_acquisition=True)
     return window
 
 class AuthorMediaSession:
@@ -275,6 +394,14 @@ class AuthorMediaSession:
             authority="provider navigation intervals; not verified video PTS",
             delivery="one chronological native-tile grid, then optional individual frame pages",
             duration_sec=(self.catalog.get("timeline_preview") or self.catalog.get("original_source") or {}).get("duration_sec"))
+        if (self.catalog.get('timeline_preview') or {}).get('profile') == 'preserved_windows_v1':
+            result['timeline_preview'].update(authority='sampled decode positions in preserved source; not verified PTS',
+                max_window_sec=self.spec['max_window_sec'],
+                coverage_intervals_sec=[[w['start'],w['end']] for w in self.catalog['windows']],
+                unavailable_policy='pending; no provider acquisition')
+        if any(w.get('kind')=='collected_vod_v1' for w in self.catalog['windows']):
+            result['coverage']='captured range envelopes; each request checks actual gaps, overlaps and source clock'
+            result['timeline_preview']['coverage_intervals_are_envelopes']=True
         if self.active_grid:
             result["active_preview_grid"] = self._grid_context()
         return result
@@ -296,6 +423,17 @@ class AuthorMediaSession:
                 "Choose source windows needed for your question; max_window_sec applies to scene/ocr, not preview. "
                 "Finish when the evidence is sufficient; repeated pixels without useful information do not resolve "
                 "a question. Missing source or service failures remain specific pending conditions.")
+        if (self.catalog.get('timeline_preview') or {}).get('profile') == 'preserved_windows_v1':
+            prompt = prompt.replace(
+                "Use preview for a broad chronological contact sheet of the provider's coarse timeline pictures.",
+                "Use preview for a chronological contact sheet sampled from this job's preserved video windows.")
+            prompt = prompt.replace('at the original tile size', 'at the delivered sample size')
+            prompt = prompt.replace(
+                'max_window_sec limits scene/ocr decoding, not preview navigation within the provider timeline.',
+                'max_window_sec bounds preview, scene and ocr decoding inside the advertised preserved coverage; '
+                'unavailable windows stay pending without provider acquisition.')
+            prompt = prompt.replace('max_window_sec applies to scene/ocr, not preview.',
+                                    'max_window_sec applies to preview, scene and ocr.')
         return prompt
 
     def validate_active(self):
@@ -363,6 +501,7 @@ class AuthorMediaSession:
         if set(args) != {"start_sec", "duration_sec", "inspection_mode"}:
             raise ValueError("editorial_media_request_invalid")
         preview = args["inspection_mode"] == "preview"
+        preserved_preview = preview and (self.catalog.get('timeline_preview') or {}).get('profile') == 'preserved_windows_v1'
         if preview:
             from .media_tools.chzzk import preview_window
             start, duration = preview_window(args["start_sec"], args["duration_sec"])
@@ -371,16 +510,16 @@ class AuthorMediaSession:
             request = ToolRequest.from_mapping(dict(args, action="frames", video_no=self.catalog["video_no"]))
         key = digest([request.canonical_payload(), self.spec["manifest"], "preview"] if preview else
                      [request.canonical_payload(), self.spec["manifest"]])
-        if not preview and request.duration_sec > self.spec["max_window_sec"]:
+        if (not preview or preserved_preview) and request.duration_sec > self.spec["max_window_sec"]:
             return self._pending(action, "window_budget_exceeded")
         if (self.spec["max_windows"] is not None and key not in self.requests
                 and len(self.requests) >= self.spec["max_windows"]):
             return self._pending(action, "media_window_budget_exhausted")
         self.requests.add(key)
-        if preview:
+        if preview and not preserved_preview:
             return self._preview(request, action, key)
         from .media_tools.executor import FRAME_PROFILES
-        required_height = FRAME_PROFILES[request.inspection_mode]["height"]
+        required_height = 2 if preserved_preview else FRAME_PROFILES[request.inspection_mode]["height"]
         covered = [w for w in self.catalog["windows"]
                    if w["start"] <= request.start_sec and request.start_sec + request.duration_sec <= w["end"]]
         adequate = [w for w in covered if w["saved_height"] >= required_height]
@@ -400,6 +539,8 @@ class AuthorMediaSession:
                 window = next(iter(saved_body["payload"]["frames"].values()))["media"]
                 _validate_window(window,self.catalog,folder)
             else:
+                if any(item["state"] == ACQUISITION_REVISION_UNAVAILABLE for item in self.pending):
+                    return self._pending(action, ACQUISITION_REVISION_UNAVAILABLE)
                 from .media_tools.contracts import MediaToolError
                 try:
                     window = _acquire_window(request,self.catalog,folder)
@@ -442,8 +583,31 @@ class AuthorMediaSession:
             body = dict(manifest=self.spec["manifest"], source_id=self.catalog["source_id"],
                 source_revision=self.catalog["source_revision"], request=request.canonical_payload(),
                 frames=frames, decode_receipt=receipt)
+            if preserved_preview:
+                ordered = sorted(frames, key=lambda ref:frames[ref]['source_sec'])
+                step = request.duration_sec / len(ordered)
+                for i, ref in enumerate(ordered):
+                    frames[ref]['source_interval_sec'] = [request.start_sec+i*step, request.start_sec+(i+1)*step]
+                    frames[ref]['uncertainty'].append('sample_bin_not_continuous_viewing')
+                self._add_preview_grid(body, folder)
             preserve(path, dict(payload=body, sha256=digest(body)))
         return self._deliver(body, key)
+
+    def _add_preview_grid(self, body, folder):
+        from .media_tools.frames import build_contact_sheet, format_timestamp
+        frames = body['frames']
+        ordered = sorted(frames, key=lambda ref:frames[ref]['source_sec'])
+        width, height = frames[ordered[0]]['delivered_dimensions']
+        columns = min(3, len(ordered))
+        sheet = build_contact_sheet([native_path(frames[r]['image']['path']) for r in ordered],
+            [frames[r]['source_sec'] for r in ordered], folder/'preview-grid.jpg',
+            columns=columns, tile_width=width, tile_height=height,
+            labels=[' - '.join(format_timestamp(t) for t in frames[r]['source_interval_sec']) for r in ordered])
+        body['preview_grid'] = dict(image=owned_images([str(sheet)], self.cfg['codex_cli_required_runtime_root'])[0],
+            navigation_only=True, delivered_dimensions=[width*columns, (height+30)*math.ceil(len(ordered)/columns)],
+            cells=[dict(frame_ref=ref, source_interval_sec=frames[ref]['source_interval_sec'],
+                grid_box=[(i%columns)*width, (i//columns)*(height+30),
+                          (i%columns+1)*width, (i//columns)*(height+30)+height]) for i,ref in enumerate(ordered)])
 
     def _preview(self, request, action, key):
         from .media_tools.chzzk import resolve_chzzk_preview_catalog, read_chzzk_preview_frames
@@ -485,19 +649,7 @@ class AuthorMediaSession:
             body = dict(manifest=self.spec["manifest"], source_id=self.catalog["source_id"],
                 source_revision=self.catalog["source_revision"], request=request.canonical_payload(),
                 frames=frames, preview_source={k:v for k,v in preview.items() if k != "seeking_thumbnail"})
-            from .media_tools.frames import build_contact_sheet, format_timestamp
-            ordered = sorted(frames, key=lambda ref: frames[ref]["source_sec"])
-            width, height = frames[ordered[0]]["delivered_dimensions"]
-            columns = min(3, len(ordered))
-            sheet = build_contact_sheet([native_path(frames[r]["image"]["path"]) for r in ordered],
-                [frames[r]["source_sec"] for r in ordered], folder/"preview-grid.jpg",
-                columns=columns, tile_width=width, tile_height=height,
-                labels=[" - ".join(format_timestamp(t) for t in frames[r]["source_interval_sec"]) for r in ordered])
-            body["preview_grid"] = dict(image=owned_images([str(sheet)], self.cfg["codex_cli_required_runtime_root"])[0],
-                navigation_only=True, delivered_dimensions=[width*columns, (height+30)*math.ceil(len(ordered)/columns)],
-                cells=[dict(frame_ref=ref, source_interval_sec=frames[ref]["source_interval_sec"],
-                    grid_box=[(i%columns)*width, (i//columns)*(height+30),
-                              (i%columns+1)*width, (i//columns)*(height+30)+height]) for i,ref in enumerate(ordered)])
+            self._add_preview_grid(body, folder)
             preserve(path, dict(payload=body, sha256=digest(body)))
         return self._deliver(body, key)
 

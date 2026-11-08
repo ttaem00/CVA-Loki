@@ -118,6 +118,7 @@ SRT와 같은 VOD의 허용된 보조 자료를 `<workspace>/<work_dir>/<video_n
 | `hierarchy`, `retrieval` | 동봉 adapter의 현재 계약을 읽고 선택. 다른 호스트의 SDK·모델 경로를 복사하지 않음 |
 | `read_page_policy` | 새 작업의 기본값 `balanced_compact_v1`. 재개할 때는 저장된 정책 유지 |
 | `search_mode` | 기본 `lexical`. `hybrid_dbsf_v1`은 명시적으로 선택한 작업에만 적용 |
+| `authoring_minutes` | 새 작업에서 명시한 양의 정수 분. 입력 준비 뒤 작성 경과를 관측하며 생략하면 새 시계를 만들지 않음 |
 
 이 필드는 `loki.json`에 추가하는 설정이 아니라 작업별 준비 spec이다. 허용값과 도구
 형식은 이 작업이 반환한 실제 계약을 따른다. 검색 모드 선택을 영상·음성 검색이나 정렬
@@ -145,6 +146,19 @@ python <runtime>/loki.py --config <workspace>/loki.json prepare --spec <workspac
 `author_input_path`를 읽고 이 작업의 계약으로 진행한다. 동일한 준비 입력을 다시 열면
 기존의 고정된 작업을 사용한다. 자료나 작성자 정보가 바뀌었다면 변경을 확인하며,
 기존 작업에 조용히 덮어쓰지 않는다.
+
+작성 시간을 관측하려면 새 spec에 `authoring_minutes`를 넣는다. 요청한15분·30분 같은
+목표는 준비된 자료에서의 작성 사용 방식이며 다운로드·STT를 포함한 전체 완료 약속이 아니다.
+준비가 끝난 뒤 시작한 시계는 강제 중지나 기존 예산 변경이 아니며, 초과해도 필요한 원문과
+국소 보정·유효 제출을 계속할 수 있다. 계측하지 않은 도구 대기·보정 시간은 미확인이다.
+
+```text
+python <runtime>/loki.py --config <workspace>/loki.json status --job-root <job-root> --expected-revision <revision>
+```
+
+`not_submitted`, `accepted_render_pending`, `terminal_record_present`를 구분한다. 제출이
+접수돼 렌더 결과를 기다리는 상태를 새 제출 권한으로 해석하지 않는다. 완료 후 시계는
+해당 결과에 고정되며 보고서 생성 완료와 관리자 저장 완료는 별개다.
 
 ## 3. 원문 읽기와 메모
 
@@ -246,6 +260,17 @@ proposal의 원본 구간 안에 있어야 한다. 제출 시 전달받은 이�
 실제로 전달받고 확인하지 않은 음성·영상에 청취·시청 주장을 넣지 않는다. 기존 생성 보고서는
 참고 맥락이며 새로 작성한 결과로 바꿔 기록하지 않는다.
 
+작업이 노출한 optional 계약에 따라 Point·Highlight에 `editorial_priority`의
+`tier`(focus/normal/later), 원문에 근거한 `reason`, `basis: author`를 붙일 수 있다.
+Story에는 별도 중요도를 넣지 않는다. 작성자는 manager/display_review 판단을 사칭하지
+않으며, 중요도는 항목 순서·원본 구간·컷 identity를 정하는 점수가 아니다.
+
+선택 `collaboration_periods`는 확인한 원문의 반구간과 근거 ID에 연결한다. 새 작성자의
+기간은 source_evidence/provisional로 남기며 확인하지 않은 참여자나 member_vods 링크를
+만들지 않는다. 기존 관리자 기간·빈 멤버 선언·명시적으로 비운 기간 배열을 덮지 않는다.
+충돌·용량·보류 진단을 확인하고, JSON 형식 통과를 인물·시각·편집 가치의 승인으로
+바꾸지 않는다. 이 선택 필드가 없으면 기존 작성·검토 흐름을 그대로 사용한다.
+
 ```text
 python <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-root> --expected-revision <revision> --response <workspace>/response.json
 ```
@@ -254,6 +279,10 @@ python <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-r
 오류를 고친 뒤 다시 제출한다. 완료된 동일 제출은 같은 결과를 반환하지만, 제출 뒤 바뀐
 응답은 충돌한다. 중단되면 기존 제출 상태부터 확인하고, 충돌을 감추려고 중복 작업을
 만들지 않는다. 원본 응답·원문 읽기 기록·생성 결과는 보존한다.
+
+반려 시 CLI의 stderr JSON과 exit2에서 실제 오류·해당 위치·부족한 원문을 확인한다.
+필요한 원문을 추가로 읽고 해당 내용만 고친 뒤 전체 최종 검사를 다시 통과한다.
+진단이나 메모가 원문 읽음 권한을 대신하지 않는다. 정상 형제와 원래 응답은 보존한다.
 
 사용자에게 새 초안 위치, 원문이 뒷받침하는 내용과 중요한 한계를 알린다. 제출은 새 로컬
 초안을 만들며 기존 보고서나 수동 수정본을 교체하지 않는다. Highlight는 원본 구간과
@@ -268,6 +297,8 @@ python <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-r
 출력된 `http://127.0.0.1:8787/`을 연다. 목록에서 기존 영상 작업실과 상세 편집기로 이동한다.
 
 1. 로컬 영상·장면과 보고서를 확인한다.
+   선택 항목의 **선정 근거와 합방 맥락**을 펼쳐 판단 주체·이유·미확인을 읽는다.
+   시각을 고치면 현재 기간과의 교집합을 표시하며 이 근거는 읽기 전용이다.
 2. 본문·D1/D2·Point·Highlight를 수정하고 미리보기를 확인한다.
 3. 명시적으로 저장한 뒤 다시 열어 저장된 revision을 확인한다.
 4. 필요하면 기존 저장 이력을 비교하고 명시적 복원 동작을 사용한다.

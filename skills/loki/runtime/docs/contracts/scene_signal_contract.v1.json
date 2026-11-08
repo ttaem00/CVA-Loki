@@ -50,27 +50,27 @@
     },
     {
       "key": "chat_laughter",
-      "label": "웃음/놀람",
-      "viewer_label": "웃음/놀람 채팅",
-      "purpose": "웃긴 컷·놀란 컷 후보",
+      "label": "웃음·놀람·의문",
+      "viewer_label": "웃음·놀람·의문 표현",
+      "purpose": "종류별 반응 후보 확인",
       "display_role": "scene",
       "default_event_role": "supporting",
       "edit_candidate_role": "supporting_signal",
       "privacy_class": "manager_only",
       "color": "rgba(247,118,142,0.84)",
-      "empty_reason": "No laughter or surprise chat burst was detected."
+      "empty_reason": "No eligible laughter, surprise or question-expression observation was detected."
     },
     {
       "key": "chat_surprise",
-      "label": "채팅 급증",
-      "viewer_label": "채팅 급증 구간",
-      "purpose": "무슨 일이 난 구간",
+      "label": "고채팅량 후보",
+      "viewer_label": "고채팅량 후보",
+      "purpose": "전체 대비 높은 채팅 수 또는 시간대 대표 관측; 인접 증가 입증 아님",
       "display_role": "scene",
       "default_event_role": "supporting",
       "edit_candidate_role": "supporting_signal",
       "privacy_class": "manager_only",
       "color": "rgba(242,166,200,0.82)",
-      "empty_reason": "No chat surge window was detected."
+      "empty_reason": "No eligible high-count or representative chat observation was detected."
     },
     {
       "key": "comment_replay",
@@ -206,9 +206,9 @@
     },
     {
       "key": "audio_peak",
-      "label": "오디오 피크",
-      "viewer_label": "소리 튄 장면",
-      "purpose": "소리 반응 확인",
+      "label": "음량·자막 변화",
+      "viewer_label": "음량·자막 변화 후보",
+      "purpose": "혼합된 음량·자막 변화의 원본 확인; 감정 확정 아님",
       "display_role": "scene",
       "default_event_role": "supporting",
       "edit_candidate_role": "supporting_signal",
@@ -218,15 +218,15 @@
     },
     {
       "key": "subtitle_density",
-      "label": "자막 긴 구간",
-      "viewer_label": "대사 많은 구간",
-      "purpose": "자막으로 맥락 확인",
+      "label": "긴 자막 후보",
+      "viewer_label": "긴 자막 후보",
+      "purpose": "관측된 자막 길이의 맥락 확인; 실제 발화 밀도 확정 아님",
       "display_role": "scene",
       "default_event_role": "supporting",
       "edit_candidate_role": "supporting_signal",
       "privacy_class": "manager_only",
       "color": "rgba(125,207,255,0.78)",
-      "empty_reason": "No long subtitle or dense dialogue region was detected."
+      "empty_reason": "No eligible long subtitle observation was detected."
     },
     {
       "key": "highlight",

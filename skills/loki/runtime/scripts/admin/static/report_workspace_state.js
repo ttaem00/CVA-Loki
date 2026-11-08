@@ -44,6 +44,29 @@
     return [];
   }
 
+  function editorialPriority(item) {
+    const value = item.editorial_priority;
+    if (!value || Object.keys(value).length !== 3
+        || !['focus', 'normal', 'later'].includes(value.tier)
+        || !['author', 'manager', 'display_review'].includes(value.basis)
+        || typeof value.reason !== 'string' || !value.reason.trim()) return null;
+    return {...value, label: {focus: '먼저 검토', normal: '함께 검토', later: '뒤에 검토'}[value.tier],
+      basisLabel: {author: '작성자 판단', manager: '관리자 판단', display_review: '검토용 표시'}[value.basis]};
+  }
+
+  function collaborationPeriodsForItem(state, type, item) {
+    const periods = state.packet && Object.hasOwn(state.packet, 'collaboration_periods')
+      ? state.packet.collaboration_periods : state.outline.collaboration_periods;
+    if (!Array.isArray(periods)) return [];
+    const spans = type === 'Highlight' ? item.source_spans || []
+      : [{start_sec: itemStart(type, item), end_sec: itemEnd(type, item)}];
+    return periods.filter(period => period && Array.isArray(period.members)
+      && Number.isFinite(period.start_sec) && Number.isFinite(period.end_sec)
+      && period.start_sec < period.end_sec && spans.some(span => type === 'Point'
+        ? period.start_sec <= span.start_sec && span.start_sec < period.end_sec
+        : Math.max(period.start_sec, span.start_sec) < Math.min(period.end_sec, span.end_sec)));
+  }
+
   function completionNotice(state) {
     const packet = state.packet || {};
     const groups = (packet.unresolved_group_outcomes || []).length;
@@ -378,7 +401,7 @@
   }
 
   window.ReportWorkspaceState = {
-    create, rows, completionNotice, selected, update, updateSpan, duration, snapshot, restore,
+    create, rows, editorialPriority, collaborationPeriodsForItem, completionNotice, selected, update, updateSpan, duration, snapshot, restore,
     setTime, addItem, deleteSelected, serialize, seconds, hms, itemStart, itemEnd, sourceSceneUrl,
     selectionParams, restoreSelection, publicationNotice, boundaryWindow, editSignature, revisionDiff,
   };

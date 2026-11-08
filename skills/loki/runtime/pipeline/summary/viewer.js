@@ -753,9 +753,9 @@ function initViewerEditorTools() {
       <div class="viewer-editor-selected-title">${esc(fmt(sec))} 주변 신호 ${signalCount}개</div>
       <div class="viewer-editor-selected-meta">
         ${timeChip(sec, event)}
-        <span class="viewer-editor-chip">자료 ${Math.max(0, Number(cluster.family_count || 0))}종</span>
-        <span class="viewer-editor-chip">시청자 클립 ${viewerClipCount}개</span>
-        <span class="viewer-editor-chip">신뢰 ${esc(clusterConfidenceLabel(cluster.confidence))}</span>
+        <span class="viewer-editor-chip">표시 종류 ${Math.max(0, Number(cluster.family_count || 0))}종</span>
+        <span class="viewer-editor-chip">클립 표시 ${viewerClipCount}개</span>
+        <span class="viewer-editor-chip">${esc(clusterSupportLabel(cluster))}</span>
         ${zoneRelatedCount ? `<span class="viewer-editor-chip">주변 묶음 ${zoneRelatedCount}개</span>` : ''}
         ${familyChipHtml}
         ${overflowCount ? `<span class="viewer-editor-chip warning">나머지 ${overflowCount}개도 펼침</span>` : ''}
@@ -791,7 +791,7 @@ function initViewerEditorTools() {
     if (!lowered.includes('audio_energy_peak') && !lowered.includes('voice_reaction_candidate') && !lowered.includes('chat_audio_overlap') && !lowered.includes('clipping_or_limiter_diagnostic')) return '';
     const parts = [];
     if (lowered.includes('audio_energy_peak')) parts.push('소리가 크게 튄 구간');
-    if (lowered.includes('voice_reaction_candidate')) parts.push('목소리 리액션이 커진 후보');
+    if (lowered.includes('voice_reaction_candidate')) parts.push('음량·자막 변화 후보');
     if (lowered.includes('chat_audio_overlap')) parts.push('채팅 반응도 같이 몰린 시각');
     if (lowered.includes('clipping_or_limiter_diagnostic')) parts.push('음량이 거칠게 잡힌 신호');
     return `${parts.join(' · ')}입니다. 편집 컷 후보로만 보고, 실제 장면 의미는 자막과 화면 흐름으로 확인하세요.`;
@@ -801,7 +801,7 @@ function initViewerEditorTools() {
     if (!friendlyAudioSignalText(raw)) return raw;
     const lowered = raw.toLowerCase();
     if (lowered.includes('chat_audio_overlap')) return '소리와 채팅이 함께 튄 구간';
-    if (lowered.includes('voice_reaction_candidate')) return '목소리 리액션이 커진 구간';
+    if (lowered.includes('voice_reaction_candidate')) return '음량·자막 변화 후보';
     if (lowered.includes('clipping_or_limiter_diagnostic')) return '음량이 갑자기 거칠어진 구간';
     return '소리가 크게 튄 구간';
   }
@@ -853,9 +853,9 @@ function initViewerEditorTools() {
       if (!messages.some((item) => `${item.title}|${item.text}` === key)) messages.push({ title, text });
     };
     if (kind === 'chat_laughter') {
-      add('웃음/놀람 채팅', '웃기거나 놀란 반응이 채팅에 많이 잡힌 구간입니다. 리액션 컷 후보로 보고, 정확한 장면 내용은 자막과 요약으로 확인하세요.');
+      add('웃음·놀람·의문 표현', '웃음·놀람·의문 표현이 관측된 후보입니다. 서로 다른 분류이며 함께 나타날 수 있습니다. 리액션 컷 후보로 보고, 정확한 장면 내용은 자막과 요약으로 확인하세요.');
     } else if (kind === 'chat_surprise') {
-      add('채팅 급증 구간', '채팅량이 갑자기 늘어난 구간입니다. 무슨 일이 났는지 찾는 출발점으로 보고, 웃긴 장면인지 이슈 장면인지는 자막과 화면 흐름으로 확인하세요.');
+      add('고채팅량 후보', '같은 방송에서 채팅 수가 높거나 시간대를 대표하는 후보입니다. 인접 구간 대비 증가를 입증한 값은 아닙니다. 무슨 일이 났는지 찾는 출발점으로 보고, 웃긴 장면인지 이슈 장면인지는 자막과 화면 흐름으로 확인하세요.');
     } else if (kind === 'chat') {
       add('채팅 반응 신호', '채팅이 몰린 위치입니다. 장면 내용은 자막이나 기존 요약과 함께 확인하세요.');
     }
@@ -1054,89 +1054,22 @@ function initViewerEditorTools() {
   function highPriorityDensityKind(kind) {
     return ['timeline', 'existing_segments', 'highlight', 'chapter', 'viewer_clip'].includes(String(kind || ''));
   }
-  function markerPriorityKindFamily(kind) {
-    const raw = String(kind || '').toLowerCase();
-    if (raw === 'timeline' || raw === 'existing_segments' || raw === 'highlight' || raw === 'chapter') return 'summary';
-    if (raw === 'viewer_clip') return 'viewer_clip';
-    if (raw.includes('chat') || raw.includes('comment')) return 'chat';
-    if (raw.includes('audio') || raw.includes('voice')) return 'audio';
-    if (raw.includes('subtitle') || raw.includes('asr')) return 'subtitle';
-    if (raw.includes('visual') || raw.includes('scene')) return 'visual';
-    if (raw.includes('live')) return 'live';
-    return raw || 'other';
-  }
-  function markerPriorityTextFamily(text) {
-    const raw = String(text || '').toLowerCase();
-    if (!raw) return '';
-    if (raw.includes('summary') || raw.includes('timeline') || raw.includes('highlight') || raw.includes('chapter') || raw.includes('요약')) return 'summary';
-    if (raw.includes('viewer_clip') || raw.includes('clip') || raw.includes('클립')) return 'viewer_clip';
-    if (raw.includes('chat') || raw.includes('comment') || raw.includes('채팅') || raw.includes('댓글')) return 'chat';
-    if (raw.includes('audio') || raw.includes('voice') || raw.includes('오디오') || raw.includes('소리')) return 'audio';
-    if (raw.includes('subtitle') || raw.includes('asr') || raw.includes('자막')) return 'subtitle';
-    if (raw.includes('visual') || raw.includes('scene') || raw.includes('화면')) return 'visual';
-    if (raw.includes('live')) return 'live';
-    return '';
-  }
-  function markerPriorityFamilies(event) {
-    const families = new Set([markerPriorityKindFamily(event && event.kind)]);
-    const addText = (value) => {
-      const family = markerPriorityTextFamily(value);
-      if (family) families.add(family);
-    };
-    (event && Array.isArray(event.source_signals) ? event.source_signals : []).forEach(addText);
-    (event && Array.isArray(event.signals) ? event.signals : []).forEach(addText);
-    (event && Array.isArray(event.evidence) ? event.evidence : [])
-      .concat(event && Array.isArray(event.guidance) ? event.guidance : [])
-      .forEach((row) => {
-        addText(row && (row.kind || row.type || row.source_type || row.label || row.title || row.text));
-      });
-    return Array.from(families).filter(Boolean);
-  }
   function markerPrioritySec(event, fallbackIndex) {
     const value = event && event.start_sec != null ? Number(event.start_sec) : Number(fallbackIndex || 0);
     return Number.isFinite(value) ? value : Number(fallbackIndex || 0);
   }
-  function markerPriorityNearbyFamilies(event, contextEvents, radiusSec = 12) {
-    const sec = markerPrioritySec(event, 0);
-    const families = new Set(markerPriorityFamilies(event));
-    (Array.isArray(contextEvents) ? contextEvents : []).forEach((candidate) => {
-      const otherSec = markerPrioritySec(candidate, NaN);
-      if (!Number.isFinite(otherSec) || Math.abs(otherSec - sec) > radiusSec) return;
-      markerPriorityFamilies(candidate).forEach((family) => families.add(family));
-    });
-    return families;
-  }
-  function markerPriorityNearbyKind(contextEvents, event, kinds, radiusSec = 12) {
-    const sec = markerPrioritySec(event, 0);
-    return (Array.isArray(contextEvents) ? contextEvents : []).some((candidate) => {
-      const kind = String(candidate && candidate.kind || '');
-      if (!kinds.includes(kind)) return false;
-      const otherSec = markerPrioritySec(candidate, NaN);
-      return Number.isFinite(otherSec) && Math.abs(otherSec - sec) <= radiusSec;
-    });
-  }
   function markerPriorityEngagement(event) {
+    const measurement = event && event.signal_measurement;
+    const measured = measurement && measurement.value != null ? Number(measurement.value) : NaN;
     const fields = ['play_count', 'like_count', 'read_count', 'reaction_count', 'chat_count', 'message_count', 'count'];
-    const total = fields.reduce((sum, key) => sum + Math.max(0, Number(event && event[key] || 0)), 0);
-    return total > 0 ? Math.min(14, Math.log10(total + 1) * 4) : 0;
+    // Aliases or repeated evidence cards do not create another observation.
+    const value = Number.isFinite(measured) ? measured
+      : Math.max(0, ...fields.map((key) => Number(event && event[key] || 0)));
+    return value > 0 ? Math.min(14, Math.log10(value + 1) * 4) : 0;
   }
-  function markerDisplayPriority(kind, event, index, laneEvents, contextEvents) {
-    let score = 0;
-    const familyCount = markerPriorityNearbyFamilies(event, contextEvents).size;
-    const rowFamilies = markerPriorityFamilies(event).length;
-    if (highPriorityDensityKind(kind)) score += kind === 'viewer_clip' ? 70 : 82;
-    if (markerPriorityNearbyKind(contextEvents, event, ['timeline', 'existing_segments', 'highlight', 'chapter'], 15)) score += 48;
-    if (markerPriorityNearbyKind(contextEvents, event, ['viewer_clip'], 15)) score += 34;
-    if (familyCount >= 4) score += 54;
-    else if (familyCount === 3) score += 40;
-    else if (familyCount === 2) score += 18;
-    if (rowFamilies >= 3) score += 18;
-    else if (rowFamilies === 2) score += 8;
-    const evidenceCount = (Array.isArray(event && event.evidence) ? event.evidence.length : 0)
-      + (Array.isArray(event && event.guidance) ? event.guidance.length : 0);
-    score += Math.min(12, evidenceCount * 3);
-    score += markerPriorityEngagement(event);
-    if (event && (event.video_no || event.source_video_no || event.seek_sec != null || event.vod_label)) score += 4;
+  function markerDisplayPriority(kind, event, index) {
+    const score = (highPriorityDensityKind(kind) ? (kind === 'viewer_clip' ? 70 : 82) : 0)
+      + markerPriorityEngagement(event);
     return {
       score,
       startSec: markerPrioritySec(event, index),
@@ -1149,8 +1082,21 @@ function initViewerEditorTools() {
     if (markerDensityLevel <= 0 || protectedDensityKind(kind) || rows.length <= 2) return rows;
     const target = Math.max(1, Math.ceil(rows.length * markerDensityRatio()));
     if (target >= rows.length) return rows;
-    const ranked = rows
-      .map((row, index) => ({ row, priority: markerDisplayPriority(kind, row, index, rows, contextEvents || rows) }))
+    const byOccurrence = new Map();
+    rows.forEach((row, index) => {
+      const key = row.source_identity_key && row.source_identity_confidence === 'high'
+        ? `occurrence:${row.source_identity_key}` : `row:${index}`;
+      if (!byOccurrence.has(key)) byOccurrence.set(key, []);
+      byOccurrence.get(key).push({ row, index });
+    });
+    const groups = Array.from(byOccurrence.values());
+    // Density controls occurrences; extra facets share the existing row cap.
+    const occurrenceTarget = groups.length <= 2 ? groups.length
+      : Math.max(1, Math.ceil(groups.length * markerDensityRatio()));
+    // Preserve the existing always-visible one/two-item exception by occurrence.
+    const rowTarget = Math.max(target, occurrenceTarget);
+    const ranked = groups
+      .map((group, index) => ({ group, priority: markerDisplayPriority(kind, group[0].row, index) }))
       .sort((a, b) => {
         if (b.priority.score !== a.priority.score) return b.priority.score - a.priority.score;
         if (a.priority.startSec !== b.priority.startSec) return a.priority.startSec - b.priority.startSec;
@@ -1158,19 +1104,26 @@ function initViewerEditorTools() {
         return a.priority.id.localeCompare(b.priority.id);
       });
     const selected = new Set();
-    if (target === 1) {
+    if (occurrenceTarget === 1) {
       selected.add(ranked[0].priority.index);
     } else {
-      const coverageTarget = Math.min(target, Math.max(2, Math.ceil(target / 2)));
+      const coverageTarget = Math.min(occurrenceTarget, Math.max(2, Math.ceil(occurrenceTarget / 2)));
       for (let slot = 0; slot < coverageTarget; slot += 1) {
-        selected.add(Math.round(slot * (rows.length - 1) / (coverageTarget - 1)));
+        selected.add(Math.round(slot * (groups.length - 1) / (coverageTarget - 1)));
       }
       for (const item of ranked) {
-        if (selected.size >= target) break;
+        if (selected.size >= occurrenceTarget) break;
         selected.add(item.priority.index);
       }
     }
-    return rows.filter((_row, index) => selected.has(index));
+    const selectedRows = new Set(Array.from(selected, (index) => groups[index][0].index));
+    for (const groupIndex of selected) {
+      for (const member of groups[groupIndex].slice(1)) {
+        if (selectedRows.size >= rowTarget) break;
+        selectedRows.add(member.index);
+      }
+    }
+    return rows.filter((_row, index) => selectedRows.has(index));
   }
   function eventsForDensity(eventList) {
     const byKind = new Map();
@@ -1269,13 +1222,6 @@ function initViewerEditorTools() {
       .sort((a, b) => Number(a.start_sec || 0) - Number(b.start_sec || 0));
     return clusters;
   }
-  function clusterConfidenceLabel(value) {
-    const raw = String(value || '').toLowerCase();
-    if (raw === 'high') return '높음';
-    if (raw === 'medium') return '중간';
-    if (raw === 'low') return '낮음';
-    return '검토용';
-  }
   function clusterFamilyText(cluster) {
     return clusterFamilyKeys(cluster).map((kind) => optionLabel(kind)).filter(Boolean).slice(0, 4).join(' · ') || '편집 후보';
   }
@@ -1306,12 +1252,36 @@ function initViewerEditorTools() {
     return event;
   }
   function clusterHeatScore(cluster) {
-    const signalCount = Math.max(0, Number(cluster && cluster.signal_count || 0));
-    const familyCount = Math.max(0, Number(cluster && cluster.family_count || 0));
-    const viewerClipCount = Math.max(0, Number(cluster && cluster.viewer_clip_count || 0));
-    const confidence = String(cluster && cluster.confidence || 'low').toLowerCase();
-    const confidenceWeight = confidence === 'high' ? 2.2 : confidence === 'medium' ? 1.1 : 0.25;
-    return signalCount + (familyCount * 1.35) + (viewerClipCount * 1.15) + confidenceWeight;
+    const value = cluster && (cluster.independent_signal_count ?? cluster.known_independent_signal_count);
+    // Unknown contributes no measured support; it is labelled as unverified, never measured zero.
+    return value != null && Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+  }
+  function clusterSupportLabel(cluster) {
+    const measured = cluster && cluster.independent_signal_count;
+    const known = cluster && cluster.known_independent_signal_count;
+    if (measured != null && Number.isFinite(Number(measured))) return `독립 근거 ${Number(measured)}개`;
+    return known != null && Number.isFinite(Number(known))
+      ? `확인된 독립 근거 ${Number(known)}개 · 나머지 독립성 미확인` : '독립 근거 수 미확인';
+  }
+  function signalMeasurementPresentation(event, candidates = events) {
+    const measure = event && event.signal_measurement;
+    if (!measure) return null;
+    if (measure.value == null || !Number.isFinite(Number(measure.value))) return { value: null, strength: null, label: '측정값 미확인', className: 'low' };
+    const value = Math.max(0, Number(measure.value));
+    const sameMeasure = (row) => {
+      const other = row && row.signal_measurement;
+      return other && other.value != null && Number.isFinite(Number(other.value))
+        && other.kind === measure.kind && other.unit === measure.unit
+        && other.window_sec === measure.window_sec && other.scope === measure.scope;
+    };
+    const maximum = Math.max(value, ...candidates.filter(sameMeasure).map((row) => Number(row.signal_measurement.value)));
+    const strength = maximum > 0 ? Math.round(value / maximum * 100) : 0;
+    const family = ({density:'채팅', laughter:'웃음', surprise:'놀람', question:'의문 표현', keyword:'키워드'})[event.signal_family] || '관측';
+    const unit = measure.unit === 'messages' ? '개' : measure.unit === 'weighted_keyword_score' ? '가중점' : String(measure.unit || '');
+    const window = measure.window_sec != null ? ` / ${Number(measure.window_sec)}초` : '';
+    const scope = measure.scope === 'time_window_representative' ? '시간대 대표' : '감지 후보';
+    const label = `${family} ${value}${unit}${window} · ${scope} · 전달된 같은 측정 후보 최대 대비 ${strength}/100`;
+    return { value, strength, label, className: strength >= 66 ? 'hot' : strength >= 34 ? 'medium' : 'low' };
   }
   const HEATMAP_PROFILE_SAMPLE_COUNT = 120;
   const MAX_PROMINENT_HEAT_ZONES = 12;
@@ -1413,12 +1383,13 @@ function initViewerEditorTools() {
         return centerDistance <= zoneRadiusSec || (row.bounds.start <= zoneEnd && row.bounds.end >= zoneStart);
       });
       const familyKeys = Array.from(new Set(related.flatMap((row) => clusterFamilyKeys(row.cluster)))).filter(Boolean);
-      const relatedSignalCount = related.reduce((sum, row) => sum + Math.max(0, Number(row.cluster && row.cluster.signal_count || 0)), 0);
+      const relatedSignalCount = related.reduce((sum, row) => sum + clusterHeatScore(row.cluster), 0);
       selected.push({
         cluster: candidate.cluster,
         index: candidate.index,
         score: candidate.score,
         heatClass,
+        strength: Math.round(strengthRatio * 100),
         center: peak.sec,
         start: zoneStart,
         end: zoneEnd,
@@ -1435,6 +1406,8 @@ function initViewerEditorTools() {
       return '';
     }
     const scored = clusters.map((cluster, index) => ({ cluster, index, score: clusterHeatScore(cluster), bounds: clusterTimeBounds(cluster) }));
+    const unknownCount = clusters.filter((cluster) => cluster.independent_signal_count == null).length;
+    const unknownText = unknownCount ? ` · ${unknownCount}개 묶음은 독립성 미확인(확인된 근거만 계산), 신호 목록에서 확인` : '';
     const profileSamples = heatmapProfileSamples(scored);
     const zones = heatmapVisualZones(scored, profileSamples);
     const areaPath = heatmapAreaPath(profileSamples);
@@ -1453,13 +1426,14 @@ function initViewerEditorTools() {
       const heatClass = zone.heatClass;
       const anchorSec = Math.max(0, Number(cluster.start_sec || 0));
       const anchorHint = Math.abs(zone.center - anchorSec) >= 30 ? ` · 연결 근거 ${fmt(anchorSec)}` : '';
-      const title = `합산 봉우리 ${fmt(zone.center)}${anchorHint} · ${clusterFamilyText(cluster)} · 묶음 ${zone.relatedCount}개 · 신호 ${zone.relatedSignalCount || signalCount}개 · 자료 ${familyKeys.length || familyCount}종 · 클립 ${viewerClipCount}개`;
+      const strengthText = `${zone.strength}/100`;
+      const title = `근거 밀도 ${strengthText} · ${fmt(zone.center)}${anchorHint} · ${clusterFamilyText(cluster)} · 묶음 ${zone.relatedCount}개 · ${clusterSupportLabel(cluster)} · 표시 ${signalCount}개 / ${familyKeys.length || familyCount}종`;
       const selected = selectedEventId === `edit_point_cluster_${clusterId}`;
       return `<button type="button" class="viewer-editor-heatmap-zone ${heatClass}${selected ? ' selected' : ''}" data-real-heatmap-zone="true" data-heatmap-prominent-zone="true" data-heatmap-zone-visual="hit-target" data-edit-point-cluster-id="${esc(clusterId)}" data-overview-rank="${index + 1}" data-overview-strength="${esc(heatClass)}" data-cluster-signal-count="${signalCount}" data-cluster-family-count="${familyCount}" data-cluster-viewer-clip-count="${viewerClipCount}" data-cluster-signal-families="${esc(familyKeys.join(' '))}" data-heatmap-zone-related-count="${zone.relatedCount}" data-heatmap-anchor-sec="${Math.round(anchorSec)}" data-sec="${Math.round(zone.center)}" aria-label="${esc(`${title}. 클릭하면 근거 펼침`)}" title="${esc(`${title} · 클릭하면 근거 펼침`)}" style="left:${left}%;width:${width}%"></button>`;
     }).join('');
     const surface = `<svg class="viewer-editor-heatmap-surface" viewBox="0 0 1000 44" preserveAspectRatio="none" aria-hidden="true" data-real-heatmap-surface="true" data-heatmap-area="true" data-heatmap-profile-samples="${profileSamples.length}"><defs><linearGradient id="viewerEditorHeatmapGradient" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="rgba(122,162,247,0.10)"/><stop offset="58%" stop-color="rgba(224,175,104,0.36)"/><stop offset="100%" stop-color="rgba(247,118,142,0.70)"/></linearGradient></defs><path class="heatmap-fill" d="${areaPath}"></path><path class="heatmap-line" d="${linePath}"></path></svg>`;
-    const legend = '<span class="low">약함</span><span class="medium">중간</span><span class="hot">강함</span>';
-    return `<div class="viewer-editor-density-row" data-real-heatmap-row="true" data-heatmap-zone-count="${zones.length}" data-heatmap-background-density="true"><div class="viewer-editor-density-label"><strong>먼저 볼 구간</strong><span>겹친 신호는 봉우리로, 약한 신호는 배경 밀도로 표시</span><div class="viewer-editor-heatmap-legend" aria-label="열지도 강도 범례">${legend}</div></div><div class="viewer-editor-density viewer-editor-heatmap-track" aria-label="전체 방송 편집 후보 열지도">${surface}${zoneButtons}</div></div>`;
+    const legend = '<span class="low">낮음</span><span class="medium">중간</span><span class="hot">높음</span>';
+    return `<div class="viewer-editor-density-row" data-real-heatmap-row="true" data-heatmap-zone-count="${zones.length}" data-heatmap-background-density="true"><div class="viewer-editor-density-label"><strong>먼저 볼 구간</strong><span>확인된 독립 근거 수의 주변 밀도 · 전달된 후보 내 상대 강도, 편집 중요도 아님${esc(unknownText)}</span><div class="viewer-editor-heatmap-legend" aria-label="열지도 강도 범례">${legend}</div></div><div class="viewer-editor-density viewer-editor-heatmap-track" aria-label="전체 방송 편집 후보 열지도">${surface}${zoneButtons}</div></div>`;
   }
   function renderAxis(options = {}) {
     closeActiveAxisDisclosure();
@@ -1598,10 +1572,13 @@ function initViewerEditorTools() {
         const colorStyle = `--viewer-marker-color:${markerColor(kind)}`;
         const style = hasRange ? `left:${left}%;width:${width}%;${colorStyle}` : `left:${left}%;${colorStyle}`;
         const clusterCount = Number(event.clip_cluster_count || 0);
-        const clusterAttrs = clusterCount > 1 ? ` data-cluster-count="${clusterCount}" aria-label="${esc(`${fmt(start)} 시청자 클립 ${clusterCount}개 묶음`)}"` : '';
+        const clusterAttrs = clusterCount > 1 ? ` data-cluster-count="${clusterCount}"` : '';
         const clusterClass = clusterCount > 1 ? ' clip-cluster viewer-editor-cluster-grain' : '';
+        const measurement = signalMeasurementPresentation(event);
+        const measurementText = measurement ? ` · ${measurement.label}` : '';
+        const markerLabel = clusterCount > 1 ? `클립 표시 ${clusterCount}개 묶음` : friendlyEventTitle(event) || '';
         renderedAxisEvents.set(String(event.id || ''), event);
-        return `<button type="button" class="viewer-editor-marker ${hasRange ? 'range' : ''}${clusterClass}" data-kind="${esc(kind)}" data-event-id="${esc(event.id)}"${clusterAttrs} title="${esc(`${fmt(start)} ${friendlyEventTitle(event) || ''}`)}" style="${style}"></button>`;
+        return `<button type="button" class="viewer-editor-marker ${hasRange ? 'range' : ''}${clusterClass}" data-kind="${esc(kind)}" data-event-id="${esc(event.id)}"${clusterAttrs} aria-label="${esc(`${fmt(start)} ${markerLabel}${measurementText}`)}" title="${esc(`${fmt(start)} ${markerLabel}${measurementText}`)}" style="${style}"></button>`;
       }).join('');
       const stateText = signalStateText(definition, matchingLanes, laneEvents.length);
       const hiddenCount = Math.max(0, laneAllEvents.length - densityEvents.length);
@@ -1674,10 +1651,18 @@ function initViewerEditorTools() {
           : '';
         const ariaType = groupLabel;
         const statusText = statusLabels.length ? ` · ${statusLabels.join(' · ')}` : '';
+        const priorityLabels = {focus: '먼저 검토', normal: '함께 검토', later: '뒤에 검토'};
+        const priorityTier = group.level === 'Point' && event.editorial_priority
+          && Object.hasOwn(priorityLabels, event.editorial_priority.tier)
+          ? event.editorial_priority.tier : 'unspecified';
+        const priorityLabel = priorityLabels[priorityTier] || '미지정';
+        const priorityText = group.level === 'Point' ? ` · ${priorityLabel}` : '';
         const overviewText = group.level === 'Highlight'
           ? (event.source_span_index === 0 ? `H${event.__highlight_index + 1}` : '')
           : (hasRange ? markerTitle : '');
-        return `<button type="button" class="${hasRange ? 'viewer-editor-outline-range' : 'viewer-editor-outline-point'} viewer-editor-outline-marker" data-outline-item="true" data-event-id="${esc(id)}"${Number.isInteger(event.source_span_index) ? ` data-highlight-id="${esc(String(event.highlight_id || event.id || ''))}" data-highlight-span-index="${event.source_span_index}" data-highlight-span-count="${event.source_span_count}"` : ''} data-evidence-preview="${esc(`${markerTitle}${spanText}${statusText}`)}" aria-label="${esc(`${ariaType}, ${markerTitle}${spanText}, ${fmt(start)}${hasRange ? `부터 ${fmt(end)}` : ''}${statusText}`)}" title="${esc(`${markerTitle}${spanText} · ${fmt(start)}${hasRange ? `-${fmt(end)}` : ''}${statusText}`)}" style="${style}">${esc(overviewText)}</button>`;
+        const priorityMarkup = group.level === 'Point'
+          ? `<span class="viewer-editor-point-priority">${priorityLabel}</span>` : '';
+        return `<button type="button" class="${hasRange ? 'viewer-editor-outline-range' : 'viewer-editor-outline-point'} viewer-editor-outline-marker" data-outline-item="true" data-event-id="${esc(id)}"${group.level === 'Point' ? ` data-priority="${priorityTier}"` : ''}${Number.isInteger(event.source_span_index) ? ` data-highlight-id="${esc(String(event.highlight_id || event.id || ''))}" data-highlight-span-index="${event.source_span_index}" data-highlight-span-count="${event.source_span_count}"` : ''} data-evidence-preview="${esc(`${markerTitle}${spanText}${statusText}${priorityText}`)}" aria-label="${esc(`${ariaType}, ${markerTitle}${spanText}, ${fmt(start)}${hasRange ? `부터 ${fmt(end)}` : ''}${statusText}${priorityText}`)}" title="${esc(`${markerTitle}${spanText} · ${fmt(start)}${hasRange ? `-${fmt(end)}` : ''}${statusText}${priorityText}`)}" style="${style}">${esc(overviewText)}${priorityMarkup}</button>`;
       }).join('');
       const pointCount = outlineProjection.filter((event) => String(event.level || '') === 'Point').length;
       const stateText = groupedEvents.length
@@ -2582,6 +2567,7 @@ function initViewerEditorTools() {
     const selectedColor = markerColor(event.kind);
     const kindLabel = selectedHighlightId ? 'Highlight' : optionLabel(event.kind);
     const titleMatchesKind = selectedTitleText === kindLabel;
+    const measurement = signalMeasurementPresentation(event);
     const chipRows = [timeChip(sec, event)];
     if (summaryStatus.label === kindLabel) {
       chipRows.push(`<span class="viewer-editor-chip ${summaryStatus.warning ? 'warning' : ''}">${esc(summaryStatus.label)}</span>`);
@@ -2596,6 +2582,7 @@ function initViewerEditorTools() {
     evidenceEl.innerHTML = `<div class="viewer-editor-selected-card" style="--viewer-marker-color:${esc(selectedColor)}">
       <span class="viewer-editor-selected-kicker">장면 찾기에서 선택한 항목</span>
       <div class="viewer-editor-selected-title">${esc(selectedTitleText)}</div>
+      ${measurement ? `<div class="viewer-editor-measurement ${measurement.className}" data-signal-measurement="true">${esc(measurement.label)}</div>` : ''}
       <div class="viewer-editor-selected-meta">
         ${chipRows.join('')}
       </div>

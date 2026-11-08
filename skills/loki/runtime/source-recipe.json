@@ -4,11 +4,14 @@
   "entrypoints": {
     "pipeline.editorial_current_conversation": [
       "cli_result_json",
+      "continuation",
+      "draft",
       "memory",
       "multimodal",
       "prepare",
       "read",
       "remember",
+      "status",
       "submit"
     ],
     "scripts.admin.manager_outline": [
@@ -203,7 +206,7 @@
       "export_sha256": "d85a385197b7ee0e7f129f3c811e153a36a997a839b26b4d43d668e874591c88",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "53fede7246ea378767a5560d698438725c9e2a26508d2e9f4d669f9747147a32"
+      "upstream_sha256": "b2132f6de1b0ee853e7a3b3ce6dd8c28b1426863163e8464cca47839e96c3702"
     },
     {
       "module": "pipeline.asr_provider_contract",
@@ -363,9 +366,11 @@
     {
       "module": "pipeline.chat_analyzer",
       "source_path": "pipeline/chat_analyzer.py",
-      "source_sha256": "3d5f9e37e81b5dda551e1dd1bb54c207ac5d241009b878fad597fb748907d274",
+      "source_sha256": "a5daf9e35ffd36983f7c1ff2cfb28db57dc8159e8d3c5d6133f4bc6a0e5d44a6",
       "symbols": [
+        "CHAT_PEAK_POLICY_REVISION",
         "WINDOW_SEC",
+        "_is_command_message",
         "build_time_series",
         "find_edit_points",
         "is_laughter_message",
@@ -373,6 +378,7 @@
         "is_surprise_message"
       ],
       "selected_symbols": [
+        "CHAT_PEAK_POLICY_REVISION",
         "Counter",
         "KEYWORD_WEIGHTS",
         "PEAK_MERGE_SEC",
@@ -385,7 +391,6 @@
         "_REACTION_FAMILIES",
         "_REACTION_FAMILY_PATTERNS",
         "_REACTION_SIGNAL_KEYS",
-        "_chat_user_key",
         "_compiled_keywords",
         "_filter_command_messages",
         "_is_command_message",
@@ -409,7 +414,7 @@
         "w",
         "z_score_peaks"
       ],
-      "export_sha256": "1948480959dcb703e29acec9576da3ace55b41de35069b461eeaf96da7da9d99",
+      "export_sha256": "6c41dd308ea420c188df2d0d830e5ba569c7004e7408ae0e02ddd0684794c60c",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -535,10 +540,12 @@
     {
       "module": "pipeline.chatgpt_export.contract.collaboration_periods",
       "source_path": "pipeline/chatgpt_export/contract/collaboration_periods.py",
-      "source_sha256": "99205bd20efbe01e7aac1bdc54c2ebbf5ad6bace296d4e1c1c7fc425cde837bf",
+      "source_sha256": "e1736558267f4196c37974386fe6ae58435ae15f4a3028aa391e306f4d672ae7",
       "symbols": [
         "MAX_PERIOD_LINKS",
         "OUTLINE_COLLABORATION_HEADING",
+        "authored_collaboration_periods",
+        "merge_authored_collaboration_periods",
         "parse_outline_collaboration_periods",
         "public_collaboration_periods",
         "recover_collaboration_periods",
@@ -547,9 +554,11 @@
       "selected_symbols": [
         "MAX_PERIOD_LINKS",
         "OUTLINE_COLLABORATION_HEADING",
+        "authored_collaboration_periods",
         "deepcopy",
         "json",
         "math",
+        "merge_authored_collaboration_periods",
         "parse_outline_collaboration_periods",
         "public_collaboration_periods",
         "re",
@@ -557,7 +566,7 @@
         "unicodedata",
         "validate_collaboration_periods"
       ],
-      "export_sha256": "792b161fdec74d5a80cc44a2648b4be50d550b052fa73693c762585f90675090",
+      "export_sha256": "39c829a443a456916a805401ba071b0a9ad5a8d1fa33a3e06e88304c111440d8",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -812,21 +821,23 @@
     {
       "module": "pipeline.collected_vod_media",
       "source_path": "pipeline/collected_vod_media.py",
-      "source_sha256": "11f3a38daa66231499851ec60164147c99bdae9d1dac350093742d252b437c32",
+      "source_sha256": "8cbb851c18185180ade38c02792719fb71c471cc4f95a0d8b163da67f32041d8",
       "symbols": [
         "assert_collected_media_fresh",
         "collected_clock",
-        "collected_media_window"
+        "collected_media_window",
+        "resolve_collected_media"
       ],
       "selected_symbols": [
         "assert_collected_media_fresh",
         "collected_clock",
-        "collected_media_window"
+        "collected_media_window",
+        "resolve_collected_media"
       ],
-      "export_sha256": "af0b4576dc7e07f4ed3b6fbbdbdac0b6cac3c6590e3b9142033b1e29a5636583",
+      "export_sha256": "79be16e49ddc2d9a3693e42ce6f87bcc7af8c4955375e46d9959198f07098e43",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "be5f46e2835b08763328f8c05364ad244e8689d7b44d54e793acde772cb4c00d"
+      "upstream_sha256": "a3aaa405c670bb3b2a1a02706cff03aac82f9e9a0090e0ff3fabb69c12b55421"
     },
     {
       "module": "pipeline.comment_adaptive_presentation",
@@ -1288,6 +1299,9 @@
       "source_sha256": "8f368d3c66cd0cf8c6a89042c79ba7c84e07a6e9b98c9a49eee6ab60709db0bc",
       "symbols": [
         "_is_valid_media_file",
+        "_load_m3u8_playlist",
+        "_parse_m3u8_attrs",
+        "_resolve_m3u8_child_url",
         "download_vod_media"
       ],
       "selected_symbols": [
@@ -1392,7 +1406,7 @@
     {
       "module": "pipeline.edit_point_clusters",
       "source_path": "pipeline/edit_point_clusters.py",
-      "source_sha256": "4acbc6e7387b579547f9d01a40758a191b76d63107523d27cc7f8678936cb34e",
+      "source_sha256": "b1d0ae606edded7f2d0dabc3bfb501c09b1745da2f7eb812376402e37a7b8833",
       "symbols": [
         "build_edit_point_clusters"
       ],
@@ -1412,7 +1426,7 @@
         "build_edit_point_clusters",
         "hashlib"
       ],
-      "export_sha256": "3007ff606a105bfd65cb9e2ff432d6b696588611f1087472c2f35656044009eb",
+      "export_sha256": "cce5fb28d47dec42eb169ce1c0fdd02e50fc149ab07c631324ef13963a334885",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -1525,33 +1539,46 @@
     {
       "module": "pipeline.editorial_author_source",
       "source_path": "pipeline/editorial_author_source.py",
-      "source_sha256": "a6b20adfe4606bb30721fe75bdb34b3edff8b1e063ca1844321a3270211e9bda",
+      "source_sha256": "62a46e2c75ab8da824e824c6b63c6b2d03fa65dc2785daee8f1e28a8bef7de04",
       "symbols": [
-        "NATIVE_RANGE_CONTRACT"
+        "NATIVE_RANGE_CONTRACT",
+        "_read_continuation_action"
       ],
       "selected_symbols": [
         "NATIVE_RANGE_CONTRACT",
-        "annotations"
+        "_read_continuation_action",
+        "annotations",
+        "deepcopy",
+        "digest",
+        "json"
       ],
-      "export_sha256": "14fa2dfc868d8f7aa30d6b5ee2af713c2e9b1e8ddf95ec8bde06daa8185cf96e",
+      "export_sha256": "92989e1f785d340d7a61932b664c2c3fbd45f145f901b99d5f9690b09beaec83",
       "overlay": false,
-      "trimmed_imports": []
+      "trimmed_imports": [
+        {
+          "line": 9,
+          "exported": "from .evidence_world.contracts import digest"
+        }
+      ]
     },
     {
       "module": "pipeline.editorial_context_author",
       "source_path": "pipeline/editorial_context_author.py",
-      "source_sha256": "994cbede753968bbe45cb9f46dea9aa8ad1270ab35d5628c34cb828432ff6b0d",
+      "source_sha256": "6fa570a96de641bca903e7e95bbe51bc306e28cd49ea63dd96d1a354944b8067",
       "symbols": [
+        "SIGNAL_PRIORITY_PROFILE",
         "context_source"
       ],
       "selected_symbols": [
         "CONTRACT",
+        "SIGNAL_PRIORITY_PROFILE",
+        "_signal_priority_context",
         "annotations",
         "context_source",
         "digest",
         "native_author_rows"
       ],
-      "export_sha256": "b34c48d3dc109a5ab1ad6bc5f5f44be19fc74f752ffb24228fd9f84cc1961dce",
+      "export_sha256": "afea7f2a545d6eff4b73a8927b6f09cfa372239afa16900076dba12e7636ec69",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -1563,7 +1590,7 @@
     {
       "module": "pipeline.editorial_context_exploration",
       "source_path": "pipeline/editorial_context_exploration.py",
-      "source_sha256": "d82406575f131e030f24f9ba6e75f0789cf6509946605aa625fc26eaa9bd34c4",
+      "source_sha256": "08881300ea8b2ceb1d112a1d3d8cda9459b08a9f0ca8daecfed1b31fba24353b",
       "symbols": [
         "add_active_frames"
       ],
@@ -1577,11 +1604,12 @@
     {
       "module": "pipeline.editorial_contract",
       "source_path": "pipeline/editorial_contract.py",
-      "source_sha256": "288d9aba8c3e309a03ec1ccd9b7a2fda0744d06e9e3b31ebc3e089fa429c4ab0",
+      "source_sha256": "fe7d625f64adc34da930cb2efd1f674f8bcef3d9a65e6b569a9fc2e6390266a3",
       "symbols": [
         "_derive_source_span_structure_refs",
         "full_author_completion_state",
-        "validate_editorial_authority_shape"
+        "validate_editorial_authority_shape",
+        "validate_editorial_priority"
       ],
       "selected_symbols": [
         "Any",
@@ -1596,14 +1624,16 @@
         "_rows",
         "_unique_nonempty_ids",
         "annotations",
+        "deepcopy",
         "full_author_completion_state",
-        "validate_editorial_authority_shape"
+        "validate_editorial_authority_shape",
+        "validate_editorial_priority"
       ],
-      "export_sha256": "075147e696dfdd7ffed83570a249f90bb1ccea5a447461d9f4d7e849b41bfe85",
+      "export_sha256": "39ad0e029654d1ed0ba66ccfd95c3879fdec6e25e2ee63605f3e42cc6985107f",
       "overlay": false,
       "trimmed_imports": [
         {
-          "line": 9,
+          "line": 10,
           "exported": "from typing import Any, Mapping"
         }
       ]
@@ -1611,14 +1641,17 @@
     {
       "module": "pipeline.editorial_current_conversation",
       "source_path": "pipeline/editorial_current_conversation.py",
-      "source_sha256": "0027450770afe0e7799cddce4a597b9468637f0f7d25fa6ebae3165b53b95892",
+      "source_sha256": "72280751160b3749e4474f35d1eef2935bb87fb47d08b0544cc9d42faa717e81",
       "symbols": [
         "cli_result_json",
+        "continuation",
+        "draft",
         "memory",
         "multimodal",
         "prepare",
         "read",
         "remember",
+        "status",
         "submit"
       ],
       "selected_symbols": [
@@ -1626,7 +1659,10 @@
         "Path",
         "SCHEMA",
         "SourcePolicy",
-        "_cited_refs",
+        "SubmissionRejected",
+        "_CONTEXT_NOTE_FIELDS",
+        "_authoring_time",
+        "_citation_paths",
         "_code_hashes",
         "_create",
         "_frame_page_result",
@@ -1650,10 +1686,12 @@
         "build_lock",
         "canonical_json",
         "cli_result_json",
+        "continuation",
         "current_conversation_author_owner",
         "current_conversation_job_binding",
         "deepcopy",
         "digest",
+        "draft",
         "file_hash",
         "hashlib",
         "json",
@@ -1664,56 +1702,71 @@
         "re",
         "read",
         "remember",
-        "submit"
+        "status",
+        "submit",
+        "time"
       ],
-      "export_sha256": "055379b0adfcbb133fe30133db62a7e9f7519aae8c133f10ef519b2b2b04845f",
+      "export_sha256": "2e876530fb1a85eb2610c20abb3b97d8619d3abcd584c2a8f69407dbc3e2fd5d",
       "overlay": false,
       "trimmed_imports": []
     },
     {
       "module": "pipeline.editorial_current_sources",
       "source_path": "pipeline/editorial_current_sources.py",
-      "source_sha256": "e243869eff9b57d8f9ab8f681854338f7aca953ce331affd183d41c71ed4c08a",
+      "source_sha256": "729b10a701b2980ed1c78191c7ef118821148772b8d73872b9c39b037101169e",
       "symbols": [
+        "NAVIGATION_PROFILE",
+        "assert_snapshot_sources",
+        "frozen_source_snapshot",
+        "prepare_navigation_features",
         "prepare_sources",
         "report_kwargs"
       ],
       "selected_symbols": [
+        "NAVIGATION_PROFILE",
         "asdict",
+        "assert_snapshot_sources",
         "deepcopy",
         "file_hash",
+        "frozen_source_snapshot",
         "json",
         "native_path",
+        "prepare_navigation_features",
         "prepare_sources",
         "report_kwargs"
       ],
-      "export_sha256": "e60617a36a18c43a0bcfd99775d9bd723eed732efc75fb27cd1b4e817441fc18",
+      "export_sha256": "b5ffee230a756dd4756fe86cf6e1f83dfef1433ffb6a91df7d3e96ab3fd41b49",
       "overlay": false,
       "trimmed_imports": []
     },
     {
       "module": "pipeline.editorial_embedding_index",
       "source_path": "pipeline/editorial_embedding_index.py",
-      "source_sha256": "68bc1f900b1d3fbeb4a1f0a51261a51dca16967c923cb59a3c652702824f2387",
+      "source_sha256": "2ad583c0cbcd75a09ef4e3c942a162934176e8a3407ac56a9d174519da6f2567",
       "symbols": [
         "SavedGemmaSearch",
         "encode_cached",
         "encode_media_cached",
+        "prepare",
         "prepare_optional",
-        "query_cache_root"
+        "query_cache_root",
+        "read_saved_documents"
       ],
       "selected_symbols": [
         "EvidenceError",
         "FAMILIES",
         "SCHEMA",
         "SavedGemmaSearch",
+        "_RUNTIME_UNSET",
         "_connect",
         "_encoder",
+        "_saved_table",
         "_table",
         "_where_keys",
         "annotations",
         "atomic_json",
         "build_lock",
+        "deepcopy",
         "digest",
         "encode_cached",
         "encode_media_cached",
@@ -1726,10 +1779,11 @@
         "prepare",
         "prepare_optional",
         "query_cache_root",
+        "read_saved_documents",
         "time",
         "units"
       ],
-      "export_sha256": "39e63d86fed7b3c3751fbf50aa6cbd0b3364e340d5a8ad4d103a3845811fdf6d",
+      "export_sha256": "a434fb02f8ef836c93e1791a16f798b2e75a4919437e7d66b0bb847857c00e56",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -1753,9 +1807,11 @@
     {
       "module": "pipeline.editorial_full_author",
       "source_path": "pipeline/editorial_full_author.py",
-      "source_sha256": "5d1293732d7b49e704b520a33886654a157cefdfd5e585a5b6bc70b56cde3704",
+      "source_sha256": "4ddce59f29fa07808580a43632db175d30ff1417f90d26bc9f6f2417d2a0e728",
       "symbols": [
+        "OPTIONAL_RESPONSE_FIELDS",
         "RESPONSE_FIELDS",
+        "bind_collaboration_lane",
         "build_broadcast_flow_context",
         "full_source_context",
         "validate_current_conversation_response"
@@ -1763,6 +1819,7 @@
       "selected_symbols": [
         "AssetBinding",
         "CONTRACT",
+        "OPTIONAL_RESPONSE_FIELDS",
         "PROFILE",
         "RESPONSE_FIELDS",
         "_author_item",
@@ -1776,6 +1833,7 @@
         "_seconds",
         "_text",
         "assert_asset_fresh",
+        "bind_collaboration_lane",
         "build_broadcast_flow_context",
         "contextmanager",
         "deepcopy",
@@ -1787,7 +1845,7 @@
         "validate_current_conversation_response",
         "validate_response"
       ],
-      "export_sha256": "8202c6016042ea047ff1f71b02c2d3309ccc7501c5c78fd0cd91c27668a167f2",
+      "export_sha256": "80a280ff5fff432db8d7d808f6f349391d1d170a5db324c018693a198b89b979",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -1821,7 +1879,7 @@
     {
       "module": "pipeline.editorial_highlight_cards",
       "source_path": "pipeline/editorial_highlight_cards.py",
-      "source_sha256": "5bc31c5628b8a920ce61bce2efd33d99db661a27bf2aaa8db6e50bcc0a86b5df",
+      "source_sha256": "2e286a1236efa2e2370664c30ce487fa2262a9ec4ad536d3a64e37abcd8a0393",
       "symbols": [
         "EDITORIAL_HIGHLIGHT_CARD_CSS",
         "editorial_scene_image_data_url",
@@ -1840,6 +1898,7 @@
         "Mapping",
         "_collaboration_clock",
         "_duration_label",
+        "_editorial_priority_detail",
         "_editorial_progress_notice",
         "_esc",
         "_hms_to_seconds",
@@ -1855,9 +1914,10 @@
         "render_editorial_highlight_cards",
         "render_editorial_scene_image",
         "render_pending_editorial_review",
-        "sec_to_hms"
+        "sec_to_hms",
+        "validate_editorial_priority"
       ],
-      "export_sha256": "690e92a2f91004eca1ea795d7e741bcbaaa36c092f903e5ff0f07d0bcb265237",
+      "export_sha256": "3ef4a1081914b1c5ec5fdd401bb9dac064613f36184964ecd64c0cb5fcbcdab6",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -1884,7 +1944,7 @@
     {
       "module": "pipeline.editorial_highlight_projection",
       "source_path": "pipeline/editorial_highlight_projection.py",
-      "source_sha256": "808b8716a4ed025826e738b35683a054fd42e8e44bf7c10f1dd3aea6a50692b2",
+      "source_sha256": "8b58a351b48fb0e655b97ffbd6e28056e4169d7aa963648d5535e27569d95231",
       "symbols": [
         "_clock_seconds",
         "broadcast_map_identity_hash",
@@ -1903,7 +1963,7 @@
         "validate_editorial_authority_shape",
         "validate_qg1_preview_payload"
       ],
-      "export_sha256": "e9d3184535b1d834a1795e0a5b5d62fb620034f7962ab7605bc4e81a2ebdf64c",
+      "export_sha256": "99c89449333e674ac227727b450ab966fb824e8ee5fd591e36dce85920787f84",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -1953,17 +2013,20 @@
     {
       "module": "pipeline.editorial_media_request",
       "source_path": "pipeline/editorial_media_request.py",
-      "source_sha256": "46240a5bcd4d266ce6ee124221bdbc3e98a7438605769086518a390a1f1cace3",
+      "source_sha256": "81af68ef71fc272fef6676762e64780087b1173b340570c8158e51afe2a7cf68",
       "symbols": [
         "current_conversation_media_session"
       ],
       "selected_symbols": [
+        "ACQUISITION_REVISION_UNAVAILABLE",
         "AuthorMediaSession",
         "MEDIA_CLOCK_TOLERANCE_SEC",
         "MEDIA_PROMPT",
         "PROFILE",
         "SCHEMA",
         "_acquire_window",
+        "_collected_production_window",
+        "_seekable_media_copy",
         "_validate_window",
         "current_conversation_media_session",
         "deepcopy",
@@ -1979,7 +2042,7 @@
         "production_media_window",
         "same_media_clock"
       ],
-      "export_sha256": "cf4149249f872754433bc981c5071a443a973740a50cbd3923d209a676465cd1",
+      "export_sha256": "2c6258727251ff543e6f6cacb68628d1a26bb6c6eb188f8740cd6c2ceab84fac",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -2048,7 +2111,7 @@
       "export_sha256": "b019214af5a5e6467b4a6fb716514dadaa2bc53de9595ab756670cb2cf0398c4",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "b701462911d225fe00b986c9b97b8093be7f14dc18e514d914702e0ff672835a"
+      "upstream_sha256": "b2f9d28c252df16ad7da5a8ae849b1409f16244fceeb54a847ef04a3d9bca37d"
     },
     {
       "module": "pipeline.editorial_multimodal_search",
@@ -2136,7 +2199,7 @@
     {
       "module": "pipeline.editorial_production_job",
       "source_path": "pipeline/editorial_production_job.py",
-      "source_sha256": "d04568ca756eaadf66336075b64101d1d7f44447e1222b024da9064c04c7ebe1",
+      "source_sha256": "80809a2268da19d3e4aa307fce22fee2f5d03c20ccf9d8db039fe3bff989064d",
       "symbols": [
         "bind_current_conversation_job",
         "current_conversation_author_mode",
@@ -2174,7 +2237,7 @@
         "production_media_root",
         "re"
       ],
-      "export_sha256": "912891a14af939136607b03fb9b3ee8f5fed946780a717503339feb5774cbc0e",
+      "export_sha256": "d3d465bdd5ee7fd3076cdd4774f4553ea2b121f2a1e53f4628089e14fb751984",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -2210,6 +2273,34 @@
       "trimmed_imports": []
     },
     {
+      "module": "pipeline.editorial_signal_scoring",
+      "source_path": "pipeline/editorial_signal_scoring.py",
+      "source_sha256": "3f24945f827b6c0b578c16436c8ac1fba2eeaed536ff9a980591603a46f307d7",
+      "symbols": [
+        "DEFAULT_WEIGHTS",
+        "MODEL_VERSION",
+        "score_candidates"
+      ],
+      "selected_symbols": [
+        "Any",
+        "DEFAULT_WEIGHTS",
+        "Iterable",
+        "MODEL_VERSION",
+        "Mapping",
+        "MappingProxyType",
+        "_CHAT_FEATURES",
+        "_FEATURES",
+        "_number",
+        "_weights",
+        "annotations",
+        "math",
+        "score_candidates"
+      ],
+      "export_sha256": "d18b1f3368253d9523746a22b61341cb09e5d2e317071a607d8ad2b3552b2b53",
+      "overlay": false,
+      "trimmed_imports": []
+    },
+    {
       "module": "pipeline.editorial_source_timing",
       "source_path": "pipeline/editorial_source_timing.py",
       "source_sha256": "511cd273c2262c53db49bb2d5fddb7f68e8dde543f4f18ce352483648d3b00a9",
@@ -2240,7 +2331,7 @@
     {
       "module": "pipeline.editorial_span_authoring",
       "source_path": "pipeline/editorial_span_authoring.py",
-      "source_sha256": "c55d6af4243f06cb67cdc3aee98d0a13d2f73123d1d7fb412d68fceac85e45d6",
+      "source_sha256": "c9bb0c37366476a293976e2af41853069e30cca94ead860208d34f6463276d96",
       "symbols": [
         "_normalize_authored_source_span_boundaries"
       ],
@@ -2333,7 +2424,7 @@
     {
       "module": "pipeline.editorial_working_view",
       "source_path": "pipeline/editorial_working_view.py",
-      "source_sha256": "e176dfc5c98d6001db4b6221a15dc2b6001bebd38fc625fe7cfe5fa71c6be5c9",
+      "source_sha256": "2cdb40ef05c8984932ecd8107392f9fb2d259e74ff0d2231a4aa5e2124bb4c60",
       "symbols": [
         "check_refs",
         "validate_owner_request",
@@ -2479,9 +2570,47 @@
       "trimmed_imports": []
     },
     {
+      "module": "pipeline.evidence_world.cluster_navigation",
+      "source_path": "pipeline/evidence_world/cluster_navigation.py",
+      "source_sha256": "9b2dae9acb2f01de35ef099493f682d4042884e575e5caf8b85e2e2755215a16",
+      "symbols": [
+        "PROFILE",
+        "attach",
+        "browse",
+        "configure",
+        "descriptor",
+        "projection"
+      ],
+      "selected_symbols": [
+        "DOCUMENT_COSINE_NAVIGATION",
+        "EvidenceError",
+        "PROFILE",
+        "_assert_identity",
+        "_members",
+        "_occurrence",
+        "atomic_json",
+        "attach",
+        "browse",
+        "build_lock",
+        "canonical_json",
+        "configure",
+        "deepcopy",
+        "descriptor",
+        "digest",
+        "file_hash",
+        "identity",
+        "json",
+        "native_path",
+        "projection"
+      ],
+      "export_sha256": "608840680f0135252d80e927ca7a3b889e3aba95980e75a137e673d8ae45a3be",
+      "overlay": false,
+      "trimmed_imports": []
+    },
+    {
       "module": "pipeline.evidence_world.context_session",
       "source_path": "pipeline/evidence_world/context_session.py",
-      "source_sha256": "13ddf66162935128052292dbae84473a11a2c0a190317fcc13011cac106b9842",
+      "source_sha256": "9d7462ec069d407e9b88bc48c8be52ad42ab049ed1d99f342ad60b20b61644df",
       "symbols": [
         "act",
         "memory",
@@ -2500,7 +2629,7 @@
         "memory",
         "remember"
       ],
-      "export_sha256": "8dcd43f21b73de06704f7e47a1728c11867e44eddf8f40ad2d6fe811cf6cd46b",
+      "export_sha256": "d47e34e6f9a607f0637e99accd71998ffc5f43e91c8b4249b8fb7973be499e73",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -2919,7 +3048,7 @@
     {
       "module": "pipeline.evidence_world.service",
       "source_path": "pipeline/evidence_world/service.py",
-      "source_sha256": "a6a88da9c81fa49dbfced28038073be9b474ab0ba340f596bcfee9aa13b0636b",
+      "source_sha256": "166c4e30a3fe401507be31cb2ca67596bbafae4cfb23e2f20ffdcca2b932e9e2",
       "symbols": [
         "EvidenceWorldService"
       ],
@@ -2950,7 +3079,7 @@
         "select_utc_records",
         "utc_ranges"
       ],
-      "export_sha256": "05bb112e0d369abb4702a63d3335ac299fbbeb13f542b908395a6aede4a7c7f7",
+      "export_sha256": "9c4585f11eeaaef6c735733939dccb6d322b14eb7d2e26bc7eb1bcf0cae9f060",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -2962,7 +3091,7 @@
     {
       "module": "pipeline.evidence_world.signal_view",
       "source_path": "pipeline/evidence_world/signal_view.py",
-      "source_sha256": "2fca4ff420563c6a59630b8c29e736f77ec97f82f176627879e0d52a54c29789",
+      "source_sha256": "2d01993d79ff043a7a062007703700e3b0c8a665124ba6e65c5f911f6883358b",
       "symbols": [
         "*",
         "PROFILE",
@@ -2972,6 +3101,7 @@
       ],
       "selected_symbols": [
         "CATALOG_REVISION",
+        "CHAT_PEAK_POLICY_REVISION",
         "CLIP_PREVIEWS",
         "EvidenceError",
         "PROFILE",
@@ -3000,7 +3130,7 @@
         "request_view",
         "zip_longest"
       ],
-      "export_sha256": "ecfc6688ccde4232af0ad7c4ed3bbd2d484655172064534941392a0670be63ad",
+      "export_sha256": "5dee5b19f3e87dabb3db650365b10c2ad7560b2253d1c916006a09187a2b78dc",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -3112,6 +3242,28 @@
       "trimmed_imports": []
     },
     {
+      "module": "pipeline.evidence_world.vector_clusters",
+      "source_path": "pipeline/evidence_world/vector_clusters.py",
+      "source_sha256": "c2ef01f01421e14a398e647a99c1e9a78c0b3114f559e53967d5aa8e5d125a54",
+      "symbols": [
+        "DOCUMENT_COSINE_NAVIGATION",
+        "_occurrence",
+        "build_navigation"
+      ],
+      "selected_symbols": [
+        "DOCUMENT_COSINE_NAVIGATION",
+        "EvidenceError",
+        "_occurrence",
+        "build_navigation",
+        "deepcopy",
+        "digest",
+        "json"
+      ],
+      "export_sha256": "f7f9e17e91c1a460edf9a35d02fbdd6169bc55d2406cf0c5b0a3da31af194de5",
+      "overlay": false,
+      "trimmed_imports": []
+    },
+    {
       "module": "pipeline.evidence_world.viewer_signals",
       "source_path": "pipeline/evidence_world/viewer_signals.py",
       "source_sha256": "391ce5da267ed0e0afcfdd222aa39b69707e4a47baefa6ccc060687e71ca1849",
@@ -3132,9 +3284,37 @@
       "trimmed_imports": []
     },
     {
+      "module": "pipeline.highlight_prompt_assets",
+      "source_path": "pipeline/highlight_prompt_assets.py",
+      "source_sha256": "660e42d3e7e8adbbd798006e55a23b66e04db277d852fc640d0d26b681e01061",
+      "symbols": [
+        "load_full_author_prompt"
+      ],
+      "selected_symbols": [
+        "Any",
+        "HighlightPromptAsset",
+        "Path",
+        "_PROMPT_ROOT",
+        "_REPO_ROOT",
+        "_REQUIRED_METADATA",
+        "_canonical_asset_path",
+        "_split_frontmatter",
+        "_validated_metadata",
+        "annotations",
+        "dataclass",
+        "hashlib",
+        "json",
+        "load_full_author_prompt",
+        "load_highlight_prompt_asset"
+      ],
+      "export_sha256": "e12be7c4c7d2fec77d9b0d85422c5e46f8404b19e77a86c5ba2e83b7c7fbf914",
+      "overlay": false,
+      "trimmed_imports": []
+    },
+    {
       "module": "pipeline.highlight_story_window",
       "source_path": "pipeline/highlight_story_window.py",
-      "source_sha256": "94122d308ea0b30f9f1a4d43aefc1885c62de5907d4dadbc0bca309817ad031f",
+      "source_sha256": "eca024d243c5b78066e7b583b03d79069255f6a4cf5587b18844538ee838520a",
       "symbols": [
         "build_editorial_highlight_set",
         "project_editorial_highlight_durations"
@@ -3153,6 +3333,7 @@
         "_canonical",
         "_derive_source_span_structure_refs",
         "_editorial_error",
+        "_editorial_highlight_id",
         "_editorial_refs",
         "_editorial_seconds",
         "_editorial_text",
@@ -3170,9 +3351,10 @@
         "json",
         "math",
         "project_editorial_highlight_durations",
+        "validate_editorial_priority",
         "validate_highlight_story_evidence"
       ],
-      "export_sha256": "f9dec8a8de22d9ed19b007bc4a58b5bceb52957e1b3460f66277b0bf9dd7e48d",
+      "export_sha256": "39f75c6159f19b5e580c6b6657754cf275c534d8f2285717966ef191b3e1e186",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -3228,7 +3410,7 @@
     {
       "module": "pipeline.live_editorial_source",
       "source_path": "pipeline/live_editorial_source.py",
-      "source_sha256": "eccd13c14fe7287fc2494db3aa345a0790f726b4c2f60bb6990ea80b1c6c8d1e",
+      "source_sha256": "dbaac5e4f32797583df852e15f49345fd6f4d990230eba3f1d34ebfeabb93eeb",
       "symbols": [
         "_cues",
         "clock_summary",
@@ -3242,6 +3424,7 @@
         "CONTEXT_POLICY",
         "CONTEXT_PROJECTION",
         "CONTEXT_SCHEMA",
+        "MAX_GAME_CONTEXT_BYTES",
         "MAX_SOURCE_SRT_BYTES",
         "SCHEMA",
         "TIME_LINE_RE",
@@ -3265,7 +3448,7 @@
         "source_clock_path",
         "validate_live_manager_context_projection"
       ],
-      "export_sha256": "bf4c9cf68b468bdb0400e42c2f94ef901fb099ad9ed0010caa82b7693d6c38b3",
+      "export_sha256": "dd3c2c17745bcd3e115c25c0892b36da011be0ac1e4c625d1429ff9028a88efe",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -3302,7 +3485,7 @@
     {
       "module": "pipeline.live_vod_finalize",
       "source_path": "pipeline/live_vod_finalize.py",
-      "source_sha256": "18ca1703ea876440314ad3aa2589d12de57e8cd25c39f094c07ed0a80f7fa666",
+      "source_sha256": "549732acf6984d59806ead2449a0b81ea22e3a4f50519482124728258d1c8bef",
       "symbols": [
         "verified_live_transcript"
       ],
@@ -3310,11 +3493,13 @@
         "POLICY",
         "Path",
         "_cues",
+        "_replay_qualified_handover_end",
         "_verified_candidate_live_transcript",
         "annotations",
         "archive_folder",
         "check_dispatch",
         "closing",
+        "datetime",
         "guard",
         "json",
         "local_file",
@@ -3322,9 +3507,13 @@
         "re",
         "sha",
         "sqlite3",
+        "stat",
+        "time",
+        "timedelta",
+        "timezone",
         "verified_live_transcript"
       ],
-      "export_sha256": "c8f1e8311d5888a0bf56ab2f5b925743603b8d3d0ab9b3d40f01c70d06dc8fc4",
+      "export_sha256": "7c756fe77f12d548cb2abbf4fb6d87a0df97ffc1aaa4b3bdbb5694e9f0958679",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -3338,17 +3527,21 @@
       "source_path": "pipeline/live_vod_repair.py",
       "source_sha256": "830702fce316ee4dae60bcaa2b0edb16ac8a7ba87f76764b65c9f9c1f5ed9180",
       "symbols": [
+        "hls_window",
         "local_file",
         "sha"
       ],
       "selected_symbols": [
+        "ANCHOR_MARGIN_SEC",
         "Path",
         "annotations",
         "hashlib",
+        "hls_window",
         "local_file",
+        "math",
         "sha"
       ],
-      "export_sha256": "d12f449174c0e8e64c78959422cd31c36bf6724827b7374295a4e3410e8f74aa",
+      "export_sha256": "98fb43494e500a9eedea75540805973273ed0f329decb7425a95fca6adab52b9",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -3390,13 +3583,14 @@
           "exported": "from typing import Any, Optional"
         }
       ],
-      "upstream_sha256": "5833de4ea7b3c73161640ecf4aa1f7e917a25afdd7af98a72451d5176fe3c810"
+      "upstream_sha256": "fc17a962c5ed99461ed3e51edede87de8bbe4799905d73f87eb953a2f2dd852c"
     },
     {
       "module": "pipeline.loki_version_policy",
       "source_path": "pipeline/loki_version_policy.py",
-      "source_sha256": "2be0caf70f20bd11edd945106aff2f8b89d789a703e3b552006b6fbe78dba269",
+      "source_sha256": "982a276a88cbe7b413cca1c705398d7f40e56362ed9e162ff9470d029e394cca",
       "symbols": [
+        "new_job_defaults",
         "normalize_pipeline",
         "pipeline_identity",
         "pipeline_label",
@@ -3409,13 +3603,14 @@
         "json",
         "load_loki_version_policy",
         "lru_cache",
+        "new_job_defaults",
         "normalize_pipeline",
         "pipeline_identity",
         "pipeline_label",
         "pipelines_for",
         "select_new_pipeline"
       ],
-      "export_sha256": "541e4a7c3d6cea7cbbf88dc38326f96c1ca0d1fbba2e255be4a654c4c2293d0f",
+      "export_sha256": "f55484790ca71e2184c850ddae1ee7f39861317333318712e2087d0e4ba5fc09",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -3547,13 +3742,14 @@
     {
       "module": "pipeline.media_tools.executor",
       "source_path": "pipeline/media_tools/executor.py",
-      "source_sha256": "d9864d7a9a95653522839290a160550a80ff5e124c06f7912717085cca9e9d57",
+      "source_sha256": "2d41054843f6e675d8562a74f0f0d3a87ef4e0861bbdee3b9b0647a97855caa7",
       "symbols": [
         "FRAME_PROFILES",
         "SharedSourcePool",
         "_artifact_rows",
         "_extract_frames",
         "_probe_duration",
+        "_run",
         "_sha256",
         "_tool_paths",
         "acquire_request"
@@ -3577,6 +3773,7 @@
         "_download_video",
         "_extract_frames",
         "_hls_demuxer_args",
+        "_hls_video_origin",
         "_partial_for",
         "_probe_duration",
         "_remote_input_args",
@@ -3586,12 +3783,14 @@
         "_tool_paths",
         "_validate_duration",
         "_window",
+        "_window_input",
         "acquire_request",
         "annotations",
         "build_contact_sheet",
         "datetime",
         "hashlib",
         "json",
+        "math",
         "os",
         "resolve_chzzk_source",
         "shutil",
@@ -3601,7 +3800,7 @@
         "timezone",
         "urlsplit"
       ],
-      "export_sha256": "2a7822395d0ea42c16319e47e304b40a0c5d862891345831dcc0e099a8dc9b40",
+      "export_sha256": "f1c42eea0902e8070747e9c5009034ba2c65d16e9a8b2f44a7732e6a82929e48",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -3632,7 +3831,7 @@
     {
       "module": "pipeline.media_tools.preserved",
       "source_path": "pipeline/media_tools/preserved.py",
-      "source_sha256": "00e7d251dceec2b11be207866f528e681bc1c720a60b1af38d8f2b53604741c8",
+      "source_sha256": "e14caef25f6a2b18e41d8dc7ba0f0e02efd45d46bac0e00fc592da018e5631e8",
       "symbols": [
         "extract_preserved_frames"
       ],
@@ -3642,13 +3841,14 @@
         "Path",
         "ToolRequest",
         "_artifact_rows",
+        "_decode_input",
         "_extract_frames",
         "_probe_duration",
         "_sha256",
         "_tool_paths",
         "extract_preserved_frames"
       ],
-      "export_sha256": "8a3e1fe18d26ac477f4cf8df0a6a127656e4761ef46e2071e19a47ce14887101",
+      "export_sha256": "292faf4f08d4171c9802f150b53b15bb4f293e1b8c352f79390b48a800a6a5b4",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -4099,7 +4299,7 @@
       "export_sha256": "03e766f2fbc2617b8506486c44a2c8d5e717c516bc5ac3a864ac2f42826a339f",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "178004eea45a7c7ff0381d3507b36365a3908857b4969e5a97d1b8e7d77514f1"
+      "upstream_sha256": "076e811b5ec83051980c45475d9d3072a17c4694da3a8b089c2063cca82f0773"
     },
     {
       "module": "pipeline.sanity_gate",
@@ -4217,7 +4417,7 @@
     {
       "module": "pipeline.signal_timeline_workbench",
       "source_path": "pipeline/signal_timeline_workbench.py",
-      "source_sha256": "7c1d3db3aa5e6130f74772bed598026c0a65737585d9b0d3be2f35c2ff1b3017",
+      "source_sha256": "d6ac4c0401346e61d4ed4413d0c5a9a4c63bf3ebddf4b574dd35b95ea046971d",
       "symbols": [
         "build_signal_timeline_workbench"
       ],
@@ -4350,7 +4550,7 @@
         "validate_lane_payload",
         "validate_signal_timeline_lane_contract"
       ],
-      "export_sha256": "86dfa8b842b032a5ab325ecf14571e604a18d72a9bcc843f37bd5b566669bfc5",
+      "export_sha256": "ac6302ea5b3663f108f680789f1ffd10a5aa54d9823e16082bb343b48f82df43",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -5326,7 +5526,7 @@
     {
       "module": "pipeline.summary.report_generation",
       "source_path": "pipeline/summary/report_generation.py",
-      "source_sha256": "3764dceb622b50ec729bdd5a24f3f8730b118290965359a2698155e28aaf2433",
+      "source_sha256": "3c216c8e8cdc473fdc7752fba24edf0efdb0201fb4468ce07e3bc94047426367",
       "symbols": [
         "_viewer_clip_window_provenance",
         "generate_reports"
@@ -5354,6 +5554,7 @@
         "_commit_generated_report_artifacts",
         "_extract_audio_peak_secs",
         "_file_sha256",
+        "_highlight_peak_evidence_metadata",
         "_inject_summary_evidence_payload_html",
         "_inject_summary_quote_citations_payload_html",
         "_inject_timeline_evidence_ux_payload_html",
@@ -5385,7 +5586,7 @@
         "timedelta",
         "timezone"
       ],
-      "export_sha256": "746b538ce6aad495ea9643e410e64e18d25e52ca249a0a62e2ffdd190b35d76f",
+      "export_sha256": "c738d6250319185ceb6ce2e795f0bd46ae796aa4cfabe893df1c9ee371e630fc",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -5512,7 +5713,7 @@
     {
       "module": "pipeline.summary.viewer_editor",
       "source_path": "pipeline/summary/viewer_editor.py",
-      "source_sha256": "197c7a517a30900a6c90dc3d13ae35be0bc79d1b65a99dc4eeb9621469f1d592",
+      "source_sha256": "038f0b4cc1fff82d44e5bbf8d67882b6e83eb2927475e4f3ab6aa8e3f503040a",
       "symbols": [
         "_VIEWER_EDITOR_LANE_LABELS",
         "_audio_peak_badge_html",
@@ -5646,7 +5847,7 @@
         "sec_to_hms",
         "timezone"
       ],
-      "export_sha256": "df88360bebda030c306dff958283b2a28e3ac3da15195de034db9461c2d588a7",
+      "export_sha256": "a9c0ee9d4f0c8a0e35c25b5d8d2124261d6172f9c93aa770f9b63bb3cdc4a96b",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -5858,7 +6059,7 @@
     {
       "module": "pipeline.timeline_comment_anchors",
       "source_path": "pipeline/timeline_comment_anchors.py",
-      "source_sha256": "f13edf54bff93528a299bf3aa2f792cbef0f7dbf1bd2d97ce10a3209d4f3c4ba",
+      "source_sha256": "e6ea0a0f9c181b483f3c19d77993723009f56165b5066e6aa17b64facc0c7947",
       "symbols": [
         "CHAPTER_TIMETABLE",
         "HIGHLIGHT_HINT",
@@ -6235,7 +6436,7 @@
       "export_sha256": "504a2c397ff27fe855dc17b0c30f85dbbef70641089d5dad61b678086e308ab9",
       "overlay": true,
       "trimmed_imports": [],
-      "upstream_sha256": "c0deb65f65ada49a36b5e31c77b854c210b8a82bf88ce5619001d13a14a21d31"
+      "upstream_sha256": "e866f0e95dcb7e0ce9648912f550df623ef5b6166c584bbf9e4d86678b1a7fd5"
     },
     {
       "module": "pipeline.vod_retention_observation",
@@ -6540,7 +6741,7 @@
     },
     {
       "source_path": "docs/contracts/scene_signal_contract.v1.json",
-      "source_sha256": "b0a3ab35f7cdb9d1e135095a66c51768ffc3c875869ccb278d9d6ddf76e4623f"
+      "source_sha256": "cd96e76964f1a357656f8e9be6e464c25f5f920d1e4eb12a625039f2c0679360"
     },
     {
       "source_path": "pipeline/assets/ttaempad_comment_format.js",
@@ -6572,15 +6773,19 @@
     },
     {
       "source_path": "pipeline/summary/viewer.css",
-      "source_sha256": "52fd1261e615cde7b03d60b085777dfee4d6201f15808c19ad60a5d08b216538"
+      "source_sha256": "950d9ac0460feaff441d965d2995b993d81aafb6f3b1fc3d5c7f11021e635688"
     },
     {
       "source_path": "pipeline/summary/viewer.js",
-      "source_sha256": "be9d2b2bab1589c88e920d0e94020e4690382f726bec320d6bd82a4d280b56aa"
+      "source_sha256": "13238676f852e96ee383497e0d4f39b75f4668384ecd00c79bfc4e7c466ba09a"
     },
     {
       "source_path": "prompts/highlight/editorial_full_author_302.md",
       "source_sha256": "e4d250c914dd4a4162442a850122c15da676723933edc4074f3fb4557f013296"
+    },
+    {
+      "source_path": "prompts/highlight/editorial_full_author_302_retention.md",
+      "source_sha256": "157aededd5ee4bda3ddb6d5c1ceb6a086f46c3b7f5863b373056794d0e9a4b8a"
     },
     {
       "source_path": "publish/web/assets/vendor/chart.umd.min.js",
@@ -6588,7 +6793,7 @@
     },
     {
       "source_path": "scripts/admin/static/app_shell.css",
-      "source_sha256": "cb76822130dac6d946627220e76ced696dcdbbfc00283b262dae3fb19fbf2570"
+      "source_sha256": "6b838a32120b75b14f5724b644e17626fedb5ab24c033f9cac7c4221b0f3ef4d"
     },
     {
       "source_path": "scripts/admin/static/approval_state.js",
@@ -6604,7 +6809,7 @@
     },
     {
       "source_path": "scripts/admin/static/report.css",
-      "source_sha256": "c06c44aab4795e8089e3472442cce3de8516ca335a247fae4969023a01a49669"
+      "source_sha256": "f0029c0ab7ea04cda7ec5f42fd0d462bd712271f7b1892e099ee57fbc3f18490"
     },
     {
       "source_path": "scripts/admin/static/report.js",
@@ -6660,11 +6865,11 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace.css",
-      "source_sha256": "d9382376bfdbd425808e49507be6a94c1871dd7359e0d5b2a6ffe868ee917866"
+      "source_sha256": "b8226eb19429457fd28bd337823bd096ff84e78b76b6a464e3502298840411b4"
     },
     {
       "source_path": "scripts/admin/static/report_workspace.js",
-      "source_sha256": "1d56a738f79d0a930a8ab637385bb9e8feb20b1fb8a6fdbc8d16d7fff6052a0c"
+      "source_sha256": "7f917713710887125c565e995cdcf702e20c67e0a6bb0a2e19d9d5a8eace4b1e"
     },
     {
       "source_path": "scripts/admin/static/report_workspace_history.js",
@@ -6672,7 +6877,7 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace_state.js",
-      "source_sha256": "032d8067c74e7d8af9671312039604f5b6903f80fb99884f7b558494464d008f"
+      "source_sha256": "fdb96aba63160a57190c72dd43ad60ac10fb76985454b066235b9de1d083b02e"
     },
     {
       "source_path": "scripts/admin/static/report_workspace_time_scrubber.js",
@@ -6680,7 +6885,7 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace_timeline.js",
-      "source_sha256": "2d2519e44e18a322aa7db8c0d4e5fa2a3e75d6c8b5416bb8a5fcbe6d373b9dd8"
+      "source_sha256": "6dc0ffa6646228ca770a061e273606167e4b3745660912a5d06c2e65ec1a38a3"
     },
     {
       "source_path": "scripts/admin/static/vendor/hls.LICENSE.txt",
@@ -6712,7 +6917,7 @@
     },
     {
       "source_path": "vendor/chat-analyze-engine/config/loki_versions.json",
-      "source_sha256": "2b7dac63b5ba1a211a2e0a94a3ba030df222769ae8d5ae159a68dd3085f7d6c1"
+      "source_sha256": "19c94ce9af26d022f0b0d65c56832bf7ed8bab60b7ad762b30812777b3f49e80"
     }
   ],
   "external_imports": [
@@ -6758,7 +6963,6 @@
     "numpy",
     "os",
     "pathlib",
-    "pipeline.summary.chunker",
     "pyarrow",
     "re",
     "requests",
@@ -6795,7 +6999,7 @@
     "xml.etree.ElementTree",
     "zlib"
   ],
-  "source_commit": "c89643862bb6c5c31df0b6412a388bc291499e85",
+  "source_commit": "81401ef1fea08de1a0b3429e79a005b4fc702be4",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",
@@ -6809,8 +7013,8 @@
     },
     {
       "source_path": "scripts/admin/static/report_workspace.js",
-      "source_sha256": "1d56a738f79d0a930a8ab637385bb9e8feb20b1fb8a6fdbc8d16d7fff6052a0c",
-      "overlay_sha256": "a3e02dedd7a34adb2986a72f620ac628cf0a084ad3a65165824ac51737de6ea0"
+      "source_sha256": "7f917713710887125c565e995cdcf702e20c67e0a6bb0a2e19d9d5a8eace4b1e",
+      "overlay_sha256": "ab472d01bc73a5ec55187b7397afe4bc2fc943c82799e55ab8e4f5d4f45b9200"
     }
   ]
 }

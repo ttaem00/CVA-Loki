@@ -6,7 +6,21 @@ and Highlight from acquiring overlapping product or time authority.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from typing import Any, Mapping
+
+def validate_editorial_priority(value: Any) -> dict[str, str] | None:
+    """Validate optional review metadata without selecting content or order."""
+    if value is None:
+        return None
+    if (not isinstance(value, Mapping) or set(value) != {"tier", "reason", "basis"}
+            or not isinstance(value["tier"], str) or value["tier"] not in {"focus", "normal", "later"}
+            or not isinstance(value["reason"], str) or not value["reason"].strip()
+            or not isinstance(value["basis"], str)
+            or value["basis"] not in {"author", "manager", "display_review"}):
+        raise ValueError("invalid_editorial_priority")
+    return deepcopy(dict(value))
 
 def full_author_completion_state(*, unresolved_proposals: object, source_clock: object = None,
                                  unresolved_flows: object = None) -> str:
@@ -159,6 +173,8 @@ def validate_editorial_authority_shape(
     for point in points:
         _reject_fields(point, _POINT_FORBIDDEN_TIME_FIELDS, "point_has_second_time_authority")
         _reject_fields(point, _CANONICAL_LANE_FORBIDDEN_FIELDS, "candidate_or_signal_mixed_into_canonical_lane")
+        if "editorial_priority" in point:
+            validate_editorial_priority(point["editorial_priority"])
         timestamp = point.get("timestamp")
         if (
             isinstance(timestamp, bool)
@@ -176,6 +192,8 @@ def validate_editorial_authority_shape(
     for story in stories:
         _reject_fields(story, _STORY_FORBIDDEN_NAVIGATION_FIELDS, "story_has_time_or_navigation_authority")
         _reject_fields(story, _CANONICAL_LANE_FORBIDDEN_FIELDS, "candidate_or_signal_mixed_into_canonical_lane")
+        if "editorial_priority" in story:
+            raise ValueError("editorial_priority_requires_point_or_highlight")
 
     if not legacy_without_story and (
         len(point_story_refs) != len(set(point_story_refs)) or set(point_story_refs) != story_ids
@@ -191,6 +209,8 @@ def validate_editorial_authority_shape(
     for highlight in highlights:
         _reject_fields(highlight, _HIGHLIGHT_FORBIDDEN_RANGE_FIELDS, "highlight_has_second_range_authority")
         _reject_fields(highlight, _CANONICAL_LANE_FORBIDDEN_FIELDS, "candidate_or_signal_mixed_into_canonical_lane")
+        if "editorial_priority" in highlight:
+            validate_editorial_priority(highlight["editorial_priority"])
         refs = highlight.get("point_refs")
         independent = (highlight.get("story_link_mode") == "source_independent"
             and highlight.get("composition_contract") == "editorial.context-author.v22"

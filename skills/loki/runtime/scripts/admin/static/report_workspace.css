@@ -299,10 +299,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
   z-index: 3;
   width: 11px;
   height: 46px;
-  border: 0;
+  border: 2px solid transparent;
+  border-radius: 3px;
   padding: 0;
   background: transparent;
-  color: var(--danger);
+  color: var(--muted);
   cursor: ew-resize;
   transform: translateX(-5px);
   touch-action: none;
@@ -311,8 +312,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .timeline-point::after { content: ""; position: absolute; left: 1px; top: 0; border: 5px solid transparent; border-top-color: currentColor; }
 .timeline-point span { position: absolute; left: 10px; top: 13px; display: none; border-radius: 4px; padding: 4px 7px; background: var(--field); color: var(--strong); font-size: 13px; white-space: nowrap; }
 .timeline-point:hover span,
-.timeline-point.selected span { display: block; }
-.timeline-point.selected { color: var(--blue); }
+.timeline-point.selected span,
+.timeline-point:focus-visible span { display: block; }
+.timeline-point[data-priority="focus"] { color: var(--amber); }
+.timeline-point[data-priority="normal"] { color: var(--blue); }
+.timeline-point[data-priority="later"] { color: var(--green); }
+.timeline-point.selected { border-color: var(--strong); }
+.timeline-point:focus-visible { outline: 3px dashed var(--blue-soft); outline-offset: 4px; z-index: 7; }
+.timeline-point-priority { position: absolute; top: 31px; left: 10px; width: max-content; padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px; background: var(--field); font: 11px/16px system-ui; pointer-events: none; }
 .timeline-playhead { position: absolute; top: 40px; bottom: 2px; z-index: 3; width: 1px; background: var(--blue); pointer-events: none; }
 .timeline-playhead::before { content: ""; position: absolute; top: 0; left: -4px; border: 4px solid transparent; border-top-color: var(--blue); }
 .timeline-help { margin: 0; padding: 11px 14px 13px; color: var(--faint); font-size: 13px; line-height: 1.5; }
@@ -622,3 +629,8 @@ code { color: var(--blue-soft); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; }
 }
+ .scene-reasons { margin-block: 12px; padding: 12px; border: 1px solid var(--border, #d7dce5); border-radius: 8px; overflow-wrap: anywhere; }
+ .scene-reasons summary { cursor: pointer; min-block-size: 24px; }
+ .scene-reasons dt { margin-block-start: 10px; font-weight: 600; }
+ .scene-reasons dd { margin: 4px 0 10px; }
+ .scene-reasons p { font-size: .875rem; }

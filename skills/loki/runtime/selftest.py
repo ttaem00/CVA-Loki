@@ -89,7 +89,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     srt = source / "source.srt"
     srt.write_text("1\n00:00:01,000 --> 00:00:03,000\ninitial claim\n\n"
                    "2\n00:00:05,000 --> 00:00:06,000\nunrelated schedule\n\n"
-                   "3\n00:00:10,000 --> 00:00:12,000\nquiet rebuttal\n", encoding="utf-8", newline="\n")
+                   "3\n00:00:10,000 --> 00:00:12,000\nSynthetic guest: quiet rebuttal\n", encoding="utf-8", newline="\n")
     source_hash = hashlib.sha256(srt.read_bytes()).hexdigest()
     base = workspace / "base.md"
     base.write_text("Existing manager report; preserve this.\n", encoding="utf-8", newline="\n")
@@ -97,7 +97,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     spec = {"vod_info": {"video_no": "1", "title": "Synthetic conversation", "channel_id": "",
                          "channel_name": "Synthetic", "duration": 20, "publish_date": "2026-01-01"},
             "source_work_dir": "work/1/sources", "srt_path": "work/1/sources/source.srt",
-            "base_path": "base.md", "job_id": "synthetic-contract-fixture",
+            "base_path": "base.md", "job_id": "synthetic-contract-fixture", "authoring_minutes": 15,
             "author": {"thread_id": "synthetic-contract-fixture", "turn_id": "fixture-no-model-call", "actual_model": "unknown"}}
     if author_mode == "current_chatgpt":
         spec["author"] = dict(host="chatgpt", session_id=uuid.uuid4().hex,
@@ -110,7 +110,12 @@ def run(runtime, workspace, *, author_mode="current_codex"):
 
     spec_path = write("spec.json", spec)
     prepared = call("prepare", "--spec", spec_path)
-    require(call("prepare", "--spec", spec_path) == prepared, "selftest_prepare_replay_changed")
+    reopened = call("prepare", "--spec", spec_path)
+    require({key: value for key, value in reopened.items() if key != "authoring_time"}
+            == {key: value for key, value in prepared.items() if key != "authoring_time"},
+            "selftest_prepare_replay_changed")
+    require(reopened['authoring_time']['started_at'] == prepared['authoring_time']['started_at'],
+            'selftest_authoring_clock_restarted')
     job = prepared["job_root"]
     saved_preparation = json.loads((Path(job) / "prepared.json").read_text(encoding="utf-8"))
     require(saved_preparation["identity"]["selected_pipeline"] == selected, "selftest_selected_pipeline_mismatch")
@@ -120,6 +125,14 @@ def run(runtime, workspace, *, author_mode="current_codex"):
             "selftest_job_author_mode_mismatch")
     revision = prepared["prepared_revision"]
     identity = ["--job-root", job, "--expected-revision", revision]
+    frozen = {name: (Path(job) / name).read_bytes()
+              for name in ('prepared.json', 'author-input.json', 'authoring-time.json')}
+    state = call('status', *identity)
+    require(state['submission_state'] == 'not_submitted'
+            and state['authoring_time']['minutes'] == 15
+            and state['authoring_time']['control'] == 'advisory_current_conversation'
+            and state['authoring_time']['tool_wait_seconds'] is None,
+            'selftest_advisory_status_invalid')
     payload = {"base_revision": prepared["base_revision"],
         "summary": "A later quiet reply changes the initial claim.", "summary_evidence_refs": ["e1", "e3"],
         "ranges": [
@@ -140,6 +153,12 @@ def run(runtime, workspace, *, author_mode="current_codex"):
         "group_outcomes": [{"terminal_state": "represented", "flow_refs": ["broadcast"], "range_refs": ["d1", "d2"],
             "reason": "The conversation retains the initial claim and later quiet rebuttal.", "evidence_refs": ["e1", "e3"]}],
         "unresolved_questions": []}
+    payload['points'][0]['editorial_priority'] = dict(tier='focus', basis='author',
+        reason='Source-linked review priority for the quiet rebuttal.')
+    payload['proposals'][0]['editorial_priority'] = dict(tier='normal', basis='author',
+        reason='Review the original guest reply.')
+    payload['collaboration_periods'] = [dict(id='synthetic-guest', start_sec=10, end_sec=12,
+        members=['Synthetic guest'], source_kind='source_evidence', support_status='provisional', evidence_refs=['e3'])]
     response = write("response.json", payload)
     call("submit", *identity, "--response", response, error="current_conversation_cited_original_not_read")
     action = {"schema_version": "ew.tool.v1", "source_id": prepared["source_id"],
@@ -151,7 +170,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
             "selftest_originals_not_loaded")
     require(isinstance(records, list) and len(records) == 3, "selftest_original_record_count")
     require(originals.get("next_cursor") is None, "selftest_original_read_incomplete")
-    require([row.get("raw_text") for row in records] == ["initial claim", "unrelated schedule", "quiet rebuttal"],
+    require([row.get("raw_text") for row in records] == ["initial claim", "unrelated schedule", "Synthetic guest: quiet rebuttal"],
             "selftest_original_text_mismatch")
     require(all(row.get("fragment_complete") is True for row in records), "selftest_original_fragment_incomplete")
     require(all(isinstance(row.get("record_id"), str) and len(row["record_id"]) == 64
@@ -171,6 +190,12 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     require(submitted["external_transport_calls"] == 0 and not submitted["manager_saved"] and not submitted["published"],
             "selftest_submission_authority_changed")
     require(call("submit", *identity, "--response", response) == submitted, "selftest_submit_replay_changed")
+    settled = call('status', *identity)
+    require(settled['submission_state'] == 'terminal_record_present'
+            and settled['authoring_time'] == submitted['authoring_time']
+            and call('status', *identity) == settled, 'selftest_terminal_status_not_frozen')
+    require(all((Path(job) / name).read_bytes() == data for name, data in frozen.items()),
+            'selftest_frozen_preparation_changed')
     payload["summary"] += " Changed after settlement."
     call("submit", *identity, "--response", write("changed-response.json", payload), error="current_conversation_submit_conflict")
     require(base.read_bytes() == base_bytes, "selftest_existing_report_changed")
@@ -180,8 +205,15 @@ def run(runtime, workspace, *, author_mode="current_codex"):
             "selftest_report_file_missing")
     html = Path(paths["html"]).read_text(encoding="utf-8")
     require("Quiet reply" in html and "A later quiet reply" in html, "selftest_rendered_content_missing")
+    require('Source-linked review priority for the quiet rebuttal.' in html
+            and 'Review the original guest reply.' in html, 'selftest_priority_not_rendered')
     metadata = json.loads(Path(paths["metadata"]).read_text(encoding="utf-8-sig"))
     require(isinstance(metadata, dict), "selftest_report_metadata_invalid")
+    packet = metadata['editorial_review_packet']
+    require(packet['broadcast_map']['points'][0]['editorial_priority'] == payload['points'][0]['editorial_priority']
+            and packet['editorial_highlights'][0]['editorial_priority'] == payload['proposals'][0]['editorial_priority']
+            and packet['collaboration_periods'] == payload['collaboration_periods'],
+            'selftest_optional_review_metadata_lost')
     report_pipeline = metadata.get("summary_pipeline", {})
     require(report_pipeline.get("actual_version") == selected
             and report_pipeline.get("mechanism_version") == version, "selftest_report_version_mismatch")
@@ -208,6 +240,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
               "checks": ["installed runtime CLI", "doctor ready with no missing dependencies", "prepare replay",
                          "unread citation rejection", "complete original texts and source-bound receipt",
                          "source-linked note and recall", "synthetic fixture response contract validation",
+                         "opt-in advisory status and frozen terminal clock", "source-linked optional review metadata",
                          "normal HTML/Markdown/metadata renderer", "submit replay", "changed settled response conflict",
                          "source and existing report preserved", "zero model transport"]}
     if author_mode == "current_chatgpt":
