@@ -82,5 +82,27 @@
     return `저장 내용: 큰 흐름 ${ranges.filter(item => item.level === 'D1').length} · 세부 흐름 ${ranges.filter(item => item.level === 'D2').length} · Point ${(outline.points || []).length} · Highlight ${highlights.length}`;
   }
 
-  window.ReportNavigation = Object.freeze({list, scene, view, report, reader, connectReader, revisionTitle, revisionSummary});
+  // The Admin host and report preview have separate script scopes. Keep the
+  // host's original links on the same platform-qualified identity contract.
+  function sourceUrl(source, seconds = NaN) {
+    const videoNo = String(source?.video_no || '');
+    const qualified = videoNo.match(/^(youtube|soop)-(.+)$/);
+    const platform = source?.source_platform || qualified?.[1] || 'chzzk';
+    const nativeId = String(source?.source_id || qualified?.[2] || videoNo);
+    if (qualified && qualified[1] !== platform) return '';
+    const pattern = platform === 'youtube' ? /^[A-Za-z0-9_-]{11}$/ : /^\d{1,16}$/;
+    if (!['chzzk', 'youtube', 'soop'].includes(platform) || !pattern.test(nativeId)) return '';
+    const workId = platform === 'chzzk' ? nativeId : `${platform}-${nativeId}`;
+    if (videoNo && videoNo !== workId && videoNo !== nativeId) return '';
+    const url = platform === 'youtube' ? `https://www.youtube.com/watch?v=${nativeId}`
+      : platform === 'soop' ? `https://vod.sooplive.com/player/${nativeId}`
+      : `https://chzzk.naver.com/video/${nativeId}`;
+    if (source?.source_url && source.source_url !== url) return '';
+    if (!Number.isFinite(seconds)) return url;
+    const offset = Math.max(0, Math.floor(seconds));
+    if (platform === 'youtube') return `${url}&t=${offset}s`;
+    return `${url}?${platform === 'soop' ? 'change_second' : 'currentTime'}=${offset}`;
+  }
+
+  window.ReportNavigation = Object.freeze({list, scene, view, report, reader, connectReader, revisionTitle, revisionSummary, sourceUrl});
 })();

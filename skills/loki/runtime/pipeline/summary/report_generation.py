@@ -265,8 +265,9 @@ def _register_generated_report_artifacts(
         provenance_record = {
             "artifact_id": metadata_artifact_id or artifact_id(output_paths[-1]),
             "source_video_no": video_no,
-            "source_url": f"https://chzzk.naver.com/video/{video_no}" if video_no else "",
-            "source_api_url": f"https://api.chzzk.naver.com/service/v2/videos/{video_no}" if video_no else "",
+            "source_url": _build_source_vod_url(vod_info),
+            "source_api_url": (f"https://api.chzzk.naver.com/service/v2/videos/{video_no}"
+                               if video_no and _source_platform(vod_info) == "chzzk" else ""),
             "pipeline_run_id": run_id,
             "producer_stage": "report_generation",
             "provider": provider,
@@ -283,7 +284,7 @@ def _register_generated_report_artifacts(
             "input_artifact_paths": input_paths,
             "input_artifact_hashes": input_hashes,
             "output_artifact_paths": output_paths,
-            "media_redownload_pointer_id": f"{video_no}:chzzk" if video_no else "",
+            "media_redownload_pointer_id": f"{video_no}:{_source_platform(vod_info)}" if video_no else "",
             "learning_dataset_refs": [
                 "data/highlight_learning",
                 "data/alignment_review",
@@ -904,7 +905,7 @@ def generate_reports(
                 "viewer_clips": {"status": "not_available_for_source", "items": []},
                 "fabricated": False,
             }
-            if _source_platform(vod_info) == "youtube"
+            if _source_platform(vod_info) == "youtube" and editorial_review_packet is None
             else None
         ),
         "viewer_clip_window": _viewer_clip_window_provenance(

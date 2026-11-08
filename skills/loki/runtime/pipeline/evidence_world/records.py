@@ -22,9 +22,13 @@ from .contracts import (AssetBinding, EvidenceError, PARSER_REVISION, RECORD_SCH
                         digest, file_hash, native_path, time_projection)
 
 def register_assets(*, video_no, srt_path, work_dir, duration_sec, policy, clip_source_path=None,
-                    chat_source_path=None):
+                    chat_source_path=None, source_platform=None, source_native_id=""):
     """Only caller-bound paths; never walk a directory or accept model paths."""
     source_id = f"chzzk:{video_no}"
+    if source_platform is not None:
+        from ..source_platforms import source_from_fields
+        reference = source_from_fields(str(video_no), source_platform, source_native_id)
+        source_id = f"{reference.platform}:{reference.native_id}"
     root = native_path(work_dir)
     from ..live_editorial_source import load_live_source_clock, clock_summary, source_clock_path
     live_source = load_live_source_clock(srt_path, video_no=video_no, duration_sec=duration_sec)
@@ -62,6 +66,10 @@ def register_assets(*, video_no, srt_path, work_dir, duration_sec, policy, clip_
                     meta = json.loads(meta_path.read_text(encoding="utf-8-sig"))
                     collection = {k: meta[k] for k in ("status", "video_no") if k in meta}
                     if "video_no" in meta and str(meta["video_no"]) != str(video_no):
+                        status = "conflict"
+                    elif source_platform is not None and (
+                            meta.get("source_platform", source_platform) != source_platform
+                            or str(meta.get("source_id", reference.native_id)) != reference.native_id):
                         status = "conflict"
                     elif meta.get("status") != "complete":
                         status = "partial"

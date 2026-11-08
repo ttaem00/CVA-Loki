@@ -44,14 +44,15 @@ function navigateChzzkCompanion(value) {
 
 function handleChzzkCompanionClick(event) {
   if (event.defaultPrevented || event.button > 0) return;
-  const link = event.target.closest?.('a[href*="chzzk.naver.com/video/"]');
+  const link = event.target.closest?.('a[href]');
   if (!link) return;
   const url = normalizeChzzkCompanionUrl(link.href);
   if (!url) return;
   const connect = link.hasAttribute('data-editor-entry-primary');
   const splitClick = connect && event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey;
   if (!splitClick && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
-  if (!connect && !new URL(url).searchParams.has('currentTime')) return;
+  const params = new URL(url).searchParams;
+  if (!connect && !['currentTime', 't', 'change_second'].some((key) => params.has(key))) return;
   event.preventDefault();
   navigateChzzkCompanion(url);
 }
@@ -63,13 +64,40 @@ function isChzzkCompanionEditorMode() {
 function normalizeChzzkCompanionUrl(value) {
   try {
     const url = new URL(String(value || ''), location.href);
-    if (url.protocol !== 'https:' || url.hostname !== 'chzzk.naver.com') return '';
+    if (url.protocol !== 'https:') return '';
     if (url.port || url.username || url.password) return '';
-    if (!/^\/video\/\d+\/?$/.test(url.pathname)) return '';
-    return url.href;
+    if (url.hostname === 'chzzk.naver.com' && /^\/video\/\d+\/?$/.test(url.pathname)) return url.href;
+    if (url.hostname === 'www.youtube.com' && url.pathname === '/watch'
+        && /^[A-Za-z0-9_-]{11}$/.test(url.searchParams.get('v') || '')
+        && [...url.searchParams.keys()].every((key) => key === 'v' || key === 't')
+        && (!url.searchParams.has('t') || /^\d+s?$/.test(url.searchParams.get('t')))) return url.href;
+    if (url.hostname === 'vod.sooplive.com' && /^\/player\/\d{1,16}$/.test(url.pathname)
+        && [...url.searchParams.keys()].every((key) => key === 'change_second')
+        && (!url.searchParams.has('change_second') || /^\d+$/.test(url.searchParams.get('change_second')))) return url.href;
+    return '';
   } catch (_err) {
     return '';
   }
+}
+
+function sourceVideoUrlAt(videoNo, seconds, platform = '') {
+  const workId = String(videoNo || '');
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return '';
+  const sec = Math.floor(value);
+  if (/^youtube-[A-Za-z0-9_-]{11}$/.test(workId)) {
+    return `https://www.youtube.com/watch?v=${workId.slice(8)}&t=${sec}s`;
+  }
+  if (/^soop-\d{1,16}$/.test(workId)) {
+    return `https://vod.sooplive.com/player/${workId.slice(5)}?change_second=${sec}`;
+  }
+  if (platform === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(workId)) {
+    return `https://www.youtube.com/watch?v=${workId}&t=${sec}s`;
+  }
+  if (platform === 'soop' && /^\d{1,16}$/.test(workId)) {
+    return `https://vod.sooplive.com/player/${workId}?change_second=${sec}`;
+  }
+  return /^\d{1,16}$/.test(workId) ? `https://chzzk.naver.com/video/${workId}?currentTime=${sec}` : '';
 }
 
 function getChzzkCompanionGuide(userAgent = window.navigator?.userAgent || '') {
@@ -103,8 +131,8 @@ function initEditorCompanionMode() {
   if (entry.dataset.companionInitialized === '1') return;
   entry.dataset.companionInitialized = '1';
 
-  const explicitUrl = entry.getAttribute('data-editor-chzzk-url') || '';
-  const sourceLink = document.querySelector('a[href*="chzzk.naver.com/video/"]');
+  const explicitUrl = entry.getAttribute('data-editor-source-url') || entry.getAttribute('data-editor-chzzk-url') || '';
+  const sourceLink = document.querySelector('a.top-vod-link, a[href*="chzzk.naver.com/video/"]');
   const chzzkUrl = explicitUrl || sourceLink?.href || '';
   const companionGuide = getChzzkCompanionGuide();
   function setEntryState(state, message) {
@@ -119,7 +147,7 @@ function initEditorCompanionMode() {
   function installCompanionEditorMode() {
     const safeChzzkUrl = normalizeChzzkCompanionUrl(chzzkUrl);
     if (!safeChzzkUrl) {
-      setEntryState('error', 'CHZZK 주소 없음');
+      setEntryState('error', '원본 영상 주소 없음');
       return;
     }
     document.body.classList.add('editor-companion-mode');
@@ -231,7 +259,7 @@ function initEditorEntryState() {
   };
   const target = document.getElementById('youtube-editor-tools');
   if (target && primaryBtn) setState('fallback', '');
-  else setState('error', target ? 'CHZZK 링크 없음' : '워크스페이스 없음');
+  else setState('error', target ? '원본 영상 링크 없음' : '워크스페이스 없음');
 }
 
 function initViewerEditorTools() {
@@ -359,7 +387,8 @@ function initViewerEditorTools() {
     const videoNo = String(row && (row.video_no || row.source_video_no) || data.video_no || '');
     if (!videoNo) return '';
     const targetSec = row && row.seek_sec != null ? row.seek_sec : sec;
-    return `https://chzzk.naver.com/video/${encodeURIComponent(videoNo)}?currentTime=${Math.max(0, Math.floor(Number(targetSec || 0)))}`;
+    const platform = String(row && row.source_platform || (videoNo === String(data.video_no || '') ? data.source_platform : '') || '');
+    return sourceVideoUrlAt(videoNo, Math.max(0, Math.floor(Number(targetSec || 0))), platform);
   }
   function evidenceSourceRow(sec) {
     const videoNo = String(data.evidence_video_no || '');
@@ -2591,7 +2620,7 @@ function initViewerEditorTools() {
     ${renderEvidenceTargetPicker(evidenceTargets, sec)}
     ${renderContextSummary(nearbySubtitles, nearbyBuckets, event)}
     ${guidanceHtml}
-    ${seekUrl(sec, event) ? `<div class="viewer-editor-row"><strong>원본 확인</strong><br><a href="${esc(seekUrl(sec, event))}" target="_blank" rel="noopener" style="color:var(--tc)">치지직에서 이 시각 열기</a></div>` : ''}
+    ${seekUrl(sec, event) ? `<div class="viewer-editor-row"><strong>원본 확인</strong><br><a href="${esc(seekUrl(sec, event))}" target="_blank" rel="noopener" style="color:var(--tc)">원본 영상에서 이 시각 열기</a></div>` : ''}
     <div class="viewer-editor-list">${evidenceRows.map(renderEvidenceRow).join('') || '<div class="viewer-editor-empty">근처 근거가 없습니다.</div>'}</div>`;
     evidenceEl.querySelectorAll('[data-evidence-target-index]').forEach((button) => {
       button.addEventListener('click', () => {

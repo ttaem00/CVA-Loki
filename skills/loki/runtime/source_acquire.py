@@ -1,4 +1,4 @@
-"""Prepare one anonymous public CHZZK VOD for the selected caller; never author a report."""
+"""Prepare one anonymous public replay for the selected caller; never author a report."""
 from __future__ import annotations
 
 import argparse
@@ -187,8 +187,9 @@ def collect_chat(network, video, duration, target):
 
 
 def run(workspace, vod, *, height=480, max_download_seconds=21600):
-    video = video_number(vod)
-    vod = "https://chzzk.naver.com/video/" + video
+    from pipeline.source_platforms import resolve_source
+    reference = resolve_source(vod)
+    video, vod = reference.work_id, reference.url
     if height not in HEIGHTS or type(max_download_seconds) is not int or not 60 <= max_download_seconds <= 21600:
         raise ValueError("loki_source_limits_invalid")
     root = Path(workspace).resolve(strict=True)
@@ -224,13 +225,16 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
             raise ValueError("loki_source_tools_receipt_invalid")
         tools = json.loads(tools_path.read_text(encoding="utf-8"))["tools"]
         binaries = {name: tools[name] for name in ("ffmpeg", "ffprobe")}
-        for name, row in binaries.items():
+        online_tools = dict(binaries)
+        if reference.platform == "youtube" and "node" in tools:
+            online_tools["node"] = tools["node"]
+        for name, row in online_tools.items():
             path = Path(row["path"]).resolve(strict=True)
             if (path.name.lower() not in {name, name + ".exe"} or not re.fullmatch(r"[a-f0-9]{64}", row["sha256"])
                     or digest(path) != row["sha256"]):
                 raise ValueError("loki_source_tool_changed")
         os.environ["LOKI_WORKSPACE"] = str(root)
-        os.environ["PATH"] = os.pathsep.join([*(str(Path(row["path"]).parent) for row in binaries.values()), os.environ.get("PATH", "")])
+        os.environ["PATH"] = os.pathsep.join([*(str(Path(row["path"]).parent) for row in online_tools.values()), os.environ.get("PATH", "")])
         from content import network
         if not hasattr(network, "public_requests"):
             raise ValueError("loki_source_installed_public_adapter_required")
@@ -238,17 +242,28 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
         if "media" not in state:
             phase = "public_download"
             os.environ["LOKI_SOURCE_PREPARATION"] = str(root)
-            with network.public_requests(limit, max_download_seconds) as check, download_processes(root, binaries):
-                _, _, _, _, _, metadata = network.NetworkManager.get_video_info(video, {}, public_only=True)
+            if reference.platform == "chzzk":
+                with network.public_requests(limit, max_download_seconds) as check, download_processes(root, binaries):
+                    _, _, _, _, _, metadata = network.NetworkManager.get_video_info(video, {}, public_only=True)
+                    duration = metadata["duration"]
+                    if type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 86400:
+                        raise ValueError("loki_source_duration_unavailable_or_exceeds_limit")
+                    def progress(*_args):
+                        check()
+                        if sum(p.stat().st_size for p in attempt.iterdir() if p.is_file()) > limit:
+                            raise ValueError("loki_source_media_exceeds_limit")
+                    media = owned(root, downloader.download_vod_media(video, {}, str(attempt), progress_func=progress,
+                        expected_duration_sec=int(duration), target_height=height))
+            else:
+                from source_adapters import acquire_video
+                acquired = acquire_video(reference, attempt, height=height, max_bytes=limit,
+                    max_download_seconds=max_download_seconds, tools=binaries)
+                metadata = acquired["metadata"]
+                media = owned(root, acquired["media_path"])
                 duration = metadata["duration"]
                 if type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 86400:
                     raise ValueError("loki_source_duration_unavailable_or_exceeds_limit")
-                def progress(*_args):
-                    check()
-                    if sum(p.stat().st_size for p in attempt.iterdir() if p.is_file()) > limit:
-                        raise ValueError("loki_source_media_exceeds_limit")
-                media = owned(root, downloader.download_vod_media(video, {}, str(attempt), progress_func=progress,
-                    expected_duration_sec=int(duration), target_height=height))
+            with download_processes(root, binaries):
                 if not media.is_relative_to(attempt) or media.stat().st_size > limit:
                     raise ValueError("loki_source_media_outside_attempt_or_limit")
                 clock = verify_media(binaries["ffprobe"]["path"], media, duration)
@@ -257,12 +272,27 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
                 state.update(media=dict(path=str(media), sha256=digest(media), bytes=media.stat().st_size),
                              metadata=metadata, clock=clock)
                 save(checkpoint, state)
-                state["chat"] = collect_chat(network, video, duration, source / (video + "_chat.log.json"))
-                save(checkpoint, state)
-            os.environ.pop("LOKI_SOURCE_PREPARATION", None)
         media = owned(root, state["media"]["path"])
         if not media.is_relative_to(attempt) or digest(media) != state["media"]["sha256"]:
             raise ValueError("loki_source_cached_media_changed")
+        if "chat" not in state:
+            phase = "public_chat"
+            os.environ["LOKI_SOURCE_PREPARATION"] = str(root)
+            target = source / (video + "_chat.log.json")
+            try:
+                if reference.platform == "chzzk":
+                    with network.public_requests(limit, 60):
+                        state["chat"] = collect_chat(network, video, state["metadata"]["duration"], target)
+                else:
+                    from source_adapters import collect_chat as collect_external_chat
+                    state["chat"] = collect_external_chat(reference, state["metadata"]["duration"], target,
+                        attempt_dir=attempt)
+            except (OSError, ValueError, RuntimeError) as error:
+                state["chat"] = dict(status="unavailable", path=str(target),
+                    meta_path=str(target.with_suffix(".meta.json")),
+                    error_code="optional_chat_" + type(error).__name__)
+            save(checkpoint, state)
+        os.environ.pop("LOKI_SOURCE_PREPARATION", None)
         phase = "local_stt"
         if "speech" not in state:
             from transcribe_source import run as transcribe
@@ -277,6 +307,8 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
             channel_name=metadata["channelName"], duration=math.ceil(state["clock"]["duration_sec"]),
             publish_date=metadata["liveOpenDate"], broadcast_start_at=metadata["liveOpenDate"],
             replay_publish_at=metadata["publishDate"], source_url=vod.rstrip("/"))
+        if reference.platform != "chzzk":
+            vod_info.update(source_platform=reference.platform, source_id=reference.native_id)
         base = attempt / "base.md"
         if not base.exists():
             with base.open("x", encoding="utf-8") as stream:

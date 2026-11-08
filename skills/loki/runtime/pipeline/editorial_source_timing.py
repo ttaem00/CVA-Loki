@@ -30,7 +30,8 @@ def bound_live_source_clock(source):
         raise ValueError("native_live_source_clock_changed")
     return current
 
-def prepare_source_timing(*, video_no, duration_sec, work_dir, chunks, srt_path=None):
+def prepare_source_timing(*, video_no, duration_sec, work_dir, chunks, srt_path=None,
+                          source_platform=None, source_native_id=""):
     from .broadcast_map_evidence import _canonical_stt_rows, _canonical_source_revision
     from .timed_evidence import build_timeline_source_evidence
 
@@ -44,7 +45,8 @@ def prepare_source_timing(*, video_no, duration_sec, work_dir, chunks, srt_path=
     if not transcript.is_relative_to(root) or not transcript.is_file():
         raise ValueError("highlight_prepared_transcript_invalid")
     asset, = register_assets(video_no=video_no, srt_path=transcript, work_dir=root,
-        duration_sec=duration_sec, policy=SourcePolicy(("stt",), ("stt",)))
+        duration_sec=duration_sec, policy=SourcePolicy(("stt",), ("stt",)),
+        source_platform=source_platform, source_native_id=source_native_id)
     records = list(iter_srt_records(asset))
     legacy_rows = _canonical_stt_rows(chunks)
     revision = _canonical_source_revision("stt", legacy_rows)

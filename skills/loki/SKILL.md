@@ -1,6 +1,6 @@
 ---
 name: loki
-description: 공개 치지직 다시보기 번호나 같은 방송의 로컬 자료를 읽고, 현재 대화의 ChatGPT 또는 Codex가 요약·타임라인·Point·Story·Highlight와 선택 이미지를 직접 작성한 뒤 검토·저장한다.
+description: 치지직을 중심으로 공개 YouTube 라이브 다시보기·SOOP VOD 또는 같은 방송의 로컬 자료를 읽고, 현재 대화의 ChatGPT 또는 Codex가 요약·타임라인·Point·Story·Highlight와 선택 이미지를 직접 작성한 뒤 검토·저장한다.
 ---
 
 # Loki로 직접 작성하기
@@ -42,9 +42,11 @@ Node/npm·FFmpeg·장치별 PyTorch·EmbeddingGemma 2·Whisper·Silero·익명 F
 합성 검사도 새 보고서 작성이나 방송 편집 품질의 증거가 아니다. 자세한 설치·F2·VAD·캐시
 기준은 설정 안내를 따른다. `media`·`core`는 사용자 요청 범위에 맞을 때만 선택한다.
 
-공개 치지직 VOD 번호 또는 URL 한 개, 같은 방송의 SRT·확인된 식별/시각 정보와 선택적 로컬
+치지직 VOD 번호, 종료된 YouTube Live 다시보기·SOOP VOD의 단일 URL, 또는 같은 방송의 SRT·확인된 식별/시각 정보와 선택적 로컬
 영상으로 시작한다. 공개 자료 취득은 별도의 온라인 준비 단계이며 로컬 STT와 작성 도구는
 오프라인을 유지한다. 쿠키·로그인 프로필을 수집하지 않는다. 원자료 준비 결과는 작성 완료가 아니다.
+온라인 준비는 `source_acquire.py --workspace <workspace> --vod <단일-다시보기-URL>`을 사용한다.
+준비 결과의 플랫폼·원본 ID·재생 시계를 유지하며, 채팅의 미제공·일부 수집을 빈 채팅으로 단정하지 않는다.
 
 ## 2. 준비 → 원문·이미지 읽기 → 직접 작성 → 제출
 

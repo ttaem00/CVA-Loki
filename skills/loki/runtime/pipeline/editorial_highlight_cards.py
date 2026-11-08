@@ -30,6 +30,8 @@ from .utils import sec_to_hms
 
 from .editorial_contract import validate_editorial_priority
 
+from .source_platforms import source_from_fields, source_url_at
+
 EDITORIAL_HIGHLIGHT_CARD_DESIGN = "chzz.editorial-highlight-card.v2"
 
 EDITORIAL_HIGHLIGHT_CARD_CSS_START = "/* editorial-highlight-cards:start */"
@@ -245,6 +247,13 @@ EDITORIAL_HIGHLIGHT_CARD_CSS = f"""
 def _esc(value: object) -> str:
     return html.escape(str(value), quote=True)
 
+def _source_url_at(video_no: str, seconds: float) -> str:
+    try:
+        source = source_from_fields(video_no)
+        return source_url_at(source.platform, source.native_id, seconds)
+    except ValueError:
+        return ""
+
 def editorial_scene_image_data_url(data_url: str) -> str:
     """Encode display pixels without changing the selected source evidence."""
 
@@ -271,7 +280,7 @@ def render_editorial_scene_image(image: object, *, video_no: str) -> str:
         f'<img src="{_esc(editorial_scene_image_data_url(image["data_url"]))}" alt="{_esc(image["alt"])}" '
         'loading="lazy" decoding="async">'
         '<figcaption><a '
-        f'href="https://chzzk.naver.com/video/{_esc(video_no)}?currentTime={int(sec)}" '
+        f'href="{_esc(_source_url_at(video_no, sec))}" '
         f'data-start="{int(sec)}">{_esc(caption)}</a>'
         f'<span class="editorial-scene-clock">{_esc(clock)}</span></figcaption></figure>'
     )
@@ -522,8 +531,7 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
                 '<a class="point-link" '
                 f'data-start="{point_start}" '
                 f'aria-label="{_esc(point.get("timestamp") or "")} {_esc(point_title)}로 이동" '
-                f'href="https://chzzk.naver.com/video/'
-                f'{_esc(video_no)}?currentTime={point_start}">'
+                f'href="{_esc(_source_url_at(video_no, point_start))}">'
                 f'<span class="point-link-time">{_esc(point.get("timestamp") or "")}</span>'
                 f'{point_title_html}</a>'
                 if point_start is not None else
@@ -599,11 +607,11 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
                 '<span class="source-span-clock">'
             f'<a class="source-time-link" data-start="{int(float(span["start_sec"]))}" '
             f'aria-label="{_esc(sec_to_hms(float(span["start_sec"])))} 구간 시작으로 이동" '
-            f'href="https://chzzk.naver.com/video/{_esc(video_no)}?currentTime={int(float(span["start_sec"]))}">'
+            f'href="{_esc(_source_url_at(video_no, float(span["start_sec"])))}">'
             f'{_esc(sec_to_hms(float(span["start_sec"])))}</a> → '
             f'<a class="source-time-link" data-start="{int(float(span["end_sec"]))}" '
             f'aria-label="{_esc(sec_to_hms(float(span["end_sec"])))} 구간 끝으로 이동" '
-            f'href="https://chzzk.naver.com/video/{_esc(video_no)}?currentTime={int(float(span["end_sec"]))}">'
+            f'href="{_esc(_source_url_at(video_no, float(span["end_sec"])))}">'
             f'{_esc(sec_to_hms(float(span["end_sec"])))}</a></span>'
                 f'<span class="source-span-reason">{_esc(span.get("reason") or "편집 구간")}</span></li>'
             )
@@ -647,13 +655,13 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
                     f'aria-label="장면 {span_index + 1}/{len(spans)}, '
                     f'{_esc(sec_to_hms(float(span["start_sec"])))}부터 '
                     f'{_esc(sec_to_hms(float(span["end_sec"])))}까지, 시작으로 이동" '
-                    f'href="https://chzzk.naver.com/video/{_esc(video_no)}?currentTime={int(float(span["start_sec"]))}">'
+                    f'href="{_esc(_source_url_at(video_no, float(span["start_sec"])))}">'
                     f'[{_esc(sec_to_hms(float(span["start_sec"])))}–{_esc(sec_to_hms(float(span["end_sec"])))}]</a>'
                     for span_index, span in enumerate(spans)
                 )
                 + '</nav><a class="highlight-link" '
                 f'data-start="{start}" '
-                f'href="https://chzzk.naver.com/video/{_esc(video_no)}?currentTime={start}">'
+                f'href="{_esc(_source_url_at(video_no, start))}">'
                 f'{action_label}</a></div>'
             )
         cards.append(
@@ -678,7 +686,7 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
         point_seek = (
             '<a class="standalone-point standalone-point-time-link" '
             f'data-start="{point_start}" aria-label="{_esc(point.get("timestamp") or "")} 원본으로 이동" '
-            f'href="https://chzzk.naver.com/video/{_esc(video_no)}?currentTime={point_start}">'
+            f'href="{_esc(_source_url_at(video_no, point_start))}">'
             f'<span class="standalone-point-time">{_esc(point.get("timestamp") or "")}</span></a>'
             if point_start is not None else
             '<span class="standalone-point standalone-point-time-link is-disabled" aria-disabled="true">'

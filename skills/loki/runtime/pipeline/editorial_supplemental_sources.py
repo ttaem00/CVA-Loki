@@ -265,7 +265,8 @@ def validate_supplemental_sources(cfg: Mapping, *, video_no=None, work_dir=None)
     if not isinstance(value, dict) or set(value) != {"profile", "video_no", "assets"}:
         raise ValueError("supplemental_sources_invalid_shape")
     video = str(value["video_no"])
-    if value["profile"] != PROFILE or not re.fullmatch(r"[0-9]+", video):
+    from .source_platforms import valid_work_id
+    if value["profile"] != PROFILE or not (re.fullmatch(r"[0-9]+", video) or valid_work_id(video)):
         raise ValueError("supplemental_sources_invalid_profile_or_video")
     if video_no is not None and str(video_no) != video:
         raise ValueError("supplemental_sources_video_mismatch")
@@ -350,8 +351,12 @@ def build_supplemental_context(cfg: Mapping, *, video_no, work_dir, duration_sec
 
 
     comment_path = next((row['path'] for row in identity['assets'] if row['family'] == 'timeline_comments'), None)
+    source_url = f"https://chzzk.naver.com/video/{video_no}"
+    if str(video_no).startswith(('youtube-', 'soop-')):
+        from .source_platforms import source_from_fields
+        source_url = source_from_fields(str(video_no)).url
     bundle = load_timeline_comment_bundle(str(video_no), native_path(comment_path).parent, cache_ttl_hours=0,
-        expected_source_url=f"https://chzzk.naver.com/video/{video_no}") if comment_available else None
+        expected_source_url=source_url) if comment_available else None
     if bundle is None and (not production or identity.get("availability", {}).get("timeline_comments") == "available"):
         raise ValueError("supplemental_sources_comments_unavailable")
     context = build_timeline_comment_context(build_private_timeline_anchors_for_bundle(bundle),
@@ -394,9 +399,11 @@ def validate_supplemental_context(value, *, video_no=None):
         raise ValueError("supplemental_context_invalid_shape")
     binding = value["binding"]
     production = isinstance(binding, dict) and binding.get("profile") == PRODUCTION_PROFILE
+    from .source_platforms import valid_work_id
     if (not isinstance(binding, dict) or set(binding) != ({"profile", "video_no", "assets", "availability"} if production else {"profile", "video_no", "assets"})
             or binding.get("profile") not in {PROFILE, PRODUCTION_PROFILE}
-            or not re.fullmatch(r"[0-9]+", str(binding.get("video_no", "")))
+            or not (re.fullmatch(r"[0-9]+", str(binding.get("video_no", "")))
+                    or valid_work_id(binding.get("video_no", "")))
             or (video_no is not None and binding.get("video_no") != str(video_no))):
         raise ValueError("supplemental_context_video_or_profile_mismatch")
     assets = binding["assets"]

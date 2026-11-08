@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import re
+from ..source_platforms import source_from_fields, source_url_at
 
 def _audio_peak_delta_text(tc_text: str, audio_peak_secs: list[float], tolerance_sec: int = 30) -> str:
     if not audio_peak_secs:
@@ -56,17 +56,21 @@ def _hms_to_seconds(hms: str) -> int | None:
     return None
 
 def _chzzk_video_url_at(video_no: str, tc_or_range: str) -> str:
-    """치지직 다시보기 특정 시점 링크.
+    """원본 다시보기 특정 시점 링크 (기존 호출 이름 유지).
 
     `HH:MM:SS` 또는 `HH:MM:SS~HH:MM:SS` (range 일 때 시작 tc 사용) 둘 다 처리.
     유효한 video_no + 파싱 가능한 tc 가 아니면 빈 문자열을 반환해 호출부에서
     링크 없이 fallback 하도록 한다.
     """
     video_no = str(video_no or "").strip()
-    if not re.fullmatch(r"[1-9][0-9]{0,19}", video_no) or not tc_or_range:
+    if not tc_or_range:
         return ""
     start_tc = tc_or_range.split("~", 1)[0].strip() if "~" in tc_or_range else tc_or_range.strip()
     secs = _hms_to_seconds(start_tc)
     if secs is None:
         return ""
-    return f"https://chzzk.naver.com/video/{video_no}?currentTime={secs}"
+    try:
+        source = source_from_fields(video_no)
+        return source_url_at(source.platform, source.native_id, secs)
+    except ValueError:
+        return ""

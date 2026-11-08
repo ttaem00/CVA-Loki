@@ -352,7 +352,10 @@ if (labels.length > 0) {
         const videoNo = source ? String(source.video_no || '') : vodVideoNo;
         if (!videoNo) return;
         const seekSec = source ? sec - Number(source.offset_sec) : sec;
-        const url = `https://chzzk.naver.com/video/${videoNo}?currentTime=${Math.max(0, Math.floor(seekSec))}`;
+        const url = typeof sourceVideoUrlAt === 'function'
+          ? sourceVideoUrlAt(videoNo, Math.max(0, seekSec), source?.source_platform || report?.source_platform || '')
+          : (/^\d{1,16}$/.test(videoNo) ? `https://chzzk.naver.com/video/${videoNo}?currentTime=${Math.max(0, Math.floor(seekSec))}` : '');
+        if (!url) return;
         if (typeof navigateChzzkCompanion === 'function') {
           navigateChzzkCompanion(url);
         } else {

@@ -252,16 +252,20 @@ class ReviewStore:
         vod = VODInfo(video_no=str(current["video_no"]), title=str(current.get("title", "")),
             channel_id=str(current.get("channel_id", "")), channel_name=str(current.get("channel", "")),
             duration=duration, publish_date=str(current.get("publish_date", "")),
+            source_platform=current.get("source_platform") or "chzzk",
+            source_id=str(current.get("source_id") or ""), source_url=str(current.get("source_url") or ""),
             thumbnail_url=str(current.get("thumbnail_url") or ""), category=str(current.get("category") or ""))
+        snapshot = current.get("report_projection")
         rendered = render_summary_report_html(ReportHtmlRenderRequest(report_markdown=markdown, vod_info=vod,
-            output_dir="", base=context["base"], highlights=[], chats=[], community_posts=[], public_url_base="",
+            output_dir="", base=context["base"], highlights=None if isinstance(snapshot, dict) else [],
+            chats=None if isinstance(snapshot, dict) else [], community_posts=[], public_url_base="",
             user_clips=None, promoted_anchors_dicts=[], show_community_reaction_summary=True,
             show_community_reaction_cafe=False, audio_reaction_metadata=None,
             youtube_chapter_readiness=deepcopy(current.get("youtube_chapter_readiness", {})), srt_path="",
             safe_timeline_comment_context={}, comment_timeline_supplement_learning=deepcopy(
                 current.get("comment_timeline_supplement_learning", {})), outline_source_path="",
             structured_outline=outline, editorial_review_packet=packet, summary_pipeline=current["summary_pipeline"],
-            report_projection_source=deepcopy(current.get("report_projection"))))
+            report_projection_source=deepcopy(snapshot)))
         meta = deepcopy(current)
         meta.update({key: value for key, value in rendered.metadata_sec.items() if key not in VOD_IDENTITY_FIELDS})
         meta.update(structured_outline=outline, manager_markdown=markdown, editorial_review_packet=packet,
@@ -411,7 +415,9 @@ class ReviewStore:
         return dict(report, kind="vod", revision_id=context["revision_id"],
             channel=meta.get("channel", ""), channel_id=meta.get("channel_id", ""),
             duration=meta["duration"], summary_pipeline=deepcopy(meta.get("summary_pipeline", {})),
-            source_platform="chzzk", public_report_url="", admin_only={},
+            source_platform=meta.get("source_platform", "chzzk"),
+            source_id=meta.get("source_id", meta["video_no"]), source_url=meta.get("source_url", ""),
+            public_report_url="", admin_only={},
             youtube_alignment={}, naver_cafe_destination=None, staleness={}, review_tools_pending=False,
             manager_outline_revisions=history, publish_revisions=self.workspace_revisions(base),
             capabilities=dict(local_edit=True, local_preview=True, local_history=True,
@@ -564,8 +570,11 @@ class ReviewStore:
         path = self._path(media["path"])
         if not path.is_relative_to(self.work / video) or not native_path(path).is_file() or path.suffix.lower() != ".mp4":
             raise ValueError("review_media_source_invalid")
-        return dict(id=identity, path=path, sha256=media["sha256"],
-            original_url="https://chzzk.naver.com/video/" + video)
+        from pipeline.source_platforms import source_from_fields
+        meta = context["meta"]
+        source = source_from_fields(video, meta.get("source_platform", "chzzk"),
+            str(meta.get("source_id") or ""), str(meta.get("source_url") or ""))
+        return dict(id=identity, path=path, sha256=media["sha256"], original_url=source.url)
 
     def workspace_catalog(self, *, q="", streamer=None, offset=0, limit=100):
         offset, limit = int(offset), int(limit)

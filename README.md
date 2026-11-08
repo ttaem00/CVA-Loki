@@ -3,6 +3,7 @@
 </p>
 
 <h1 align="center">CVA-Loki 3.0.7</h1>
+<p align="center">정식 요약 메커니즘 Loki 3.0.7</p>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
@@ -26,14 +27,25 @@
   <a href="#policy">정책 확인</a>
 </p>
 
-<p align="center">
-  <a href="https://chzzk.naver.com/"><img src="docs/assets/chzzk-logo-ko.png" width="132" alt="대상 플랫폼 치지직의 공식 한글 로고" /></a>
-</p>
-<p align="center"><strong>치지직 대상 비공식 프로젝트</strong><br />네이버·치지직이 제작·운영하는 공식 서비스가 아니며, 제휴·후원·보증 관계가 없습니다.<br />치지직 명칭과 로고의 권리는 네이버에 있습니다.</p>
+<table align="center">
+  <tr>
+    <td align="center"><a href="https://chzzk.naver.com/"><img src="docs/assets/chzzk-logo-ko.png" height="100" alt="치지직 공식 한글 로고" /></a></td>
+    <td align="center"><a href="https://www.youtube.com/#gh-light-mode-only"><img src="docs/assets/youtube-logo.png" height="100" alt="YouTube 공식 로고" /></a><a href="https://www.youtube.com/#gh-dark-mode-only"><img src="docs/assets/youtube-logo-dark.png" height="100" alt="YouTube 공식 로고" /></a></td>
+    <td align="center"><a href="https://www.sooplive.com/#gh-light-mode-only"><img src="docs/assets/soop-logo.svg" height="100" alt="SOOP 공식 로고" /></a><a href="https://www.sooplive.com/#gh-dark-mode-only"><img src="docs/assets/soop-logo-dark.svg" height="100" alt="SOOP 공식 로고" /></a></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>CHZZK 메인</strong></td>
+    <td align="center"><strong>YouTube Live 다시보기</strong></td>
+    <td align="center"><strong>SOOP VOD</strong></td>
+  </tr>
+</table>
+<p align="center"><strong>치지직을 메인으로 하는 비공식 프로젝트</strong><br />네이버·치지직, Google·YouTube, SOOP이 제작·운영하는 공식 서비스가 아니며, 제휴·후원·보증 관계가 없습니다.</p>
 
 치지직 로고는 대상 플랫폼을 안내하기 위해 원본 형태로 표시합니다. [치지직 공식 로고 사용 안내](https://help.naver.com/service/23946/contents/23364?lang=ko&osType=COMMONOS)의 형태·색상·비율 보존, 제휴 오인 금지, 상업적 목적 사용 금지 조건을 따릅니다. CVA의 이용허락은 치지직 로고나 방송 원자료의 이용 권리까지 부여하지 않습니다.
 
-공개 치지직 VOD 번호 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex 또는 명시적으로 선택한 ChatGPT가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다.
+YouTube·SOOP 로고도 공식 원본의 형태·색상·비율을 유지합니다. 로고의 권리와 사용 조건은 각 권리자에게 있으며, [원본 출처와 제3자 고지](THIRD_PARTY_NOTICES.md#플랫폼-로고)를 확인하세요.
+
+현재 `main` 소스 설치에서는 공개 치지직 VOD 번호, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex 또는 명시적으로 선택한 ChatGPT가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다. YouTube·SOOP 원자료 준비는 현재 소스 설치에 포함되며, 기존 v3.0.7 ZIP에는 포함되지 않습니다.
 
 ### ChatGPT 자체 Linux에서 사용
 
@@ -42,7 +54,7 @@ ChatGPT 호환성(`current_chatgpt`)은 이 배포본에 포함되어 있습니�
 ```sh
 python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode current_chatgpt
 # 이후 설치 결과의 실제 Python/runtime 경로를 사용한다.
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <VOD번호>
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <VOD번호-또는-단일-다시보기URL>
 <workspace-python> <runtime>/loki.py --config <workspace>/loki.json prepare --spec <반환된-prepare_spec_path>
 ```
 
@@ -79,12 +91,14 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 ### 1. 배포 폴더를 준비하세요
 
-CVA-Loki 3.0.7은 정식 요약 메커니즘 Loki 3.0.7을 포함합니다. [3.0.7 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.7)의 `CVA-Loki-3.0.7.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+YouTube Live 다시보기·SOOP VOD를 준비하려면 아래 명령으로 [원본 저장소의 현재 `main` 소스](https://github.com/ttaem00/CVA-Loki/tree/main)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+
+[기존 v3.0.7 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.7)의 `CVA-Loki-3.0.7.zip`은 치지직 원자료 준비를 포함한 고정 배포본입니다. 이 ZIP과 태그는 그대로 보존하며, 현재 소스에 추가된 YouTube·SOOP 원자료 준비는 포함하지 않습니다.
 
 배포·플러그인·스킬·요약 메커니즘 버전은 모두 **3.0.7**이며, 새 작업의 `latest`도 **Loki 3.0.7**을 선택합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 보존합니다. 이미 설치한 이전 버전의 작업공간을 덮어쓰지 말고 새 배포본은 새 작업공간에 설치하세요.
 
 ```sh
-git clone https://github.com/ttaem00/CVA-Loki.git
+git clone --branch main --single-branch https://github.com/ttaem00/CVA-Loki.git
 cd CVA-Loki
 ```
 
@@ -131,9 +145,9 @@ docker compose run --build --rm loki
 
 이 저장소를 다운로드하거나 clone한 뒤, 해당 폴더를 열어 둔 현재 Codex에 다음처럼 요청하세요.
 
-> README와 Loki 스킬을 읽고, 이 컴퓨터에 맞는 기본 전체 기능을 설치해줘. 배포 폴더 밖의 새 작업공간을 사용하고 GPU 감지·실행 결과를 확인해줘. 설치가 끝나면 내가 준 치지직 VOD를 준비하고, 네가 Loki의 원문과 반환 이미지를 직접 읽어 새 보고서를 작성·제출해줘. 마지막으로 검토 UI를 열어줘. 외부 게시는 하지 마.
+> README와 Loki 스킬을 읽고, 이 컴퓨터에 맞는 기본 전체 기능을 설치해줘. 배포 폴더 밖의 새 작업공간을 사용하고 GPU 감지·실행 결과를 확인해줘. 설치가 끝나면 내가 준 VOD를 준비하고, 네가 Loki의 원문과 반환 이미지를 직접 읽어 새 보고서를 작성·제출해줘. 마지막으로 검토 UI를 열어줘. 외부 게시는 하지 마.
 
-VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함께 전달하세요. 기존 SRT로 시작하려면 URL 대신 해당 파일과 확인된 VOD 정보를 알려주면 됩니다.
+실제 요청할 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD의 단일 URL을 함께 전달하세요. 기존 SRT로 시작하려면 URL 대신 해당 파일과 확인된 VOD 정보를 알려주면 됩니다.
 
 </details>
 
@@ -142,7 +156,7 @@ VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함�
 
 | 기능 | 요약 메커니즘 3.0.7 동작 |
 | --- | --- |
-| 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
+| 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
 | 원문 읽기와 메모 | 출처·시계·revision에 연결된 원문을 읽고 유용한 판단 메모를 보존합니다. |
 | 피크·채팅 신호 | 반응·채팅 밀도·클립 등의 시각과 근거를 따라 원문 위치를 찾습니다. 같은 발생의 여러 표시를 구분해 후보를 고릅니다. |
@@ -176,7 +190,7 @@ VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함�
 
 ```mermaid
 flowchart TD
-    URL["사용자가 지정한 공개 치지직 VOD"] --> ACQ["온라인 원자료 준비"]
+    URL["공개 치지직 VOD · YouTube Live 다시보기 · SOOP VOD"] --> ACQ["온라인 원자료 준비"]
     LOCAL["기존 SRT와 같은 VOD 영상"] --> PREP["출처와 시계를 묶어 준비"]
     ACQ --> AV["로컬 영상·메타데이터·채팅"]
     AV --> STT["로컬 Whisper · Silero · 익명 F2"]
@@ -255,10 +269,10 @@ AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지�
 <a id="native-install"></a>
 ## 로컬 설치
 
-저장소를 clone하거나 ZIP을 해제합니다.
+현재 `main` 소스를 clone해 설치합니다. 기존 v3.0.7 ZIP을 해제한 경우에는 그 배포본에 포함된 치지직 원자료 준비를 사용합니다.
 
 ```sh
-git clone https://github.com/ttaem00/CVA-Loki.git
+git clone --branch main --single-branch https://github.com/ttaem00/CVA-Loki.git
 cd CVA-Loki
 python install.py --workspace ../loki-workspace --mode skill
 ```
@@ -428,7 +442,7 @@ docker compose -p my-loki run --build --rm loki
 <a id="source-preparation"></a>
 ## 공개 VOD로 원자료 준비
 
-공개 VOD 한 개를 영상·메타데이터·자막으로 준비한 뒤 현재 Codex의 작성 흐름에 연결합니다.
+현재 소스 설치에서는 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기 또는 SOOP VOD 한 개를 영상·메타데이터·자막으로 준비한 뒤 같은 현재 Codex 작성 흐름에 연결합니다.
 
 <details>
 <summary><strong>공개 VOD 준비 명령·옵션·prepare spec 보기</strong></summary>
@@ -439,16 +453,23 @@ docker compose -p my-loki run --build --rm loki
 <workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://chzzk.naver.com/video/<video-number>
 ```
 
+YouTube·SOOP도 같은 명령의 `--vod` 값만 바꿉니다.
+
+```sh
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod "https://www.youtube.com/watch?v=<video-id>"
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://vod.sooplive.com/player/<vod-number>
+```
+
 | 인수 | 범위 |
 | --- | --- |
 | `--workspace` | 설치한 작업공간. |
-| `--vod` | 단일 `https://chzzk.naver.com/video/숫자` URL. |
+| `--vod` | 치지직 VOD 번호 또는 단일 치지직·YouTube·SOOP VOD URL. SOOP의 기존 AfreecaTV VOD URL도 같은 SOOP 원본으로 연결합니다. |
 | `--height` | 144, 360, 480, 720, 1080 중 하나. 기본 480. |
 | `--max-download-seconds` | 다운로드 단계 제한. 기본 21600초, 허용 60–21600초. STT 전체 시간 제한이 아닙니다. |
 
 다운로드한 영상은 오디오·비디오 스트림과 길이를 검사합니다. 준비 계약의 정수 duration은 검증한 미디어 길이를 올림해 마지막 소수점 자막 cue가 제외되지 않게 하며, 정확한 미디어 길이와 원본 시작 offset은 clock 기록에 보존합니다.
 
-요청별 파일은 `work/<video_no>/source-<attempt>/`에 남습니다. 이전 입력이나 사용자 메모를 덮어쓰지 않고, STT 실패 뒤에도 검증된 다운로드 체크포인트를 재사용할 수 있습니다. 익명 접근이 안 되는 VOD는 인증 우회 없이 실패합니다. 사용 가능한 공개 채팅은 선택 자료이며 채팅 수집 실패 자체가 전사 성공을 무효화하지는 않습니다.
+요청별 파일은 `work/<video_no>/source-<attempt>/`에 남습니다. YouTube·SOOP은 작업 번호에 플랫폼을 포함해 같은 숫자의 치지직 VOD와 구분합니다. 이전 입력이나 사용자 메모를 덮어쓰지 않고, STT 실패 뒤에도 검증된 다운로드 체크포인트를 재사용할 수 있습니다. 익명 접근이 안 되는 VOD는 인증 우회 없이 실패합니다. 사용 가능한 공개 채팅은 선택 자료이며 채팅 수집 실패 자체가 전사 성공을 무효화하지는 않습니다.
 
 Docker에 설치했다면 같은 볼륨을 연결한 서비스에서 런타임을 실행할 수 있습니다.
 
@@ -842,7 +863,7 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 아닙니다. 로컬 검색 encoder입니다. 현재 대화의 Codex가 원문·이미지를 직접 읽고 판단·작성합니다.
 
 **VOD URL만 주면 되나요?**  
-익명 공개 치지직 VOD라면 전체 설치의 source 준비부터 시작할 수 있습니다. 준비 이후 현재 Codex의 실제 읽기·작성·제출이 필요하며 인증이 필요한 VOD는 수집하지 않습니다.
+현재 소스의 전체 설치에서는 익명 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL로 source 준비부터 시작할 수 있습니다. 기존 v3.0.7 ZIP의 온라인 원자료 준비는 치지직 대상입니다. 준비 이후 현재 Codex의 실제 읽기·작성·제출이 필요하며 인증이 필요한 VOD는 수집하지 않습니다.
 
 **GPU 없이 사용할 수 있나요?**  
 네. 호환 GPU가 없거나 명시 CPU를 선택하면 가능합니다. Docker에서는 CPU override도 함께 사용하세요. 긴 STT 작업은 처리 시간과 메모리 요구를 고려해야 합니다.

@@ -16,6 +16,11 @@ def _prepare_current_conversation_sources(*, vod, spec, source_dir, root, work, 
     if native_path(configured_work).resolve() != work:
         raise ValueError("loki_current_source_workspace_mismatch")
     core = policy["features"] == "core"
+    if getattr(vod, 'source_platform', 'chzzk') in {'youtube', 'soop'}:
+        if spec.get('media_path') and core:
+            raise ValueError("loki_media_feature_not_installed")
+        from ..editorial_current_sources import prepare_local_source_files
+        return prepare_local_source_files(vod=vod, spec=spec, source_dir=source_dir, root=root)
     video = str(vod.video_no)
     prepared_media_path = spec.get("media_path")
     if prepared_media_path:

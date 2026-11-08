@@ -183,7 +183,6 @@ def prepare(spec):
     minutes = spec.get('authoring_minutes')
     if 'authoring_minutes' in spec and (type(minutes) is not int or minutes <= 0):
         raise ValueError('current_conversation_authoring_minutes_must_be_positive_integer')
-    author_owner = current_conversation_author_owner(spec["author"])
     vod = VODInfo(**spec["vod_info"])
     video = str(vod.video_no)
     source_dir = native_path(spec["source_work_dir"]).resolve()
@@ -210,6 +209,15 @@ def prepare(spec):
             if saved["spec_sha256"] != spec_sha256:
                 raise ValueError("current_conversation_prepare_identity_changed")
             return _prepare_receipt(root, saved)
+        source_binding = {}
+        if vod.source_platform != "chzzk" or video.startswith(("youtube-", "soop-")):
+            from .source_platforms import source_from_fields
+            reference = source_from_fields(video, vod.source_platform, vod.source_id, vod.source_url)
+            if (reference.work_id != video or reference.platform != vod.source_platform
+                    or not vod.source_id or not vod.source_url):
+                raise ValueError("current_conversation_source_work_identity_mismatch")
+            source_binding = dict(source_platform=reference.platform, source_native_id=reference.native_id)
+        author_owner = current_conversation_author_owner(spec["author"])
         preparation_started = time.time()
         from .loki_version_policy import new_job_defaults, select_new_pipeline
         selected_pipeline = select_new_pipeline(spec.get("summary_pipeline_version", "latest"))
@@ -259,7 +267,7 @@ def prepare(spec):
             run_root=root / "source-reads", duration_sec=vod.duration,
             policy=SourcePolicy(allowed_families=("stt", "chat", "clip", "audio_features"), required_families=("stt",)),
             owner=author_owner, clip_source_path=clip_path,
-            chat_source_path=chat_source_path)
+            chat_source_path=chat_source_path, **source_binding)
         service.configure_read(read_page_policy)
         service.configure_hierarchy(spec.get('hierarchy'))
         from .evidence_world.summary_hints import vod_hint_configuration

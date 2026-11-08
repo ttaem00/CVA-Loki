@@ -305,7 +305,7 @@
       document.title = `${data.title} — Report Admin`;
 
       const isBundle = data.kind === 'bundle';
-      const isYoutube = data.source_platform === 'youtube';
+      const isChzzk = !data.source_platform || data.source_platform === 'chzzk';
       // #448 source manifest 는 번들엔 적용 X — 링크 숨김.
       if (sourceManifestLinkEl) {
         sourceManifestLinkEl.style.display = isBundle ? 'none' : '';
@@ -351,18 +351,18 @@
         }
         document.querySelector('.youtube-section').style.display = '';
         if (naverCafePanelEl) naverCafePanelEl.style.display = '';
-        if (chzzkCommentGroupEl) chzzkCommentGroupEl.style.display = isYoutube ? 'none' : '';
+        if (chzzkCommentGroupEl) chzzkCommentGroupEl.style.display = isChzzk ? '' : 'none';
         applyYoutubePayload(data.youtube_alignment || {});
         renderAdminOnlyPanel(data);
         renderNaverCafeDestination(data.naver_cafe_destination || null);
-        splitVideoNo = isYoutube ? '' : String(data.video_no || '');
+        splitVideoNo = isChzzk ? String(data.video_no || '') : '';
         if (splitViewToggleBtn) {
           splitViewToggleBtn.disabled = !splitVideoNo;
-          splitViewToggleBtn.title = isYoutube
-            ? 'YouTube 보고서는 오른쪽 미리보기에서 확인합니다.'
+          splitViewToggleBtn.title = !isChzzk
+            ? '이 원본은 장면 도구의 원본 링크에서 확인합니다.'
             : '타임라인 카드를 누르면 위쪽 플레이어가 그 장면으로 이동합니다';
         }
-        if (isYoutube) setSplitView(false, { silent: true });
+        if (!isChzzk) setSplitView(false, { silent: true });
         let savedSplit = '0';
         try { savedSplit = localStorage.getItem('reportAdmin.splitView') || '0'; } catch (_) {}
         if (savedSplit === '1' && splitVideoNo) setSplitView(true, { silent: true });
@@ -401,8 +401,8 @@
       }
       if (chzzkCommentDraftListEl) chzzkCommentDraftListEl.innerHTML = '';
       setChzzkCommentStatus(
-        isYoutube
-          ? 'YouTube 리포트에는 CHZZK 댓글 도구를 사용하지 않습니다.'
+        !isChzzk
+          ? '이 원본에는 CHZZK 댓글 도구를 사용하지 않습니다.'
           : isBundle
           ? '현재 본문 기준으로 VOD별 CHZZK 댓글 초안을 만들 수 있습니다.'
           : '현재 본문 기준으로 CHZZK 댓글 초안을 만들 수 있습니다.',

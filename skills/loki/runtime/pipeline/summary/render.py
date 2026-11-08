@@ -18,15 +18,15 @@ from ..models import VODInfo
 
 from .parse import _parse_summary_sections
 
-from .render_primitives import _chzzk_video_url_at, _hms_to_seconds, _html_escape
+from .render_primitives import _hms_to_seconds, _html_escape
 
-from .viewer_editor import _VIEWER_EDITOR_LANE_LABELS, _viewer_editor_lane_summaries_for_events, _viewer_editor_limit_events_preserving_viewer_clips, _viewer_editor_guidance_from_flags, _viewer_editor_stable_source_identity_key, _scope_viewer_editor_evidence_source, _build_viewer_editor_tools_payload, _dedupe_viewer_editor_viewer_clip_events, _audio_peak_badge_html, _build_chzzk_vod_url, _build_source_vod_url, _build_user_clips_block, _build_viewer_editor_tools_html, _chartjs_script_tag, _generate_youtube_html, _normalize_viewer_clip_title, _render_chzzk_comment_text, _render_community_reaction_md, _render_tc_anchor_html, _render_top_vod_link_html, _source_id, _source_platform, _validate_editorial_review_projection, _viewer_clip_badge_html, _viewer_editor_json
+from .viewer_editor import _VIEWER_EDITOR_LANE_LABELS, _viewer_editor_lane_summaries_for_events, _viewer_editor_limit_events_preserving_viewer_clips, _viewer_editor_guidance_from_flags, _viewer_editor_stable_source_identity_key, _scope_viewer_editor_evidence_source, _build_viewer_editor_tools_payload, _dedupe_viewer_editor_viewer_clip_events, _audio_peak_badge_html, _build_source_vod_url, _build_user_clips_block, _build_viewer_editor_tools_html, _chartjs_script_tag, _generate_youtube_html, _normalize_viewer_clip_title, _render_chzzk_comment_text, _render_community_reaction_md, _render_tc_anchor_html, _render_top_vod_link_html, _source_id, _source_platform, _validate_editorial_review_projection, _viewer_clip_badge_html, _viewer_editor_json
 
 from .cafe_projection import _HIGHLIGHT_LEARNING_NOTICE, _render_inline_md, _render_naver_cafe_html
 
 from .merge_recovery import SUMMARY_MERGE_FALLBACK_MARKER, SUMMARY_MERGE_FALLBACK_SCHEMA_VERSION, SUMMARY_MERGE_FALLBACK_TIMELINE_MAX_BLOCKS
 
-from .markdown_postprocess import _postprocess_summary_md, _strip_editorial_review_markdown, _merge_editorial_review_markdown, _normalize_promoted_anchors_for_inject
+from .markdown_postprocess import _source_video_url_at, _postprocess_summary_md, _strip_editorial_review_markdown, _merge_editorial_review_markdown, _normalize_promoted_anchors_for_inject
 
 _VIEWER_EDITOR_TOOLS_JS = (Path(__file__).parent / "viewer.js").read_text(encoding="utf-8")
 
@@ -295,7 +295,7 @@ def _project_official_highlight_candidates_into_markdown(
         matched = legacy_by_start.get(int(start_sec), {})
         title = str(candidate.get("title") or matched.get("title") or "하이라이트 후보").strip()
         reason = str(matched.get("reason") or candidate.get("content") or "").strip()
-        url = _chzzk_video_url_at(str(vod_info.video_no or ""), start_text)
+        url = _source_video_url_at(vod_info, start_text)
         rendered.append(f"{index}. **[{start_text}~{end_text}]({url}) {title}**\n" + (f"    - 추천 이유: {reason}\n" if reason else ""))
     replacement = "### 🎬 하이라이트 추천 구간\n\n" + "\n".join(rendered).rstrip() + "\n"
     pattern = re.compile(r"^###\s*🎬\s*하이라이트 추천 구간\s*$.*?(?=^###\s|\Z)", flags=re.MULTILINE | re.DOTALL)
@@ -560,11 +560,18 @@ _SUMMARY_EVIDENCE_CONTROLS_HTML = """
     const s = total % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
-  const chzzkUrlAt = (sec) => {
+  const sourceUrlAt = (sec) => {
     const videoNo = String(quotePayload?.video_no || '').trim();
     const value = Number(sec);
     if (!videoNo || !Number.isFinite(value) || value < 0) return '';
-    return `https://chzzk.naver.com/video/${encodeURIComponent(videoNo)}?currentTime=${Math.floor(value)}`;
+    const seconds = Math.floor(value);
+    if (/^youtube-[A-Za-z0-9_-]{11}$/.test(videoNo)) {
+      return `https://www.youtube.com/watch?v=${videoNo.slice(8)}&t=${seconds}s`;
+    }
+    if (/^soop-\\d{1,16}$/.test(videoNo)) {
+      return `https://vod.sooplive.com/player/${videoNo.slice(5)}?change_second=${seconds}`;
+    }
+    return /^\\d{1,16}$/.test(videoNo) ? `https://chzzk.naver.com/video/${videoNo}?currentTime=${seconds}` : '';
   };
   const quoteBySegment = new Map();
   if (
@@ -602,14 +609,14 @@ _SUMMARY_EVIDENCE_CONTROLS_HTML = """
       const chip = document.createElement('span');
       chip.className = 'summary-evidence-quote-citation';
       const time = row.timecode || formatTime(row.start_sec);
-      const url = chzzkUrlAt(row.start_sec);
+      const url = sourceUrlAt(row.start_sec);
       if (time && url) {
         const link = document.createElement('a');
         link.href = url;
         link.target = '_blank';
         link.rel = 'noopener';
         link.textContent = `[${time}]`;
-        link.title = '치지직 다시보기에서 이 근거 시점부터 재생';
+        link.title = '원본 영상에서 이 근거 시점부터 재생';
         chip.append(link);
       } else if (time) {
         const span = document.createElement('span');
