@@ -1,9 +1,9 @@
 {
   "schema_version": "loki.release.v1",
   "version": "3.0.7",
-  "source_commit": "0d9b6f23f77f28ad1d9a7781d666cf490f4a2e8d",
+  "source_commit": "221045261aa1279217c9f42d3980fe254438295a",
   "source_recipe": "skills/loki/runtime/source-recipe.json",
-  "source_recipe_sha256": "5c4db0382db693d9586d84c19799d4747da2a743e6e77ab52ba0e4d48a07bb1b",
+  "source_recipe_sha256": "2ab0af8f3fa7f93ba385a165816a3bf5182a317aaf3b9f655fc9842a8a47d7f3",
   "files": [
     {
       "path": ".agents/plugins/marketplace.json",
@@ -81,9 +81,19 @@
       "bytes": 4066
     },
     {
+      "path": "docs/assets/soop-logo-dark.svg",
+      "sha256": "07f481df5682a20d47606a4800ad9a7edaa195b66ca99a9aca618fc3ed015080",
+      "bytes": 4367
+    },
+    {
       "path": "docs/assets/soop-logo.svg",
       "sha256": "55b3fc7c8a330e5583e8e98266f796f4d0e1c6cd6e5b1719244d5d580720126d",
       "bytes": 4365
+    },
+    {
+      "path": "docs/assets/youtube-logo-dark.png",
+      "sha256": "1bc961a4149125ae68018ca083f25abf254bd689606c1aac9354eff750384ac1",
+      "bytes": 19117
     },
     {
       "path": "docs/assets/youtube-logo.png",
@@ -127,8 +137,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "6ba2a1cf68b6b81d25026c8b7fd42c731e93a7afedf1ca8bc4e29771b5822872",
-      "bytes": 67827
+      "sha256": "37e5e64c145b8b0bc3830de9a01a231a20a4d89999c8a8ffe8a00b7af991022c",
+      "bytes": 68071
     },
     {
       "path": "SECURITY.md",
@@ -166,9 +176,19 @@
       "bytes": 39845
     },
     {
+      "path": "skills/loki/references/assets/soop-logo-dark.svg",
+      "sha256": "07f481df5682a20d47606a4800ad9a7edaa195b66ca99a9aca618fc3ed015080",
+      "bytes": 4367
+    },
+    {
       "path": "skills/loki/references/assets/soop-logo.svg",
       "sha256": "55b3fc7c8a330e5583e8e98266f796f4d0e1c6cd6e5b1719244d5d580720126d",
       "bytes": 4365
+    },
+    {
+      "path": "skills/loki/references/assets/youtube-logo-dark.png",
+      "sha256": "1bc961a4149125ae68018ca083f25abf254bd689606c1aac9354eff750384ac1",
+      "bytes": 19117
     },
     {
       "path": "skills/loki/references/assets/youtube-logo.png",
@@ -212,8 +232,8 @@
     },
     {
       "path": "skills/loki/references/THIRD_PARTY_NOTICES.md",
-      "sha256": "731e0589653146759b2148d048ea6c744f088cda708db385d0a29baed6495c08",
-      "bytes": 10859
+      "sha256": "fdfed3abb36cdb761845268bdadad7e593f11fc0f12dddf345716b3558220f17",
+      "bytes": 11240
     },
     {
       "path": "skills/loki/references/workflow.md",
@@ -1427,12 +1447,12 @@
     },
     {
       "path": "skills/loki/runtime/source-manifest.json",
-      "sha256": "8f1eef003b8459a75a22c6dd4dc66b47d8a24106a9224187c5fce69d98174405",
+      "sha256": "24af539a0ab60ca1dad19415877b487a9b34ca9e3c3208050509f0379cb0c83b",
       "bytes": 262637
     },
     {
       "path": "skills/loki/runtime/source-recipe.json",
-      "sha256": "5c4db0382db693d9586d84c19799d4747da2a743e6e77ab52ba0e4d48a07bb1b",
+      "sha256": "2ab0af8f3fa7f93ba385a165816a3bf5182a317aaf3b9f655fc9842a8a47d7f3",
       "bytes": 232363
     },
     {
@@ -1502,8 +1522,8 @@
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
-      "sha256": "b1c1f81bcc5238e60c718dd95ef073b7e154a8ec57534c1879c667d5ed60273b",
-      "bytes": 10871
+      "sha256": "f195651bfc3bf9f4bccd76f402201fb7865e799e497da66e5caead8657516b21",
+      "bytes": 11246
     },
     {
       "path": "verify_release.py",

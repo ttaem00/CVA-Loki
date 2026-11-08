@@ -87,9 +87,15 @@ YouTube 로고 `docs/assets/youtube-logo.png`의 권리는 Google LLC에 있습�
 최소 크기와 여백 조건을 유지합니다. 이 로고에 CVA의 소스 이용허락을 적용하거나
 Google·YouTube의 제휴·후원·보증을 주장하지 않습니다.
 
+다크 테마의 `youtube-logo-dark.png`도 같은 공식 ZIP의
+`YouTube_Logo/Digital/01 Full Color/yt_logo_fullcolor_white_digital.png`를 변경 없이 사용합니다.
+
 SOOP 로고 `docs/assets/soop-logo.svg`의 권리는 SOOP에 있습니다.
 [SOOP 공식 서비스](https://www.sooplive.com/)에서 사용하는
 [공식 SVG 원본](https://res.sooplive.com/images/svg/soop_logo.svg)을 변경 없이 동봉합니다.
 형태·색상·비율을 유지하며 대상 플랫폼을 안내하는 용도로 표시합니다. 공식 원본의
 공개 접근을 별도 오픈소스 이용허락으로 해석하지 않으며, CVA 코드의 이용허락이
 이 로고에 관한 권리를 확대하지 않습니다. SOOP의 제휴·후원·보증을 주장하지 않습니다.
+
+다크 테마의 `soop-logo-dark.svg`는 공식 서비스의 다크 테마가 사용하는
+[공식 다크 SVG](https://res.sooplive.com/images/svg/soop_logo_dark.svg)를 변경 없이 동봉합니다.
