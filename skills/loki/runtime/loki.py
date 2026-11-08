@@ -155,7 +155,8 @@ def prepare_spec(root, work, policy, path):
 
     allowed = {"vod_info", "work_root", "source_work_dir", "srt_path", "base_path", "job_id",
                "code_version", "author", "packet_path", "orientation_paths", "hierarchy", "retrieval", "media_path",
-               "search_mode", "read_page_policy"}
+               "search_mode", "read_page_policy", "authoring_minutes", "author_prompt_profile", "feature_profile",
+               "signal_priority_profile"}
     if set(spec) - allowed:
         raise ValueError("loki_unavailable_prepare_option")
     if spec.get("author") is not None or policy["author_mode"] == "current_chatgpt":
@@ -226,15 +227,19 @@ def main(argv=None):
     sub.add_parser("doctor")
     prep = sub.add_parser("prepare")
     prep.add_argument("--spec", required=True)
-    for command in ("read", "submit", "remember", "memory"):
+    for command in ("read", "submit", "remember", "memory", "status", "continuation", "draft"):
         child = sub.add_parser(command)
         child.add_argument("--job-root", required=True)
         child.add_argument("--expected-revision", required=True)
         field = {"read": "action", "submit": "response", "remember": "note"}.get(command)
         if field:
             child.add_argument("--" + field, required=True)
-        else:
+        elif command == 'memory':
             child.add_argument("--query")
+        elif command == 'continuation':
+            child.add_argument('--read-id', required=True)
+        elif command == 'draft':
+            child.add_argument('--fields')
     args = parser.parse_args(argv)
     if args.command == "init":
         root = Path(args.directory).absolute()
@@ -298,11 +303,25 @@ def main(argv=None):
                 validate_author_mode(author, policy["author_mode"])
             if args.command == "memory":
                 result = current.memory(job, expected_revision=args.expected_revision, query=args.query)
+            elif args.command == 'continuation':
+                result = current.continuation(job, read_id=args.read_id, expected_revision=args.expected_revision)
+            elif args.command == 'draft':
+                fields = None
+                if args.fields:
+                    path = contained(root, args.fields)
+                    fields = load_json(path, policy['max_input_bytes'])
+                result = current.draft(job, fields, expected_revision=args.expected_revision)
+            elif args.command == 'status':
+                result = current.status(job, expected_revision=args.expected_revision)
             elif args.command == "submit":
                 response = contained(root, args.response)
                 if response.stat().st_size > policy["max_input_bytes"]:
                     raise ValueError("loki_input_exceeds_policy")
-                result = current.submit(job, response, expected_revision=args.expected_revision)
+                try:
+                    result = current.submit(job, response, expected_revision=args.expected_revision)
+                except current.SubmissionRejected as error:
+                    print(json.dumps(error.rejection, ensure_ascii=False, indent=2), file=sys.stderr)
+                    return 2
             else:
                 field = "action" if args.command == "read" else "note"
                 path = contained(root, getattr(args, field))

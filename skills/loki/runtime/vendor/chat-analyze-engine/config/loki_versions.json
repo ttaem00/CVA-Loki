@@ -1,7 +1,7 @@
 {
   "schema_version": "loki.version-policy.v1",
   "product_name": "Loki",
-  "current_pipeline": "loki_3_0_6_1",
+  "current_pipeline": "loki_3_0_7",
   "pipelines": {
     "legacy_v1": {"kind": "legacy", "label": "기존 요약"},
     "pipeline_2_5": {"kind": "structured", "version": "2.9.4.2"},
@@ -11,8 +11,16 @@
     "loki_3_0_4": {"kind": "full_author", "version": "3.0.4", "adoption_status": "manager_selected"},
     "loki_3_0_5": {"kind": "full_author", "version": "3.0.5", "adoption_status": "manager_selected"},
     "loki_3_0_6": {"kind": "full_author", "version": "3.0.6", "adoption_status": "manager_selected"},
-    "loki_3_0_6_1": {"kind": "full_author", "version": "3.0.6.1", "adoption_status": "manager_selected"}
+    "loki_3_0_6_1": {"kind": "full_author", "version": "3.0.6.1", "adoption_status": "manager_selected"},
+    "loki_3_0_7": {"kind": "full_author", "version": "3.0.7", "adoption_status": "manager_selected",
+      "new_job_defaults": {
+        "author_prompt_profile": "evidence_retention_v1",
+        "feature_profile": "source_bound_navigation_v1",
+        "signal_priority_profile": "weighted_signals_v1",
+        "read_page_policy": "balanced_compact_v1",
+        "search_mode": "hybrid_branch_v1"
+      }}
   },
   "aliases": {"aemeth_2_5": "pipeline_2_5"},
-  "new_choices": ["latest", "loki_3_0_6_1"]
+  "new_choices": ["latest", "loki_3_0_7"]
 }

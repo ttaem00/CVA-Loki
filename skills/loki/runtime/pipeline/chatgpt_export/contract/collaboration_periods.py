@@ -153,6 +153,42 @@ def validate_collaboration_periods(periods, duration_sec=None, *, require_eviden
             raise ValueError("collaboration_period_evidence_required")
     return periods
 
+def authored_collaboration_periods(rows, duration_sec=None):
+    """Admit new writer judgments under the existing provisional wire only."""
+    if not isinstance(rows, list):
+        raise ValueError('collaboration_periods_must_be_bounded_array')
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError('collaboration_period_shape_invalid')
+        if row.get('source_kind') != 'source_evidence' or row.get('support_status') != 'provisional':
+            raise ValueError('collaboration_authored_cannot_claim_manager_or_verified_authority')
+        if 'member_vods' in row:
+            raise ValueError('collaboration_authored_member_vods_not_allowed')
+    return deepcopy(validate_collaboration_periods(rows, duration_sec))
+
+def merge_authored_collaboration_periods(retained, authored, duration_sec=None):
+    """Keep retained rows exact; diagnose conflicting new judgments separately."""
+    explicitly_empty = isinstance(retained, list) and not retained
+    retained = [] if retained is None else deepcopy(retained)
+    validate_collaboration_periods(retained, duration_sec, require_evidence_refs=False)
+    authored = authored_collaboration_periods([] if authored is None else authored, duration_sec)
+    accepted, diagnostics = [], []
+    for index, row in enumerate(authored):
+        if explicitly_empty:
+            code = 'authored_period_retained_empty'
+        elif any(row['id'] == kept['id'] or max(row['start_sec'], kept['start_sec'])
+                < min(row['end_sec'], kept['end_sec']) for kept in retained):
+            code = 'authored_period_conflict'
+        elif len(retained) + len(accepted) >= 128:
+            code = 'authored_period_capacity'
+        else:
+            accepted.append(row)
+            continue
+        diagnostics.append(dict(code=code, authored_index=index, period_id=row['id']))
+    periods = sorted(retained + accepted, key=lambda row: (row['start_sec'], row['end_sec'], row['id']))
+    validate_collaboration_periods(periods, duration_sec, require_evidence_refs=False)
+    return dict(periods=periods, diagnostics=diagnostics, accepted_ids=[row['id'] for row in accepted])
+
 def public_collaboration_periods(periods, duration_sec=None):
     projection = recover_collaboration_periods(periods, duration_sec, require_evidence_refs=False)
     return [{key: deepcopy(value) for key, value in row.items() if key != "evidence_refs"}

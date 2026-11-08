@@ -76,6 +76,10 @@ def _cluster_event(row: dict[str, Any]) -> dict[str, Any] | None:
         "title": str(row.get("title") or row.get("label") or row.get("kind_label") or kind).strip(),
         "role": str(row.get("role") or ""),
         "source_identity_key": str(row.get("source_identity_key") or ""),
+        "source_identity_kind": str(row.get("source_identity_kind") or ""),
+        "source_identity_confidence": str(row.get("source_identity_confidence") or ""),
+        "source_clock_ref": str(row.get("source_clock_ref") or ""),
+        "source_interval_sec": row.get("source_interval_sec"),
     }
 
 def _cluster_summary(cluster: list[dict[str, Any]], *, index: int, max_events: int) -> dict[str, Any]:
@@ -83,6 +87,34 @@ def _cluster_summary(cluster: list[dict[str, Any]], *, index: int, max_events: i
     end = max(row["end_sec"] for row in cluster)
     kinds = sorted({row["kind"] for row in cluster if row["kind"]})
     viewer_clip_events = [row for row in cluster if row["kind"] == "viewer_clip"]
+    independent = {}
+    unknown = []
+    for row in cluster:
+        key = row["source_identity_key"]
+        if key and row["source_identity_confidence"] == "high":
+            independent.setdefault(key, row)
+        else:
+            unknown.append(row)
+
+
+    chat_windows = [row for row in independent.values()
+                    if row["source_identity_kind"] in {"chat_peak_bucket", "chat_context_bucket"}
+                    and row["source_clock_ref"] and isinstance(row["source_interval_sec"], list)
+                    and len(row["source_interval_sec"]) == 2]
+    overlapping = set()
+    for i, left in enumerate(chat_windows):
+        for right in chat_windows[i+1:]:
+            if (left["source_clock_ref"] == right["source_clock_ref"]
+                    and max(left["source_interval_sec"][0], right["source_interval_sec"][0])
+                    < min(left["source_interval_sec"][1], right["source_interval_sec"][1])):
+                overlapping.update((left["source_identity_key"], right["source_identity_key"]))
+    known = [row for key, row in independent.items() if key not in overlapping]
+    unresolved = bool(unknown or overlapping)
+    support = known or cluster[:1]
+
+
+    support_kinds = sorted({"chat" if row["source_identity_kind"] in {"chat_peak_bucket", "chat_context_bucket"}
+                            else row["source_identity_kind"] or "unclassified" for row in support})
     event_ids = [row["event_id"] for row in cluster]
     cluster_id = _cluster_id(start, event_ids)
     return {
@@ -94,7 +126,11 @@ def _cluster_summary(cluster: list[dict[str, Any]], *, index: int, max_events: i
         "family_count": len(kinds),
         "signal_families": kinds,
         "viewer_clip_count": len(viewer_clip_events),
-        "confidence": _cluster_confidence(kinds, len(cluster), len(viewer_clip_events)),
+        "independent_signal_count": len(independent) if not unresolved else None,
+        "known_independent_signal_count": len(known),
+        "independent_family_count": len(support_kinds) if not unresolved and "unclassified" not in support_kinds else None,
+        "independence_status": "observed" if not unresolved else "partial" if known else "unverified",
+        "confidence": _cluster_confidence(support_kinds, len(support), sum(row["source_identity_kind"] == "public_viewer_clip_uid" for row in support)),
         "representative_events": cluster[:max(0, max_events)],
         "overflow_event_count": max(0, len(cluster) - max(0, max_events)),
         "event_ids": event_ids,

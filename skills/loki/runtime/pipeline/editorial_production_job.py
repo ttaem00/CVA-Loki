@@ -147,6 +147,27 @@ def _source_scope(cfg):
     if (cfg.get('summary_pipeline_version') in FULL_AUTHOR_PIPELINES
             and cfg.get('evidence_world_search_mode') is not None):
         scope['evidence_world_search_mode'] = cfg['evidence_world_search_mode']
+    if cfg.get('author_prompt_profile') is not None:
+        if cfg.get('summary_pipeline_version') not in FULL_AUTHOR_PIPELINES:
+            raise ValueError('full_author_prompt_profile_requires_full_author')
+        scope['author_prompt_profile'] = cfg['author_prompt_profile']
+    from .loki_version_policy import new_job_defaults
+    if ('signal_priority_profile' in new_job_defaults(cfg.get('summary_pipeline_version'))
+            and cfg.get('signal_priority_profile') is not None):
+        scope['signal_priority_profile'] = cfg['signal_priority_profile']
+    if cfg.get('editorial_feature_profile') is not None:
+        from .editorial_current_sources import NAVIGATION_PROFILE
+        if (cfg.get('summary_pipeline_version') not in FULL_AUTHOR_PIPELINES
+                or cfg['editorial_feature_profile'] != NAVIGATION_PROFILE):
+            raise ValueError('full_author_feature_profile')
+        scope['editorial_feature_profile'] = cfg['editorial_feature_profile']
+        if cfg.get('editorial_navigation_features') is not None:
+            feature_ref = cfg['editorial_navigation_features']
+            if (not isinstance(feature_ref, dict) or set(feature_ref) != {'path', 'sha256'}
+                    or not native_path(feature_ref['path']).resolve().is_relative_to(native_path(cfg['work_dir']).resolve())
+                    or file_hash(feature_ref['path']) != feature_ref['sha256']):
+                raise ValueError('normal_navigation_features_changed')
+            scope['editorial_navigation_features'] = dict(feature_ref)
     for key in ("editorial_full_author_navigation", "editorial_full_author_source_actions", "editorial_full_author_handoff_policy", "editorial_multimodal_runtime"):
         if cfg.get(key) is not None:
             if cfg.get("summary_pipeline_version") not in FULL_AUTHOR_PIPELINES:

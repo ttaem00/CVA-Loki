@@ -23,6 +23,8 @@ SCHEMA = "editorial.live-source-clock.v1"
 
 MAX_SOURCE_SRT_BYTES = 32_000_000
 
+MAX_GAME_CONTEXT_BYTES = 32_000_000
+
 _SHA = re.compile(r"[a-f0-9]{64}\Z")
 
 _ARCHIVE = re.compile(r"[a-f0-9]{32}-[1-9]\d*\Z")
@@ -50,11 +52,12 @@ def manager_context_path(srt_path, *, revision_id=None):
 
 def live_manager_context_projection(value, *, source_clock):
     """Project bounded producer GET data without creating source/clock authority."""
-    if (not isinstance(value, dict) or set(value) not in (
+    if (not isinstance(value, dict) or set(value) - {"game_export"} not in (
             {"schema_version", "snapshot", "manager_context"},
             {"schema_version", "snapshot", "manager_context", "automatic_context"})
             or value["schema_version"] != CONTEXT_SCHEMA
-            or len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > 500_000):
+            or len(json.dumps(value, ensure_ascii=False).encode("utf-8")) >
+                (MAX_GAME_CONTEXT_BYTES if "game_export" in value else 500_000)):
         raise ValueError("live_manager_context_snapshot_invalid")
     archive = source_clock["archive_id"]
     opened = source_clock["broadcast_start_at_ms"]
@@ -138,6 +141,39 @@ def live_manager_context_projection(value, *, source_clock):
         source if source is not None else dict(historical_context=dict(status="unavailable", reason=reason)),
         producer_source_id=source_id, channel_uid=archive[:32], as_of_ms=as_of)
     body["availability"]["automatic_context"] = body["automatic_channel_context"]["status"]
+    if "game_export" in value:
+        export = value["game_export"]
+        expected = "chzzk:" + archive[:32] + ":" + archive[33:]
+        if (not isinstance(export, dict) or set(export) != {"schema", "broadcastId", "cutoffRevision", "records", "sha256"}
+                or export.get("schema") != "chzz.live-game.approved-export.v1"
+                or export.get("broadcastId") != expected or type(export.get("cutoffRevision")) is not int
+                or export["cutoffRevision"] < 0 or not isinstance(export.get("records"), list)
+                or export["sha256"] != digest({key: item for key, item in export.items() if key != "sha256"})):
+            raise ValueError("live_manager_game_export_invalid")
+        latest, previous = {}, 0
+        for row in export["records"]:
+            if (not isinstance(row, dict) or type(row.get("approvalId")) is not int
+                    or not previous < row["approvalId"] <= export["cutoffRevision"]
+                    or not isinstance(row.get("proposalId"), str) or type(row.get("revision")) is not int
+                    or row["revision"] < 1 or row.get("status") not in {"active", "withdrawn"}
+                    or not isinstance(row.get("record"), dict) or row["record"].get("schema") != "chzz.live-game.record.v1"
+                    or type(row["record"].get("sourceActualAtMs")) is not int
+                    or "eventAtMs" in row["record"] and type(row["record"]["eventAtMs"]) is not int
+                    or type(row["record"].get("elapsedMs")) is not int or row["record"]["elapsedMs"] < 0
+                    or row["record"].get("openAtRevision") == time["openAtRevision"]
+                        and row["record"].get("eventAtMs", row["record"]["sourceActualAtMs"]) - opened != row["record"]["elapsedMs"]
+                    or len(json.dumps(row, ensure_ascii=False).encode()) > 70000):
+                raise ValueError("live_manager_game_export_invalid")
+            previous = row["approvalId"]
+            prior = latest.get(row["proposalId"])
+            if prior is None or row["revision"] > prior["revision"]:
+                latest[row["proposalId"]] = row
+        cutoff = source_clock.get("context_as_of_ms", 2**53 - 1)
+        body["approved_games"] = [dict(row, clockMapping="current_revision" if
+            row["record"].get("openAtRevision") == time["openAtRevision"] else "revision_differs")
+            for row in latest.values() if row["status"] == "active"
+            and row["record"]["sourceActualAtMs"] <= cutoff]
+        body["approved_game_export_sha256"] = export["sha256"]
     return dict(body, projection_sha256=digest(body))
 
 def validate_live_manager_context_projection(value, *, source_clock):
@@ -162,7 +198,7 @@ def load_live_manager_context(srt_path, *, source_clock, binding=None):
     if binding is None and not path.exists():
         return None
     if (source_clock is None or path.is_symlink() or not path.is_file()
-            or path.stat().st_size > 500_000):
+            or path.stat().st_size > MAX_GAME_CONTEXT_BYTES):
         raise ValueError("live_manager_context_source_invalid")
     raw = path.read_bytes()
     sha = hashlib.sha256(raw).hexdigest()

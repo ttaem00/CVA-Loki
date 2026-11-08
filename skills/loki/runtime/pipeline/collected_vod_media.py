@@ -3,6 +3,10 @@
 def collected_clock(srt_path, video_no, duration_sec):
     return None
 
+def resolve_collected_media(*, source, media_ref, output_dir, start_sec=None):
+    """Captured live-finalizer archives are unavailable in standalone inputs."""
+    return None
+
 def assert_collected_media_fresh(*args, **kwargs):
     from pathlib import Path
     path = Path(args[0]).resolve(strict=True)

@@ -70,14 +70,17 @@ class EvidenceWorldService:
         self.dense_backend = None
         self.search_mode = "lexical"
 
-    def configure_retrieval(self, config, *, search_mode="lexical"):
+    def configure_retrieval(self, config, *, search_mode="lexical", runtime=...,
+                            index_root=None, query_root=None):
         if not isinstance(search_mode, str) or search_mode not in {"lexical", "hybrid_branch_v1", "hybrid_dbsf_v1"}:
             raise EvidenceError("unsupported_default_search_mode")
         if config is not None:
             from ..editorial_embedding_index import SavedGemmaSearch
             stt=next(a for a in self.assets.values() if a.family=='stt')
             self.dense_backend=SavedGemmaSearch(config,
-                source_dir=native_path(stt.source_locator['path']).parent)
+                source_dir=native_path(stt.source_locator['path']).parent,
+                index_root=index_root, query_root=query_root,
+                **({"runtime": runtime} if runtime is not ... else {}))
         else:
             self.dense_backend = None
         self.search_mode = search_mode if self.dense_backend else "lexical"
@@ -91,6 +94,16 @@ class EvidenceWorldService:
     def configure_hierarchy(self, config):
         from .pageindex_tree import prepare_hierarchy
         self.hierarchy = prepare_hierarchy(self, config) if config else None
+
+    def configure_cluster_reader(self, selected, *, defer_details=False):
+        from .cluster_navigation import configure
+        configure(self, selected, defer_details=defer_details)
+
+    def navigation_projection(self, envelope):
+        if not getattr(self,'cluster_reader',None):
+            return None
+        from .cluster_navigation import projection
+        return projection(self, envelope)
 
     def configure_summary_hints(self, *, generation_root, node_executable=None, cold_archive_root=None,
                                 finalized_vod=None):
@@ -111,6 +124,9 @@ class EvidenceWorldService:
             **({"hierarchy": {"profile": self.hierarchy["profile"],
                 "projection_hash": self.hierarchy["projection_hash"], "provider_calls": 0,
                 "derived": True, "raw_read": False}} if getattr(self, "hierarchy", None) else {}),
+            **({"related_groups":dict(profile=self.cluster_reader['descriptor']['profile'],
+                view='related_group',entry='search_hit.related_group_action',derived=True,raw_read=False,
+                outside_navigation='source_order')} if getattr(self,'cluster_reader',None) else {}),
             **({"dense_identity": self.dense_backend.identity,
                 "dense_families": getattr(self.dense_backend,'families',["stt"]),
                 "query_encoding": self.dense_backend.strategy} if self.dense_backend else {}))
@@ -164,6 +180,10 @@ class EvidenceWorldService:
         if getattr(self,'hierarchy',None):
             from .pageindex_tree import attach_search_nodes
             attach_search_nodes(self,response,max_bytes=page.get('max_bytes',16000) if page else 16000)
+        if getattr(self,'cluster_reader',None):
+            from .cluster_navigation import attach
+            attach(self,response,query=query,page=page,
+                max_bytes=page.get('max_bytes',16000) if page else 16000)
         return response
 
     def read(self, *, question_id, record_ids=None, intervals_sec=None, families=None,
@@ -352,7 +372,15 @@ class EvidenceWorldService:
 
     def browse(self, *, question_id, families=None, order="chronological", cursor=0, limit=20,
                view="coverage", max_bytes=12000, interval_sec=None, interval_utc_ms=None, record_ids=None,
-               report_id=None, report_revision=None, query=None):
+               report_id=None, report_revision=None, query=None, search_id=None, anchor_unit_id=None):
+        if view == 'related_group':
+            if any(x is not None for x in (query,interval_sec,interval_utc_ms,record_ids,report_id,report_revision)):
+                raise EvidenceError('browse_scope_unsupported_for_view')
+            from .cluster_navigation import browse
+            return browse(self,question_id=question_id,search_id=search_id,anchor_unit_id=anchor_unit_id,
+                families=families,cursor=cursor,limit=limit,max_bytes=max_bytes)
+        if search_id is not None or anchor_unit_id is not None:
+            raise EvidenceError('browse_scope_unsupported_for_view')
         if view == 'question':
             if report_id is not None or report_revision is not None:
                 raise EvidenceError('browse_scope_unsupported_for_view')

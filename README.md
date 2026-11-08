@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.6.1 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.7 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.6.1</h1>
+<h1 align="center">CVA-Loki 3.0.7</h1>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.6.1" src="https://img.shields.io/badge/버전-3.0.6.1-8B5CF6?style=flat-square" /></a>
+  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.7" src="https://img.shields.io/badge/버전-3.0.7-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
   <a href="#codex-integration"><img alt="코덱스 플러그인과 스킬" src="https://img.shields.io/badge/코덱스-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
   <a href="#docker-install"><img alt="도커 한 명령 설치" src="https://img.shields.io/badge/도커-한%20명령%20설치-2496ED?style=flat-square" /></a>
@@ -22,7 +22,7 @@
 <p align="center">
   <a href="#quickstart"><strong>바로 설치</strong></a> ·
   <a href="#codex-integration">플러그인·스킬</a> ·
-  <a href="#verification">설치 검증 범위</a> ·
+  <a href="#verification">설치 확인·업데이트</a> ·
   <a href="#policy">정책 확인</a>
 </p>
 
@@ -48,7 +48,7 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 설치 기본값은 전체 multimodal 도구와 로컬 전사 자산을 준비합니다. 텍스트 자료만 제공받은 작은 실험은 `--features core`를 선택할 수 있으며, core 설치가 영상 다운로드·전사 준비까지 증명하지는 않습니다. ChatGPT 모드는 로컬 세션 UUID를 기존 준비 템플릿에 한 번 기록합니다. Codex 설치·로그인·thread/turn ID가 필요하지 않고, 실제 모델이 노출되지 않으면 `unknown`으로 유지합니다. 이는 플랫폼 계정 인증이 아니라 로컬 작업 출처입니다.
 
-이후 현재 ChatGPT가 `author-input.json`의 계약을 읽고 기존 `read`·`remember`·`memory`·`submit`으로 직접 작성합니다. 다른 CLI/API 작성자는 호출하지 않습니다. 준비 성공·합성 selftest·원문 처리와 실제 방송의 발견 품질은 구분합니다. [실험 계획](docs/chatgpt-linux-experiment-plan.md)과 [복사 입력문](docs/chatgpt-linux-experiment-prompt.md)을 따르세요.
+이후 현재 ChatGPT가 `author-input.json`의 계약을 읽고 기존 `read`·`remember`·`memory`·`submit`으로 직접 작성합니다. 다른 CLI/API 작성자는 호출하지 않습니다. [실험 계획](docs/chatgpt-linux-experiment-plan.md)과 [복사 입력문](docs/chatgpt-linux-experiment-prompt.md)을 따르세요.
 
 | 원문에서 시작 | 장면을 근거로 선택 | 기존 UI로 마무리 |
 | :--- | :--- | :--- |
@@ -64,7 +64,7 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 | 시작·설치 | 작성·편집 | 설정·운영 |
 | :--- | :--- | :--- |
 | [빠른 시작](#quickstart) | [공개 VOD 준비](#source-preparation) | [설정](#configuration) |
-| [기능 범위](#features) | [현재 Codex가 직접 작성](#authoring) | [설치 검증](#verification) |
+| [주요 기능](#features) | [현재 Codex가 직접 작성](#authoring) | [설치 확인](#verification) |
 | [구조와 네트워크](#architecture) | [이미지·멀티모달](#images) | [작업공간과 결과](#outputs) |
 | [준비 사항과 GPU](#requirements) | [검토·편집 UI](#review-ui) | [문제 해결](#troubleshooting) |
 | [로컬 설치](#native-install) | [플러그인·스킬](#codex-integration) | [정책·개인정보·비용](#policy) |
@@ -79,9 +79,9 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 ### 1. 배포 폴더를 준비하세요
 
-CVA-Loki 3.0.6.1은 정식 요약 메커니즘 Loki 3.0.6.1을 포함한 3.0.6의 후속 수정 패치입니다. [3.0.6.1 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.6.1)의 `CVA-Loki-3.0.6.1.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+CVA-Loki 3.0.7은 정식 요약 메커니즘 Loki 3.0.7을 포함합니다. [3.0.7 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.7)의 `CVA-Loki-3.0.7.zip`을 해제하거나 아래 명령으로 [원본 저장소](https://github.com/ttaem00/CVA-Loki)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
 
-배포·플러그인·스킬·요약 메커니즘 버전은 모두 **3.0.6.1**이며, 새 작업의 `latest`도 **Loki 3.0.6.1**을 선택합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 보존합니다. 이미 설치한 이전 버전의 작업공간을 덮어쓰지 말고 새 배포본은 새 작업공간에 설치하세요.
+배포·플러그인·스킬·요약 메커니즘 버전은 모두 **3.0.7**이며, 새 작업의 `latest`도 **Loki 3.0.7**을 선택합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 보존합니다. 이미 설치한 이전 버전의 작업공간을 덮어쓰지 말고 새 배포본은 새 작업공간에 설치하세요.
 
 ```sh
 git clone https://github.com/ttaem00/CVA-Loki.git
@@ -140,11 +140,14 @@ VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함�
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 요약 메커니즘 3.0.6.1 동작 |
+| 기능 | 요약 메커니즘 3.0.7 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
 | 원문 읽기와 메모 | 출처·시계·revision에 연결된 원문을 읽고 유용한 판단 메모를 보존합니다. |
+| 피크·채팅 신호 | 반응·채팅 밀도·클립 등의 시각과 근거를 따라 원문 위치를 찾습니다. 같은 발생의 여러 표시를 구분해 후보를 고릅니다. |
+| 검색·관련 군집 | 단어·문장 검색과 관련된 군집에서 member 원문으로 이동합니다. 필요한 원문이나 프레임을 조회할 때 기존 검증을 재사용합니다. |
+| Point 중요도 | 작성자가 판단한 중요도와 이유를 표시합니다. 중요도 색·라벨은 피크 강도, 선택 표시와 구분하고 저장·재열기에 보존합니다. |
 | 보고서 작성 | 현재 Codex가 요약·D1/D2·Point·Story·Highlight를 직접 작성합니다. |
 | 이미지 추출 | 같은 VOD의 로컬 영상에서 제한된 구간의 실제 프레임을 추출하고 선택 이미지를 보고서에 연결합니다. |
 | 멀티모달 탐색 | 로컬 EmbeddingGemma 2가 text/image/audio/video 근거 후보를 찾고 캐시합니다. |
@@ -166,15 +169,7 @@ VOD URL은 실제 요청할 `https://chzzk.naver.com/video/영상번호`로 함�
 
 </details>
 
-포함하지 않는 기능도 있습니다.
-
-- 방송 종료를 상시 감지하거나 주기적으로 VOD를 수집하는 daemon·스케줄러.
-- 로그인·쿠키·브라우저 인증을 가져오는 비공개 VOD 수집.
-- 영상 컷 편집이나 Highlight 영상 렌더링.
-- 외부 사이트 공개, 네이버 카페 게시, 외부 댓글창 연결.
-- 별도 Codex/Claude CLI·API 모델을 최종 작성자로 실행하는 기능.
-
-외부 게시·카페·댓글 내보내기 연결은 검토 UI에서도 비활성화됩니다. 로컬 Markdown/HTML 저장은 사용할 수 있습니다.
+완성한 보고서는 로컬 Markdown/HTML로 저장하고 검토 UI에서 열 수 있습니다. 제출과 로컬 저장은 외부 게시를 실행하지 않습니다.
 
 <a id="architecture"></a>
 ## 작동 구조
@@ -247,7 +242,7 @@ flowchart TD
 
 이 설치기의 CUDA 12.8 드라이버 사전 검사 기준은 Windows 570.65, Linux 570.26 이상입니다. 장치가 보인다는 사실과 실제 모델이 GPU에서 실행됐다는 사실은 별개입니다. 설치 결과의 `device_selection.selected`와 `device_selection.actual`을 확인하세요. 호스트 드라이버는 Loki가 설치하거나 바꾸지 않습니다.
 
-AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지되면 지원 범위 안내에 따라 명시적으로 CPU를 선택할 수 있습니다. Whisper·임베딩은 선택 장치를 사용하고, 기존 F2 감지는 별도 Sherpa CPU 작업자로 실행합니다.
+AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지되면 장치 안내를 확인하고 명시적으로 CPU를 선택할 수 있습니다. Whisper·임베딩은 선택 장치를 사용하고, 기존 F2 감지는 별도 Sherpa CPU 작업자로 실행합니다.
 
 ### 디스크·메모리
 
@@ -336,8 +331,8 @@ python install.py --workspace ../loki-plugin-workspace --mode plugin
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.6.1` |
-| 요약 메커니즘 | `3.0.6.1` · `latest`는 `loki_3_0_6_1` 선택 |
+| 배포 버전 | `3.0.7` |
+| 요약 메커니즘 | `3.0.7` · `latest`는 `loki_3_0_7` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
 | skill | `loki` / 명시 호출 `$loki` |
@@ -655,27 +650,26 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 </details>
 
 <a id="verification"></a>
-## 설치 결과와 검증 범위
+## 설치 확인과 업데이트
 
-ChatGPT Linux에서의 별도 실험은 [실험 계획](docs/chatgpt-linux-experiment-plan.md)과
-[실험용 프롬프트](docs/chatgpt-linux-experiment-prompt.md)를 참고하세요. 이 문서는
-실험 절차이며, ChatGPT가 정식 Loki 제출 경로를 지원한다는 보증은 아닙니다.
+설치 후 작업공간의 `installation-result.json`에서 실제 Python·runtime 경로와 장치, 도구 준비 결과를 확인하세요. ChatGPT 자체 Linux에서 사용할 때는 [실행 안내](docs/chatgpt-linux-experiment-plan.md)와 [복사 입력문](docs/chatgpt-linux-experiment-prompt.md)을 참고하세요.
 
 <a id="release-version-policy"></a>
 ### 버전 정책
 
-공개 배포는 3.0.6.1 하나입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 같은 버전을 씁니다.
-공개한 태그·ZIP은 덮어쓰지 않으며, 이후 수정은 새 패치 버전으로 냅니다. 이미 만든 작업의
-버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다.
+현재 정식 배포는 **3.0.7**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 같은 버전을 씁니다. 공개한 태그·ZIP과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
 
-### 이 버전에서 확인한 범위
+### 3.0.7의 주요 변경
 
-3.0.6.1은 작성 경로를 막던 네 가지 오류(공개 다시보기 길이의 1초 차이로 미리보기 격자와 원본 이미지가 거부되던 문제, 60초 미리보기 조각보다 짧은 창에 격자가 비던 문제, 새 작업에 Gemma 문장 색인이 준비되지 않던 문제, 멀티모달 저장 검색과 5분 요약 힌트가 '없음'으로 읽히던 안내 부재)를 고친 배포본입니다. 배포 검증은 설치·계약·렌더링 합성 검사이며 새 VOD 요약을 만들지 않았습니다. 이 검사는 프롬프트 품질, 실제 방송의 새 요약 품질 또는 10–15분 작성 시간의 증거가 아닙니다.
+- 피크·채팅 신호의 집계와 후보 선택을 보정하고, 종류별 시각·근거·강도를 연결했습니다.
+- 원문 조회에서 반복 검증 비용을 줄이고, 검색·관련 군집에서 실제 원문으로 이어지는 탐색을 연결했습니다.
+- 기존 격자·프레임·로컬 멀티모달 탐색과 같은 출처·시계의 원문을 함께 확인할 수 있습니다.
+- Point 중요도의 이유·색·라벨을 표시하며, 기존 미지정 값과 보고서 저장·재열기를 보존합니다.
 
-**기본 설치는 전체 기능과 GPU 자동 선택입니다.** `core` 검사 성공을 전체 모델 준비·GPU 추론·실제 VOD 전사 성공으로 해석하지 않습니다. 사용 중인 환경의 실제 결과는 설치 후 생성되는 `installation-result.json`에서 확인하세요.
+**기본 설치는 전체 기능과 GPU 자동 선택입니다.** 사용 중인 환경의 실행 장치와 설치 결과는 `installation-result.json`에서 확인하세요.
 
 <details>
-<summary><strong>설치 결과 파일 읽는 법과 검증 범위</strong></summary>
+<summary><strong>설치 결과 파일 읽는 법</strong></summary>
 
 ### 설치한 환경에서 확인할 값
 
@@ -695,7 +689,7 @@ ChatGPT Linux에서의 별도 실험은 [실험 계획](docs/chatgpt-linux-exper
 
 `speech.verification=assets_only_not_transcription`은 **자산 준비**입니다. 실제 STT 성공은 `transcribe_source.py`의 결과와 SRT·전사 receipt로 별도로 확인합니다. F2가 enabled라는 설정과 실제 감지 상태도 구분합니다.
 
-합성 selftest는 `kind=synthetic_contract_selftest`, `semantic_author=synthetic_fixture_not_a_model`로 식별합니다. 고정 응답으로 검사하는 설치 계약이며 실제 방송의 작성·편집 품질 증거가 아닙니다. 실제 보고서는 현재 Codex가 실제 자료를 읽어 새로 작성해야 합니다.
+selftest는 `kind=synthetic_contract_selftest`, `semantic_author=synthetic_fixture_not_a_model`로 식별합니다. 합성 원문과 고정 응답으로 설치 계약을 점검합니다. 실제 보고서는 현재 Codex가 실제 자료를 읽어 작성합니다.
 
 패키지 자체를 확인하려면 전체 배포 폴더에서 실행할 수 있습니다.
 
@@ -862,8 +856,6 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 **보고서를 수정하고 이전 버전으로 돌아갈 수 있나요?**  
 네. 기존 Report Admin UI의 편집·미리보기·로컬 저장·재열기·이력 비교/복원을 사용합니다. 최초 작성 제출과 원문·이미지 근거는 보존합니다.
 
-**설치 PASS가 방송 요약 품질까지 보장하나요?**  
-아닙니다. 설치·합성 계약·미디어·임베딩 실행, 자산 준비, 실제 STT, 실제 Codex 작성, UI 저장은 서로 다른 증거입니다. 각 결과와 한계를 확인해야 합니다.
 
 </details>
 

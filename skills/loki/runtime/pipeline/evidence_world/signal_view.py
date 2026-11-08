@@ -8,7 +8,7 @@ from itertools import zip_longest
 
 from statistics import median
 
-from ..chat_analyzer import WINDOW_SEC
+from ..chat_analyzer import WINDOW_SEC, CHAT_PEAK_POLICY_REVISION
 
 from .contracts import EvidenceError, canonical_json, digest, file_hash, native_path
 
@@ -18,7 +18,7 @@ from .records import assert_asset_fresh, chat_analysis_rows
 
 PROFILE = "source_signal_orientation_v1"
 
-CATALOG_REVISION = "records_native_clock_v9-independent-clip-orientation"
+CATALOG_REVISION = f"records_native_clock_v10-{CHAT_PEAK_POLICY_REVISION}"
 
 CLIP_PREVIEWS = {"location_v1", "title_time_duration_v1"}
 
@@ -150,7 +150,7 @@ def _catalog(service):
             empty_or_unobserved_windows_not_imputed=True,coverage_complete=False)
         if not users_known[t]:
             for k in list(stats):
-                if "user" in k or k=="laughter_echo_max":stats[k]=None
+                if ("user" in k and k not in {'user_count_status','unidentified_user_count'}) or k=="laughter_echo_max":stats[k]=None
         native = service.duration is None
         span = None if native else [t,min(t+10,service.duration)]
         items.append(dict(kind="chat_reaction",family="chat",interval_sec=span,stats=stats,
@@ -166,11 +166,21 @@ def _catalog(service):
             start,end=peak['start_sec'],min(peak['end_sec'],service.duration)
             stats=dict(peak)
             stats.pop('laughter_echo_text',None)
+
+
+            stats.pop('peak_members',None)
+            stats['family_peaks'] = {family: {k: v for k, v in member.items() if k != 'laughter_echo_text'}
+                                     for family, member in (stats.get('family_peaks') or {}).items()}
+            for member in stats['family_peaks'].values():
+                if member.get('user_count_status') != 'observed':
+                    for key in list(member):
+                        if key.endswith('_user_count') or key == 'laughter_echo_max':
+                            member[key] = None
             located=[t for t in raw_counts if start<=t<end]
             known=all(users_known[t] for t in located)
             if not known:
                 for k in list(stats):
-                    if 'user' in k or k=='laughter_echo_max':stats[k]=None
+                    if ('user' in k and k not in {'user_count_status','unidentified_user_count'}) or k=='laughter_echo_max':stats[k]=None
             items.append(dict(kind='chat_peak_cluster',family='chat',interval_sec=[start,end],stats=stats,rank=peak['rank'],
                 all_original_occurrences=sum(raw_counts[t] for t in located),
                 command_filter_applies_to_stats=True,user_counts_known=known,

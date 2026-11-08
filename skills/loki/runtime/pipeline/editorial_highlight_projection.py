@@ -127,6 +127,8 @@ def build_qg1_preview(
             "evidence_refs": list(row.get("evidence_refs") or row.get("used_evidence_ids") or []),
         }
         selected = selected_points.get(projected["id"])
+        if 'editorial_priority' in row:
+            projected['editorial_priority'] = deepcopy(row['editorial_priority'])
         if selected and str(selected.get("story_packet_id") or "") in selected_story_refs:
             projected.update({
                 "story_ref": str(selected.get("story_packet_id") or ""),

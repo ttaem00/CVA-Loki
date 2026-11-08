@@ -11,6 +11,8 @@ import json
 
 import time
 
+from copy import deepcopy
+
 from contextlib import nullcontext
 
 from functools import lru_cache
@@ -22,6 +24,8 @@ from .evidence_world.index import atomic_json, build_lock
 SCHEMA = 'ew.gemma2_lance.v1'
 
 FAMILIES = ('stt', 'chat')
+
+_RUNTIME_UNSET = object()
 
 def fuse_score_frontier(lexical, dense_scores, native_order):
     """Opt-in DBSF on the measured 20+20 frontier, retaining the full tail.
@@ -133,11 +137,18 @@ def encode_cached(texts, *, role, root, runtime, model=None):
         reused_rows=len(keys)-len(missing),elapsed_sec=time.monotonic()-started,
         device=str(getattr(model,'device','not_loaded_cache_hit')))
 
-def encode_media_cached(content,*,modality,root,runtime,model,media_sha256,window):
+def encode_media_cached(content,*,modality,root,runtime,model,media_sha256,window,
+                        effective_source_sha256=None):
     import numpy as np
     if modality not in {'image','audio','video'}:
         raise EvidenceError('gemma_media_modality')
-    key=digest([model_basis(runtime),modality,media_sha256,window['start'],window['duration'],'fps1-256x144-pcm16k-v1'])
+    identity=[model_basis(runtime),modality,media_sha256,window['start'],window['duration'],'fps1-256x144-pcm16k-v1']
+    if effective_source_sha256 is not None:
+        if (not isinstance(effective_source_sha256,str) or len(effective_source_sha256)!=64
+                or any(c not in '0123456789abcdef' for c in effective_source_sha256)):
+            raise EvidenceError('gemma_media_source_identity')
+        identity.append(effective_source_sha256)
+    key=digest(identity)
     table=_table(_connect(native_path(root)/'lance'),'vectors')
     rows=table.search().where(_where_keys([key])).select(['vector']).limit(1).to_list()
     if rows:return np.asarray(rows[0]['vector'],dtype=np.float32).reshape(1,768)
@@ -149,12 +160,12 @@ def encode_media_cached(content,*,modality,root,runtime,model,media_sha256,windo
         dict(key=key,role=modality,vector=vector[0].tolist())])
     return vector
 
-def prepare(service, *, source_dir, runtime, cached_only=False):
+def prepare(service, *, source_dir, runtime, cached_only=False, index_root=None):
     """Build or reuse source-bound vectors; optional admission uses cached_only."""
     import pyarrow as pa
     from .evidence_world.records import assert_asset_fresh
     for asset in service.assets.values():assert_asset_fresh(asset)
-    root = native_path(source_dir)/'embedding-index'
+    root = native_path(index_root) if index_root is not None else native_path(source_dir)/'embedding-index'
     with service.open() as db:
         rows = units(db)
     if not rows:
@@ -164,13 +175,18 @@ def prepare(service, *, source_dir, runtime, cached_only=False):
     name = 'units_'+identity
     cfg = dict(schema_version=SCHEMA,table=name,units_sha256=digest(rows),model_basis=basis,
         relative_root='embedding-index')
-    root.mkdir(parents=True,exist_ok=True)
+    if cached_only and not root.is_dir():
+        return None
+    if not cached_only:
+        root.mkdir(parents=True,exist_ok=True)
     receipt = root/'manifests'/(identity+'.json')
     with (nullcontext() if cached_only else build_lock(root)):
         if receipt.is_file():
             saved=json.loads(receipt.read_text(encoding='utf-8'))
             if saved['config']!=cfg:
                 raise EvidenceError('gemma_index_identity_changed')
+            if not (root/'lance').is_dir():
+                raise EvidenceError('gemma_index_not_prepared')
             table=_connect(root/'lance').open_table(name)
             if table.count_rows()!=len(rows) or table.version!=saved['table_version']:
                 raise EvidenceError('gemma_index_changed')
@@ -196,24 +212,82 @@ def prepare(service, *, source_dir, runtime, cached_only=False):
         for asset in service.assets.values():assert_asset_fresh(asset)
     return cfg
 
-def prepare_optional(service,*,source_dir,runtime,cached_only=True):
+def prepare_optional(service,*,source_dir,runtime,cached_only=True,index_root=None,status_root=None):
     """New authoring reuses settled vectors; lexical originals need no encoder."""
     if runtime is None:return None
-    root=native_path(source_dir)/'embedding-index'
+    root=native_path(index_root) if index_root is not None else native_path(source_dir)/'embedding-index'
+    status=native_path(status_root) if status_root is not None else root
     try:
-        result=prepare(service,source_dir=source_dir,runtime=runtime,cached_only=cached_only)
+        result=prepare(service,source_dir=source_dir,runtime=runtime,cached_only=cached_only,index_root=root)
     except Exception as exc:
 
 
-        atomic_json(root/'preparation-status.json',dict(status='unavailable',
+        atomic_json(status/'preparation-status.json',dict(status='unavailable',
             reason=type(exc).__name__,original_search_available=True))
         return None
     if result is None:
-        atomic_json(root/'preparation-status.json',dict(status='unavailable',
+        atomic_json(status/'preparation-status.json',dict(status='unavailable',
             reason='index_not_prepared',original_search_available=True))
     else:
-        atomic_json(root/'preparation-status.json',dict(status='ready',config=result))
+        atomic_json(status/'preparation-status.json',dict(status='ready',config=result))
     return result
+
+def _saved_table(config, *, db, index_root, max_units=None):
+    """Validate a settled table against SQL without model or write-side effects."""
+    from .editorial_multimodal_navigation import _sha
+    if (not isinstance(config, dict)
+            or set(config)!={'schema_version','table','units_sha256','model_basis','relative_root'}
+            or config['schema_version']!=SCHEMA or config['relative_root']!='embedding-index'
+            or not _sha(config['units_sha256']) or not _sha(config['model_basis'])
+            or not isinstance(config['table'],str) or not config['table'].startswith('units_')
+            or not _sha(config['table'][6:])):
+        raise EvidenceError('gemma_index_config')
+    if max_units is not None:
+        if type(max_units) is not int or not 1 <= max_units <= 30000:
+            raise EvidenceError('gemma_index_unit_limit')
+        count=db.execute("SELECT COUNT(*) FROM units WHERE family IN ('stt','chat')").fetchone()[0]
+        if count>max_units:
+            raise EvidenceError('gemma_index_unit_limit')
+    rows=units(db)
+    if digest(rows)!=config['units_sha256']:
+        raise EvidenceError('gemma_index_source_changed')
+    root=native_path(index_root)
+    path=root/'manifests'/(config['table'][6:]+'.json')
+    if not path.is_file() or not (root/'lance').is_dir():
+        raise EvidenceError('gemma_index_not_prepared')
+    saved=json.loads(path.read_text(encoding='utf-8'))
+    if saved.get('config')!=config or saved.get('rows')!=len(rows):
+        raise EvidenceError('gemma_index_changed')
+    table=_connect(root/'lance').open_table(config['table'])
+    count=table.count_rows()
+    if count!=len(rows) or table.version!=saved.get('table_version'):
+        raise EvidenceError('gemma_index_changed')
+    if max_units is not None and count>max_units:
+        raise EvidenceError('gemma_index_unit_limit')
+    return rows,saved,table
+
+def read_saved_documents(config, *, db, index_root, max_units=30000):
+    """Read exact source-bound document vectors; no encoder or query runtime."""
+    import numpy as np
+    rows,saved,table=_saved_table(config,db=db,index_root=index_root,max_units=max_units)
+    columns=['unit_id','family','start_us','end_us','members_json','vector']
+    stored=table.search().select(columns).limit(len(rows)).to_list() if rows else []
+    by_id={row['unit_id']:row for row in stored}
+    if len(stored)!=len(rows) or len(by_id)!=len(rows) or set(by_id)!={row['unit_id'] for row in rows}:
+        raise EvidenceError('gemma_index_member_changed')
+    for row in rows:
+        if any(by_id[row['unit_id']][key]!=row[key] for key in columns[:-1]):
+            raise EvidenceError('gemma_index_member_changed')
+    try:
+        vectors=np.asarray([by_id[row['unit_id']]['vector'] for row in rows],dtype=np.float32)
+    except (TypeError,ValueError) as exc:
+        raise EvidenceError('gemma_index_vector_changed') from exc
+    if not rows:
+        vectors=np.empty((0,768),dtype=np.float32)
+    if (vectors.shape!=(len(rows),768) or not np.isfinite(vectors).all()
+            or not np.allclose(np.linalg.norm(vectors,axis=1),1.,atol=.005)):
+        raise EvidenceError('gemma_index_vector_changed')
+    return dict(rows=rows,vectors=vectors,manifest=saved)
 
 class SavedGemmaSearch:
     """Native vector search; SQL remains the authority for returned original IDs."""
@@ -221,36 +295,27 @@ class SavedGemmaSearch:
     strategy='local_query_only'
     prepares_query_outside_ranking_budget=True
 
-    def __init__(self,config,*,source_dir):
+    def __init__(self,config,*,source_dir,index_root=None,query_root=None,runtime=_RUNTIME_UNSET):
         if (set(config)!={'schema_version','table','units_sha256','model_basis','relative_root'}
                 or config['schema_version']!=SCHEMA or config['relative_root']!='embedding-index'):
             raise EvidenceError('gemma_index_config')
         self.config=config
-        self.root=native_path(source_dir)/'embedding-index'
+        self.root=native_path(index_root) if index_root is not None else native_path(source_dir)/'embedding-index'
+        self.query_root=native_path(query_root) if query_root is not None else None
         self.identity=digest(config)
         self._query={}
         self._rows=None
-        from .editorial_multimodal_navigation import resolve_local_runtime
-        self.runtime=resolve_local_runtime()
+        if runtime is _RUNTIME_UNSET:
+            from .editorial_multimodal_navigation import resolve_local_runtime
+            runtime=resolve_local_runtime()
+        self.runtime=deepcopy(runtime)
         if self.runtime is None or model_basis(self.runtime)!=config['model_basis']:
             raise EvidenceError('gemma_index_model_unavailable')
 
     def validate(self,db,*,world_revision,deadline):
-        from .editorial_multimodal_navigation import _sha
-        cfg=self.config
-        if (not _sha(cfg.get('units_sha256')) or not _sha(cfg.get('model_basis'))
-                or not cfg.get('table','').startswith('units_') or not _sha(cfg['table'][6:])):
-            raise EvidenceError('gemma_index_config')
-        rows=units(db)
-        if digest(rows)!=cfg['units_sha256'] or model_basis(self.runtime)!=cfg['model_basis']:
+        rows,saved,table=_saved_table(self.config,db=db,index_root=self.root)
+        if model_basis(self.runtime)!=self.config['model_basis']:
             raise EvidenceError('gemma_index_source_changed')
-        path=self.root/'manifests'/(cfg['table'][6:]+'.json')
-        saved=json.loads(path.read_text(encoding='utf-8'))
-        if saved['config']!=cfg or saved['rows']!=len(rows):
-            raise EvidenceError('gemma_index_changed')
-        table=_connect(self.root/'lance').open_table(cfg['table'])
-        if table.count_rows()!=len(rows) or table.version!=saved['table_version']:
-            raise EvidenceError('gemma_index_changed')
         self._rows={r['unit_id']:r for r in rows}
         self._table=table
         self._partitions=saved['partitions']
@@ -259,7 +324,7 @@ class SavedGemmaSearch:
         if text not in self._query:
 
 
-            root=query_cache_root()
+            root=self.query_root if self.query_root is not None else query_cache_root()
             with build_lock(root):
                 vectors,_=encode_cached([text],role='query',root=root,runtime=self.runtime,
                     model=None)

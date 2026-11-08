@@ -16,6 +16,8 @@ from pathlib import Path
 
 import re
 
+import time
+
 from .evidence_world.contracts import SourcePolicy, canonical_json, digest, file_hash, native_path
 
 from .evidence_world.index import build_lock
@@ -30,6 +32,18 @@ from .editorial_production_job import (
 )
 
 SCHEMA = "chzz.current_conversation_prepared.v1"
+
+_CONTEXT_NOTE_FIELDS = {
+    'question_id': 'string: the question being tracked',
+    'text': 'string: a working hypothesis, not original evidence',
+    'read_ids': 'nonempty distinct list of actual read_id values returned by this job',
+}
+
+class SubmissionRejected(ValueError):
+    """A repairable validation failure, with the original error code intact."""
+    def __init__(self, rejection):
+        super().__init__(rejection['error'])
+        self.rejection = rejection
 
 def _json(path):
     raw = native_path(path).read_bytes()
@@ -49,15 +63,19 @@ def _create(path, value):
     with path.open("xb") as stream:
         stream.write(data)
 
-def _code_hashes():
+def _code_hashes(prompt_path=None):
     files = [Path(__file__).with_name(name) for name in (
         "editorial_current_conversation.py", "editorial_current_sources.py",
         "editorial_full_author.py", "editorial_production_job.py",
-        "editorial_supplemental_sources.py", "editorial_embedding_index.py")]
-    files.append(Path(__file__).resolve().parents[1] / 'prompts/highlight/editorial_full_author_302.md')
+        "editorial_supplemental_sources.py", "editorial_embedding_index.py",
+        "editorial_context_author.py", "editorial_signal_scoring.py", "highlight_prompt_assets.py")]
+    files.append(Path(prompt_path) if prompt_path is not None else
+        Path(__file__).resolve().parents[1] / 'prompts/highlight/editorial_full_author_302.md')
     navigation = Path(__file__).with_name('editorial_multimodal_navigation.py')
     if navigation.is_file():
         files.append(navigation)
+    files.extend(path for name in ('service.py', 'vector_clusters.py', 'pageindex_tree.py', 'cluster_navigation.py')
+                 if (path := Path(__file__).with_name('evidence_world') / name).is_file())
     return {str(p): file_hash(p) for p in files}
 
 def _mint(prepared):
@@ -83,6 +101,8 @@ def _load(job_root):
         raise ValueError("current_conversation_identity_changed")
     if digest(prepared["source"]) != prepared["source_sha256"]:
         raise ValueError("current_conversation_native_snapshot_changed")
+    if prepared.get('authoring_time'):
+        _authoring_time(root, prepared)
     for artifact in prepared.get("orientation_artifacts", []):
         if file_hash(artifact["path"]) != artifact["sha256"]:
             raise ValueError("current_conversation_orientation_changed")
@@ -109,8 +129,13 @@ def _service(root, prepared):
     service.configure_read(prepared.get('read_page_policy', 'family_serial_v1'))
     for asset in service.assets.values():
         assert_asset_fresh(asset)
-    service.configure_retrieval(prepared.get('retrieval'), search_mode=prepared.get('search_mode', 'lexical'))
+    features = prepared.get('navigation_features')
+    service.configure_retrieval(prepared.get('retrieval'), search_mode=prepared.get('search_mode', 'lexical'),
+        **(dict(runtime=prepared.get('multimodal_runtime'), index_root=features['index_root'],
+                query_root=features['query_root']) if features else {}))
     service.configure_hierarchy(prepared.get('hierarchy'))
+    if features and features.get('cluster_reader'):
+        service.configure_cluster_reader(features['cluster_reader'],defer_details=True)
     if prepared.get('summary_hints'):
         service.configure_summary_hints(**{k:v for k,v in prepared['summary_hints'].items() if k != 'profile'})
     return service
@@ -147,21 +172,18 @@ def _orientation_binding(value, path, source, source_dir):
 
 def prepare(spec):
     """Refresh public support into this job; reuse STT without ASR or model calls."""
-    from .editorial_full_author import build_broadcast_flow_context, full_source_context, RESPONSE_FIELDS
+    from .editorial_full_author import build_broadcast_flow_context, full_source_context, RESPONSE_FIELDS, OPTIONAL_RESPONSE_FIELDS
     from .models import VODInfo
     required = {"vod_info", "work_root", "source_work_dir", "srt_path", "base_path", "job_id",
                 "code_version", "author"}
     if (not isinstance(spec, dict) or not required <= set(spec)
-            or set(spec) - required - {"summary_pipeline_version", "packet_path", "orientation_paths", "hierarchy", "navigation_path", "media_path", "multimodal_runtime", "summary_hints", "source_output_dir", "source_data_dir", "retrieval", "read_page_policy", "search_mode"}):
+            or set(spec) - required - {"summary_pipeline_version", "packet_path", "orientation_paths", "hierarchy", "navigation_path", "media_path", "multimodal_runtime", "summary_hints", "source_output_dir", "source_data_dir", "retrieval", "read_page_policy", "search_mode", "authoring_minutes", "signal_priority_profile", "source_snapshot", "author_prompt_profile", "feature_profile", "read_index_root"}):
         raise ValueError("current_conversation_prepare_spec_shape")
+    spec_sha256 = digest(spec)
+    minutes = spec.get('authoring_minutes')
+    if 'authoring_minutes' in spec and (type(minutes) is not int or minutes <= 0):
+        raise ValueError('current_conversation_authoring_minutes_must_be_positive_integer')
     author_owner = current_conversation_author_owner(spec["author"])
-    from .evidence_world.read_pages import POLICIES
-    read_page_policy = spec.get('read_page_policy', 'balanced_compact_v1')
-    if not isinstance(read_page_policy, str) or read_page_policy not in POLICIES:
-        raise ValueError('unknown_read_page_policy')
-    search_mode = spec.get('search_mode', 'lexical')
-    if not isinstance(search_mode, str) or search_mode not in {'lexical', 'hybrid_branch_v1', 'hybrid_dbsf_v1'}:
-        raise ValueError('unsupported_default_search_mode')
     vod = VODInfo(**spec["vod_info"])
     video = str(vod.video_no)
     source_dir = native_path(spec["source_work_dir"]).resolve()
@@ -185,17 +207,52 @@ def prepare(spec):
     with build_lock(root):
         if (root / "prepared.json").exists():
             _, saved, _ = _load(root)
-            if saved["spec_sha256"] != digest(spec):
+            if saved["spec_sha256"] != spec_sha256:
                 raise ValueError("current_conversation_prepare_identity_changed")
             return _prepare_receipt(root, saved)
-        from .loki_version_policy import select_new_pipeline
+        preparation_started = time.time()
+        from .loki_version_policy import new_job_defaults, select_new_pipeline
         selected_pipeline = select_new_pipeline(spec.get("summary_pipeline_version", "latest"))
+        spec = dict(spec)
+        for key, value in new_job_defaults(selected_pipeline).items():
+            spec.setdefault(key, value)
+        from .editorial_current_sources import NAVIGATION_PROFILE
+        feature_profile = spec.get('feature_profile')
+        if feature_profile is not None and feature_profile != NAVIGATION_PROFILE:
+            raise ValueError('current_conversation_feature_profile')
+        if 'read_index_root' in spec:
+            if (feature_profile != NAVIGATION_PROFILE or not isinstance(spec['read_index_root'], str)
+                    or not spec['read_index_root'].strip()):
+                raise ValueError('current_conversation_read_index_root_invalid')
+            read_root = native_path(spec['read_index_root']).resolve()
+            if (read_root.name != 'embedding-index'
+                    or not read_root.is_relative_to(source_dir / 'current-conversation')
+                    or read_root.is_relative_to(root)):
+                raise ValueError('current_conversation_read_index_root_outside_source')
+        from .highlight_prompt_assets import load_full_author_prompt
+        prompt_asset = load_full_author_prompt(spec.get('author_prompt_profile'))
+        if spec.get('signal_priority_profile') is not None:
+            from .editorial_context_author import SIGNAL_PRIORITY_PROFILE
+            if spec['signal_priority_profile'] != SIGNAL_PRIORITY_PROFILE:
+                raise ValueError('unknown_signal_priority_profile')
+        from .evidence_world.read_pages import POLICIES
+        read_page_policy = spec.get('read_page_policy', 'balanced_compact_v1')
+        if not isinstance(read_page_policy, str) or read_page_policy not in POLICIES:
+            raise ValueError('unknown_read_page_policy')
+        search_mode = spec.get('search_mode', 'lexical')
+        if not isinstance(search_mode, str) or search_mode not in {'lexical', 'hybrid_branch_v1', 'hybrid_dbsf_v1'}:
+            raise ValueError('unsupported_default_search_mode')
         if not vod.duration or vod.duration <= 0:
             raise ValueError("current_conversation_duration_required")
         from .vod.process import _prepare_current_conversation_sources
-        (chunks, source, prepared_media_path, chat_source_path, comment_dir, clip_path) = (
-            _prepare_current_conversation_sources(vod=vod, spec=spec, source_dir=source_dir,
-                root=root, work=work, selected_pipeline=selected_pipeline))
+        snapshot = None
+        if 'source_snapshot' in spec:
+            from .editorial_current_sources import frozen_source_snapshot
+            sources, snapshot = frozen_source_snapshot(spec, source_dir=source_dir, root=root)
+        else:
+            sources = _prepare_current_conversation_sources(vod=vod, spec=spec, source_dir=source_dir,
+                root=root, work=work, selected_pipeline=selected_pipeline)
+        chunks, source, prepared_media_path, chat_source_path, comment_dir, clip_path = sources
         _create(root / "source-identity.json", spec["vod_info"])
         service = EvidenceWorldService.prepare(video_no=video, srt_path=spec["srt_path"],
             source_work_dir=source_dir, cache_root=root / "evidence-world-cache",
@@ -230,6 +287,11 @@ def prepare(spec):
                 raise ValueError('current_conversation_media_outside_source')
             media = dict(path=str(media_path), sha256=file_hash(media_path))
             bundle['frozen_assets'].append(dict(family='media', **media))
+        if snapshot is not None:
+            from .editorial_current_sources import assert_snapshot_sources
+            assert_snapshot_sources(snapshot, assets, bundle,
+                [a.public() for a in service.assets.values()])
+            orientation_artifacts.append(dict(kind='frozen_source_snapshot', **deepcopy(spec['source_snapshot'])))
         packet = deepcopy(bundle['packet'])
         existing_broadcast_map = None
         if spec.get("packet_path"):
@@ -280,8 +342,12 @@ def prepare(spec):
         flow_context = build_broadcast_flow_context(source=source, base_revision=base_revision,
             existing_broadcast_map=existing_broadcast_map, orientations=orientations)
         packet['_broadcast_flow_context'] = flow_context
-        view, _ = full_source_context(source=source, packet=packet)
-        prompt_path = Path(__file__).resolve().parents[1] / 'prompts/highlight/editorial_full_author_302.md'
+        if spec.get('signal_priority_profile') is not None:
+            packet['signal_priority_profile'] = spec['signal_priority_profile']
+        else:
+            packet.pop('signal_priority_profile', None)
+        view, source_evidence = full_source_context(source=source, packet=packet)
+        prompt_path = Path(__file__).resolve().parents[1] / prompt_asset.relative_path
         prompt_text = prompt_path.read_text(encoding='utf-8-sig')
         prompt_header = json.loads(prompt_text.splitlines()[1])
         prompt = dict(path=str(prompt_path), sha256=file_hash(prompt_path),
@@ -299,9 +365,33 @@ def prepare(spec):
         multimodal_runtime = None
         multimodal_context = None
         from .editorial_multimodal_navigation import resolve_local_runtime, LocalNavigationSession
-        multimodal_runtime = resolve_local_runtime(spec.get('multimodal_runtime'))
-        retrieval=spec.get('retrieval')
-        if retrieval is None and multimodal_runtime is not None:
+        frozen_features = snapshot is not None and feature_profile is None
+        if frozen_features and any(key in spec and spec[key] != snapshot.get(key)
+                for key in ('multimodal_runtime', 'retrieval')):
+            raise ValueError('current_conversation_snapshot_runtime_changed')
+        multimodal_runtime = (deepcopy(snapshot.get('multimodal_runtime'))
+            if frozen_features else resolve_local_runtime(spec.get('multimodal_runtime')))
+        retrieval = (deepcopy(snapshot.get('retrieval')) if frozen_features
+                     else spec.get('retrieval'))
+        hierarchy = deepcopy(spec.get('hierarchy'))
+        features = None
+        if feature_profile is not None:
+            from .editorial_current_sources import prepare_navigation_features
+            features = prepare_navigation_features(service=service, source_dir=source_dir,
+                runtime=multimodal_runtime, derived_root=root / 'derived',
+                retrieval=retrieval, hierarchy=hierarchy,
+                **(dict(read_index_root=spec['read_index_root']) if 'read_index_root' in spec else {}))
+            retrieval, hierarchy = features['retrieval'], features['hierarchy']
+            service.configure_hierarchy(hierarchy)
+            if features.get('cluster_reader'):
+                service.configure_cluster_reader(features['cluster_reader'])
+            if features.get('selected_index_manifest'):
+                orientation_artifacts.append(dict(kind='cached_document_index_manifest',
+                    **features['selected_index_manifest']))
+            if features['clusters']:
+                orientation_artifacts.append(dict(kind='document_vector_navigation',
+                    path=features['clusters']['path'], sha256=features['clusters']['sha256']))
+        elif retrieval is None and multimodal_runtime is not None and snapshot is None:
             from .editorial_embedding_index import prepare_optional
             from .editorial_multimodal_navigation import _local_runtime_assets
 
@@ -310,21 +400,70 @@ def prepare(spec):
             _, missing_asset = _local_runtime_assets(multimodal_runtime)
             retrieval=prepare_optional(service,source_dir=source_dir,runtime=multimodal_runtime,
                                        cached_only=missing_asset is not None)
-        service.configure_retrieval(retrieval, search_mode=search_mode)
+        service.configure_retrieval(retrieval, search_mode=search_mode,
+            **(dict(runtime=multimodal_runtime, index_root=features['index_root'],
+                    query_root=features['query_root']) if features else {}))
         if multimodal_runtime is not None:
             multimodal_context = LocalNavigationSession(source=source, service=service, media_ref=media,
-                runtime=multimodal_runtime, root=root / 'multimodal').snapshot()
+                runtime=multimodal_runtime, root=root / 'multimodal',
+                **(dict(cache_root=features['derived_root']) if features else {})).snapshot()
         _create(root / "author-input.json", dict(base_revision=base_revision, source_material=view,
             response_fields=sorted(RESPONSE_FIELDS), source_id=service.source_id,
+            response_optional_fields=dict(collaboration_periods='Optional source_evidence/provisional periods '
+                'with actual original evidence_refs. Never claim manager/verified authority or invent member_vods.'),
+            editorial_priority_contract='Point/proposal editorial_priority is optional: '
+                '{tier:focus|normal|later,reason:<source-grounded review reason>,basis:author}. '
+                'It does not select content, change cut boundaries or reorder the list. Story has no independent priority.',
             world_revision=service.world_revision, availability=service.admission(),
-            source_read_contract=("Original read receipts record delivery only, not understanding. "
+            **(dict(navigation_features=dict(profile=feature_profile,
+                clusters=features['clusters'], derived=True, original_read=False,
+                outside_navigation='source_order',
+                **(dict(cluster_reader=features['cluster_reader']) if features.get('cluster_reader') else {}),
+                guidance='Search the current question, follow a hit related_group_action when available, '
+                         'then member original read actions. Follow returned continuation for unread members. '
+                         'Source-order and optional hierarchy remain available. '
+                         'Document cosine groups are navigation, not events, cut boundaries or importance. '
+                         'Source-order, low-signal and unindexed originals remain available. '
+                         'Preview grids sample only preserved media coverage in windows of at most120seconds; '
+                         'scene/ocr keep their stated resolution requirements. No provider acquisition fallback. '
+                         'Open the actual returned grid image, then individual precision frames if needed.')) if features else {}),
+            source_read_contract=("Native CLI --action requires a complete EW envelope: "
+                + canonical_json(dict(schema_version='ew.tool.v1', source_id=service.source_id,
+                    world_revision=service.world_revision, question_id='<your question ID>',
+                    action='<action>', args={}))
+                + " Set your action and args inside this binding. For read_evidence use "
+                "args={intervals_sec:[[start_sec,end_sec],...],families:['stt' or 'chat'],context_cues:2}, "
+                "or exact record_ids returned by a tool; citation refs such as e1 are not record_ids. "
+                "Input STT rows contain original text and help locate content, but reading those rows "
+                "does not enter this job's read ledger. Before adopting/citing a claim in the first complete "
+                "JSON, genuinely read its needed originals through this job and check their meaning; "
+                "do not postpone all writing until all originals are read. Do not collect receipts without "
+                "reading or delete supported citations merely to pass. Wait for a running command on the "
+                "same job to finish before dependent read/frame/draft commands; independent jobs are separate. "
+                "Original read receipts record delivery only, not understanding. "
                 "The CLI sends ew.owner_read.v1 for compact pages: merge record_defaults with "
                 "zip(record_columns, each record_rows entry) to recover exact original text, IDs and clocks. "
                 "Full provenance remains in the immutable read_id artifact. A next_cursor means unread "
-                "originals remain; continue with the same read selector and page budget. "
+                "originals remain; call continuation --read-id <returned read_id> with this job root and "
+                "expected revision, then execute its next_original_action unchanged. It preserves the "
+                "same read selector, families, question, page budget and cursor. Do not assemble a cursor-only action. "
                 "A page boundary never establishes meaning completeness."),
+            working_draft_contract=dict(command='draft', fields_argument='--fields',
+                fields_optional=True, field_names=sorted(RESPONSE_FIELDS | OPTIONAL_RESPONSE_FIELDS),
+                provisional=True, original_evidence=False,
+                policy='Optional same-writer partial author fields; omit --fields to reopen. '
+                    'Supplied fields replace the whole field, including explicit []; omitted fields retain. '
+                    'Notes never apply to draft fields. Submit still requires your complete final JSON '
+                    'and never adds or merges draft content automatically.'),
             read_page_policy=read_page_policy,
             search_mode=search_mode,
+            **(dict(authoring_time_contract=dict(minutes=minutes,
+                control='advisory_current_conversation', status_command='status',
+                arguments=['--job-root', '--expected-revision'],
+                policy='The requested minutes replace legacy 10-15 minute examples for this job. '
+                    'Writing starts after this input is ready. Query status for current time; '
+                    'on overrun finish preserved work, keeping unsupported work pending. '
+                    'No model cancellation or transport budget reset is available.')) if minutes is not None else {}),
             existing_orientation=orientations, broadcast_flow_context=flow_context, author_prompt=prompt,
             retrieval_contract=service.retrieval_contract(), multimodal_navigation=navigation,
             **(dict(source_search_contract=("For this job's STT/chat topic searches, omit query.mode to use "
@@ -340,33 +479,100 @@ def prepare(spec):
             media_source=media,
             media_read_contract=dict(actions=['read_frames', 'read_frame_page'],
                 image_selection=dict(frame_ref='a returned frame ref', alt='short visible description', caption='image caption'),
-                policy='Select only inspected same-source pixels inside the authored range or source span; returned locators alone do not prove viewing.'),
+                policy="Use the same complete EW envelope. read_frames args={start_sec,duration_sec,"
+                    "inspection_mode:'scene'|'ocr'|'preview'} uses numeric seconds for one continuous window, "
+                    "not intervals_sec. read_frame_page args={cursor:returned_cursor} uses its returned cursor. "
+                    "Availability and window limits follow the actual selected media profile. Select only "
+                    "inspected same-source pixels inside the authored range or source span; returned "
+                    "locators alone do not prove viewing."),
             retained_collaboration=deepcopy(bundle['retained_collaboration']),
             context_memory_contract=dict(commands=['remember', 'memory'],
-                notes_are_hypotheses=True, original_reads_required=True)))
+                notes_are_hypotheses=True, original_reads_required=True,
+                expected_revision_argument='--expected-revision',
+                expected_revision_from='prepare.prepared_revision',
+                remember=dict(note_argument='--note', note_shape=_CONTEXT_NOTE_FIELDS),
+                memory=dict(query_argument='--query', query_optional=True))))
         manifest_path = service.root / "manifest.json"
-        prepared = dict(schema_version=SCHEMA, identity=identity, spec_sha256=digest(spec),
-            code_hashes=_code_hashes(), source=source, source_sha256=digest(source),
+        prepared = dict(schema_version=SCHEMA, identity=identity, spec_sha256=spec_sha256,
+            code_hashes=_code_hashes(prompt_path), source=source, source_sha256=digest(source),
             base_path=str(base), vod_info=deepcopy(spec["vod_info"]), packet=packet,
             source_bundle=bundle, retrieval=deepcopy(retrieval), read_page_policy=read_page_policy,
             search_mode=search_mode,
             **(dict(summary_hints=summary_hints) if summary_hints else {}),
-            hierarchy=deepcopy(spec.get('hierarchy')), multimodal_navigation=navigation, media_source=media,
+            hierarchy=hierarchy, multimodal_navigation=navigation, media_source=media,
+            **(dict(feature_profile=feature_profile, navigation_features=features) if features else {}),
             **(dict(multimodal_runtime=multimodal_runtime) if multimodal_runtime is not None else {}),
             **(dict(multimodal_final_review=dict(policy='consume_or_defer_v1',
                 initial_context=deepcopy(multimodal_context))) if multimodal_runtime is not None else {}),
             orientation_artifacts=orientation_artifacts,
             world_manifest_path=str(manifest_path), world_manifest_sha256=file_hash(manifest_path),
             world_revision=service.world_revision, input_sha256=file_hash(root / "author-input.json"))
+        if 'signal_priority_trace' in source_evidence:
+            prepared['signal_priority_trace'] = source_evidence['signal_priority_trace']
+        if spec.get('author_prompt_profile') is not None:
+            prepared['author_prompt_profile'] = spec['author_prompt_profile']
+        if minutes is not None:
+            clock_path = root / 'authoring-time.json'
+            if clock_path.exists():
+                clock, _ = _json(clock_path)
+                if any(clock.get(key) != value for key, value in dict(minutes=minutes,
+                        spec_sha256=spec_sha256, input_sha256=prepared['input_sha256']).items()):
+                    raise ValueError('current_conversation_authoring_time_identity_changed')
+            else:
+                started = time.time()
+                _create(clock_path, dict(minutes=minutes, spec_sha256=spec_sha256,
+                    input_sha256=prepared['input_sha256'], started_at=started,
+                    preparation_seconds=max(0, started - preparation_started)))
+            prepared['authoring_time'] = dict(path=str(clock_path), sha256=file_hash(clock_path))
         prepared["prepared_revision"] = digest(prepared)
         _create(root / "prepared.json", prepared)
         return _prepare_receipt(root, prepared)
 
 def _prepare_receipt(root, prepared):
-    return dict(job_root=str(root), prepared_revision=prepared["prepared_revision"],
+    receipt = dict(job_root=str(root), prepared_revision=prepared["prepared_revision"],
         base_revision=prepared["identity"]["base_revision"], author_input_path=str(root / "author-input.json"),
         author_input_sha256=prepared["input_sha256"], world_revision=prepared["world_revision"],
         source_id=prepared["source"]["asset"]["source_id"], external_transport_calls=0)
+    if prepared.get('authoring_time'):
+        receipt['authoring_time'] = _authoring_time(root, prepared)
+    return receipt
+
+def _authoring_time(root, prepared):
+    """Observe the opt-in clock; no deadline, read authority or budget is changed."""
+    binding = prepared.get('authoring_time')
+    if not binding:
+        return None
+    path = root / 'authoring-time.json'
+    if native_path(binding['path']).resolve() != path.resolve() or file_hash(path) != binding['sha256']:
+        raise ValueError('current_conversation_authoring_time_changed')
+    terminal = root / 'submission-result.json'
+    if terminal.exists():
+        return _json(terminal)[0].get('authoring_time')
+    clock, _ = _json(path)
+    observed = time.time()
+    elapsed = max(0, observed - clock['started_at'])
+    allowance = clock['minutes'] * 60
+    return dict(minutes=clock['minutes'], started_at=clock['started_at'], observed_at=observed,
+        preparation_seconds=clock['preparation_seconds'], elapsed_seconds=elapsed,
+        remaining_seconds=max(0, allowance - elapsed), overrun_seconds=max(0, elapsed - allowance),
+        phase='overdue' if elapsed >= allowance else 'writing',
+        control='advisory_current_conversation', can_cancel_inflight_generation=False,
+        clock_basis='unix_wall_clock; system clock adjustments affect observation',
+        tool_wait_seconds=None, repair_seconds=None, connection_recovery_seconds=None,
+        manager_saved=False)
+
+def status(job_root, *, expected_revision):
+    """Observe this job without rewriting its input or bounded original-read wire."""
+    root, prepared, _ = _load(job_root)
+    with build_lock(root):
+        if expected_revision != prepared['prepared_revision']:
+            raise ValueError('current_conversation_prepare_conflict')
+        state, clock = 'not_submitted', _authoring_time(root, prepared)
+        if (root / 'submission.json').exists():
+            state = 'accepted_render_pending'
+            if (root / 'submission-result.json').exists():
+                state = 'terminal_record_present'
+        return dict(prepared_revision=prepared['prepared_revision'], submission_state=state, authoring_time=clock)
 
 def read(job_root, action, *, expected_revision):
     root, prepared, _ = _load(job_root)
@@ -388,20 +594,23 @@ def read(job_root, action, *, expected_revision):
             if media is None:
                 return dict(status='pending', error_code='media_not_collected', question_id=action['question_id'],
                     frame_refs=[], frames=[], pixels_seen='UNVERIFIED', audio_listened=False)
-            result = _frame_page_result(media, media.dispatch(action))
+            result = _frame_page_result(media, media.dispatch(action), include_grid=bool(prepared.get('feature_profile')))
         else:
             result = act(service, action)
         _create(root / "action-results" / (digest([action, result]) + ".json"),
                 dict(action=action, result=result, result_sha256=digest(result)))
         return result
 
-def _frame_page_result(session, result):
+def _frame_page_result(session, result, *, include_grid=False):
     """Return this page's actual owned image locators for the current writer."""
     frames = [dict(frame_ref=ref, source_sec=session.active[ref]['source_sec'],
                    image=deepcopy(session.active[ref]['image']),
                    **{key:deepcopy(session.active[ref][key]) for key in ('time_binding', 'source_interval_sec')
                       if key in session.active[ref]}) for ref in result.get('frame_refs', [])]
-    return dict(result, frames=frames, pixels='Inspect the returned local images; paths are not a visual interpretation.',
+    return dict(result, frames=frames,
+                **(dict(preview_grid=deepcopy(session.active_grid))
+                   if include_grid and session.active_grid else {}),
+                pixels='Inspect the returned local images; paths are not a visual interpretation.',
                 pixels_seen='UNVERIFIED', audio_listened=False)
 
 def _frame_session(root, prepared):
@@ -418,7 +627,7 @@ def _frame_session(root, prepared):
             continue
         if digest(entry['result']) != entry['result_sha256']:
             raise ValueError('current_conversation_read_changed')
-        result = _frame_page_result(session, session.dispatch(action))
+        result = _frame_page_result(session, session.dispatch(action), include_grid=bool(prepared.get('feature_profile')))
         if result != entry['result']:
             raise ValueError('current_conversation_frame_read_changed')
         delivered.update({ref:deepcopy(session.active[ref]) for ref in result.get('frame_refs', [])})
@@ -429,7 +638,7 @@ def remember(job_root, note, *, expected_revision):
     with build_lock(root):
         if expected_revision != prepared['prepared_revision'] or (root / 'submission.json').exists():
             raise ValueError('current_conversation_note_conflict')
-        if not isinstance(note, dict) or set(note) != {'question_id', 'text', 'read_ids'}:
+        if not isinstance(note, dict) or set(note) != _CONTEXT_NOTE_FIELDS.keys():
             raise ValueError('current_conversation_note_shape')
         from .evidence_world.context_session import remember as retain
         return retain(_service(root, prepared), **note)
@@ -440,6 +649,64 @@ def memory(job_root, *, expected_revision, query=None):
         raise ValueError('current_conversation_memory_conflict')
     from .evidence_world.context_session import memory as recall
     return recall(_service(root, prepared), query=query)
+
+def continuation(job_root, *, read_id, expected_revision):
+    """Recover an exact delivered query without enlarging or mutating read pages."""
+    root, prepared, _ = _load(job_root)
+    if expected_revision != prepared['prepared_revision']:
+        raise ValueError('current_conversation_prepare_conflict')
+    page = _service(root, prepared).load_read(read_id)
+    original = None
+    for path in sorted((root / 'action-results').glob('*.json')):
+        entry, _ = _json(path)
+        result, action = entry['result'], entry['action']
+        if result.get('read_id') != read_id:
+            continue
+        if (digest(result) != entry['result_sha256'] or digest(result) != digest(page)
+                or path.stem != digest([action, result])):
+            raise ValueError('current_conversation_read_changed')
+        if (action.get('action') == 'read_evidence' and 'read_id' not in action.get('args', {})
+                and any(key in action.get('args', {}) for key in ('record_ids', 'intervals_sec', 'intervals_utc_ms'))):
+            original = action
+    if original is None:
+        raise ValueError('current_conversation_original_read_action_missing')
+    from .editorial_author_source import _read_continuation_action
+    return dict(read_id=read_id, original_evidence=False,
+                next_original_action=_read_continuation_action(page, original, root))
+
+def draft(job_root, fields=None, *, expected_revision):
+    """Retain this writer's provisional fields; submit never consumes this file."""
+    from .editorial_full_author import RESPONSE_FIELDS, OPTIONAL_RESPONSE_FIELDS
+    from .evidence_world.index import atomic_json
+    root, prepared, _ = _load(job_root)
+    with build_lock(root):
+        if (expected_revision != prepared['prepared_revision']
+                or fields is not None and (root / 'submission.json').exists()):
+            raise ValueError('current_conversation_draft_conflict')
+        if fields is not None and (not isinstance(fields, dict)
+                or set(fields) - RESPONSE_FIELDS - OPTIONAL_RESPONSE_FIELDS):
+            raise ValueError('current_conversation_draft_fields')
+        path = root / 'current-draft.json'
+        prior = {}
+        if path.exists():
+            saved, _ = _json(path)
+            body = {key:value for key, value in saved.items() if key != 'draft_revision'}
+            if (saved.get('schema_version') != 'chzz.current_writer_draft.v1'
+                    or saved.get('prepared_revision') != expected_revision
+                    or saved.get('draft_revision') != digest(body) or not isinstance(saved.get('fields'), dict)):
+                raise ValueError('current_conversation_draft_changed')
+            prior = saved['fields']
+        updates = deepcopy(fields) if fields is not None else {}
+        application = dict(applied_fields=sorted(updates),
+            changed_fields=sorted(key for key in updates if key not in prior or updates[key] != prior[key]),
+            retained_fields=sorted(set(prior) - set(updates)), notes_apply_to_draft=False)
+        body = dict(schema_version='chzz.current_writer_draft.v1', prepared_revision=expected_revision,
+                    fields={**prior, **updates})
+        revision = digest(body)
+        if fields is not None:
+            atomic_json(path, dict(body, draft_revision=revision))
+        return dict(draft=body['fields'], draft_revision=revision, provisional=True,
+                    original_evidence=False, meaning_complete=False, draft_application=application)
 
 def _navigation_media_hashes(prepared):
     media = prepared.get('media_source')
@@ -461,7 +728,9 @@ def multimodal(job_root, action, *, expected_revision):
             raise ValueError('current_conversation_multimodal_runtime_not_configured')
         session = LocalNavigationSession(source=prepared['source'], service=_service(root, prepared),
             media_ref=prepared.get('media_source'), runtime=prepared['multimodal_runtime'],
-            root=root / 'multimodal')
+            root=root / 'multimodal',
+            **(dict(cache_root=prepared['navigation_features']['derived_root'])
+               if prepared.get('navigation_features') else {}))
         try:
             result = session.execute(action)
         except ValueError as exc:
@@ -580,17 +849,25 @@ def _reads(root, prepared):
                 time_sec=row["time_index"]["start_us"] / 1000000, text=text)
     return receipts, complete_ids, list(chats.values())
 
-def _cited_refs(value):
-    refs = set()
+def _citation_paths(value, path=()):
+    refs = {}
     if isinstance(value, dict):
         for key, item in value.items():
-            if key in {"summary_evidence_refs", "evidence_refs", "used_evidence_ids", "start_evidence_ref", "frame_ref"}:
-                refs.update([item] if isinstance(item, str) else item or [])
+            if key in {"summary_evidence_refs", "evidence_refs", "used_evidence_ids",
+                       "start_evidence_ref", "end_evidence_ref", "frame_ref"}:
+                if isinstance(item, str):
+                    refs.setdefault(item, []).append([*path, key])
+                elif isinstance(item, list):
+                    for index, ref in enumerate(item):
+                        if isinstance(ref, str):
+                            refs.setdefault(ref, []).append([*path, key, index])
             else:
-                refs.update(_cited_refs(item))
+                for ref, paths in _citation_paths(item, (*path, key)).items():
+                    refs.setdefault(ref, []).extend(paths)
     elif isinstance(value, list):
-        for item in value:
-            refs.update(_cited_refs(item))
+        for index, item in enumerate(value):
+            for ref, paths in _citation_paths(item, (*path, index)).items():
+                refs.setdefault(ref, []).extend(paths)
     return refs
 
 def _multimodal_final_review(prepared, payload, navigation_receipts):
@@ -647,12 +924,20 @@ def submit(job_root, response_path, *, expected_revision):
                 stream.write(raw)
         receipts, complete_ids, chats = _reads(root, prepared)
         ref_ids = {"e" + str(r["ordinal"] + 1): r["record_id"] for r in prepared["source"]["records"]}
-        cited = _cited_refs(payload)
-        if not receipts or any(ref_ids[ref] not in complete_ids for ref in cited if ref in ref_ids):
-            raise ValueError("current_conversation_cited_original_not_read")
+        cited = _citation_paths(payload)
         packet = deepcopy(prepared["packet"])
         packet.update(chat_rows=chats, chat_source_revision=digest(prepared["identity"]["source_assets"]))
         try:
+            missing = [dict(ref=ref, record_id=ref_ids[ref], paths=cited[ref])
+                       for ref in sorted(cited) if ref in ref_ids and ref_ids[ref] not in complete_ids]
+            if not receipts or missing:
+                error = ValueError('current_conversation_cited_original_not_read')
+                error.submission_diagnostics = dict(missing_originals=missing,
+                    original_read_required=not bool(receipts),
+                    instruction='Read these exact originals through this job, including every page. '
+                        'Search, notes and navigation do not grant read authority. Preserve the response '
+                        'and unrelated items; resubmit only after genuine reads or a supported local correction.')
+                raise error
             if any(ref.startswith('frame:') for ref in cited):
                 _, frames = _frame_session(root, prepared)
                 packet['_delivered_media_frames'] = frames
@@ -663,10 +948,17 @@ def submit(job_root, response_path, *, expected_revision):
                 packet=packet, duration_sec=prepared["vod_info"]["duration"], raw_sha256=raw_sha,
                 source_reads=receipts)
         except ValueError as exc:
-            _create(root / "response-rejections" / (raw_sha + ".json"), dict(
+            diagnostics = deepcopy(getattr(exc, 'submission_diagnostics', {}))
+            for field in ('item_path', 'range_findings', 'flow_findings'):
+                if hasattr(exc, field):
+                    diagnostics[field] = deepcopy(getattr(exc, field))
+            rejection = dict(schema_version='chzz.current_conversation_rejection.v1', status='rejected',
                 raw_response_sha256=raw_sha, prepared_revision=expected_revision,
-                error=str(exc), external_transport_calls=0))
-            raise
+                error=str(exc), diagnostics=diagnostics, external_transport_calls=0)
+
+
+            _create(root / 'response-rejections' / (raw_sha + '-' + digest(rejection) + '.json'), rejection)
+            raise SubmissionRejected(rejection) from exc
         quality = dict(schema_version="chzz.editorial_highlight_quality.v1",
             authority_revision_id=result["authority_revision_id"], cumulative_call_count=0,
             selected_model=prepared["identity"]["author"]["actual_model"],
@@ -691,9 +983,11 @@ def submit(job_root, response_path, *, expected_revision):
                 original_reread_required=True, whole_broadcast=False, pixels_delivered=False, audio_listened=False),
             policy='Input delivery and source-bound navigation only; semantic adoption requires original comparison and author judgment.')
         projected = result["full_author_projection"]
-        for key, value in prepared['source_bundle']['retained_collaboration'].items():
-            result[key] = deepcopy(value)
-            projected['outline'][key] = deepcopy(value)
+        from .editorial_full_author import bind_collaboration_lane
+        retained = prepared['source_bundle']['retained_collaboration']
+        bind_collaboration_lane(result, retained=retained.get('collaboration_periods'),
+            retained_diagnostics=retained.get('collaboration_diagnostics'),
+            duration_sec=prepared['vod_info']['duration'])
         preview = build_qg1_preview(broadcast_map=projected["outline"], editorial_result=result,
             quality=quality, story_selection=projected["story_shadow"]["story_point_selection"],
             source_broadcast_map=projected["outline"], projection_mode="qg1_review_candidate")
@@ -717,6 +1011,9 @@ def submit(job_root, response_path, *, expected_revision):
             raw_response_sha256=raw_sha, result_sha256=digest(result), paths=paths,
             external_transport_calls=0, manager_saved=False, published=False,
             original_report_changed=False, completion_state=result["completion_state"])
+        clock = _authoring_time(root, prepared)
+        if clock is not None:
+            report['authoring_time'] = dict(clock, phase='generated_report')
         _create(terminal, report)
         return report
 
@@ -753,9 +1050,10 @@ def _report_source_kwargs(prepared):
 
 def cli_result_json(result):
     """Share the exact bounded read wire with the standalone Loki CLI."""
-    if result.get('schema_version') == 'ew.read_result.v1' and result.get('read_page_policy') == 'balanced_compact_v1':
-        from .evidence_world.owner_payload import compact_read
-        result = compact_read(result)
-    if result.get('schema_version') in {'ew.owner_read.v1', 'ew.read_result.v1'}:
-        return canonical_json(result)
+    if isinstance(result, dict):
+        if result.get('schema_version') == 'ew.read_result.v1' and result.get('read_page_policy') == 'balanced_compact_v1':
+            from .evidence_world.owner_payload import compact_read
+            result = compact_read(result)
+        if result.get('schema_version') in {'ew.owner_read.v1', 'ew.read_result.v1'}:
+            return canonical_json(result)
     return json.dumps(result, ensure_ascii=False, indent=2) + '\n'

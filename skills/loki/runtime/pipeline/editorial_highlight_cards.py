@@ -28,6 +28,8 @@ from PIL import Image
 
 from .utils import sec_to_hms
 
+from .editorial_contract import validate_editorial_priority
+
 EDITORIAL_HIGHLIGHT_CARD_DESIGN = "chzz.editorial-highlight-card.v2"
 
 EDITORIAL_HIGHLIGHT_CARD_CSS_START = "/* editorial-highlight-cards:start */"
@@ -431,6 +433,18 @@ def _render_collaboration_periods(periods: list[Mapping[str, Any]]) -> str:
         + '</ul><p>끝 시각은 포함하지 않습니다. 구간 사이의 공백은 미확인입니다.</p></section>'
     )
 
+def _editorial_priority_detail(item: Mapping[str, Any]) -> str:
+    try:
+        priority = validate_editorial_priority(item.get('editorial_priority'))
+    except ValueError:
+        return '<p class="editorial-priority-details">검토 중요도를 확인하지 못했습니다.</p>'
+    if priority is None:
+        return ''
+    tier = {'focus': '먼저 검토', 'normal': '함께 검토', 'later': '뒤에 검토'}[priority['tier']]
+    basis = {'author': '작성자 판단', 'manager': '관리자 판단', 'display_review': '검토용 표시'}[priority['basis']]
+    return ('<dl class="editorial-priority-details"><dt>검토 중요도 · ' + _esc(tier)
+        + ' · ' + _esc(basis) + '</dt><dd>' + _esc(priority['reason']) + '</dd></dl>')
+
 def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) -> str:
     """Render one validated editorial view as editor-ready cards."""
 
@@ -519,7 +533,7 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
             )
             point_links.append(
                 '<div class="highlight-point-jump">'
-                f'{point_seek}{point_reason_html}</div>'
+                f'{point_seek}{point_reason_html}{_editorial_priority_detail(point)}</div>'
             )
 
         point_heading = "시작 지점" if len(point_refs) == 1 else f"주요 시작 지점 {len(point_refs)}개"
@@ -611,7 +625,7 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
             '<details class="highlight-card-details"><summary>'
             '<span>편집 정보 보기</span>'
             '</summary><div class="highlight-card-details-body">'
-            f'{story_flow}{point_nav}{source_panel}</div></details>'
+            f'{_editorial_priority_detail(highlight)}{story_flow}{point_nav}{source_panel}</div></details>'
         )
         if not has_valid_spans:
             action_html = (
@@ -678,7 +692,7 @@ def render_editorial_highlight_cards(view: Mapping[str, Any], *, video_no: str) 
             f'<span class="standalone-point-disclosure-title">{_esc(point_title)}</span>'
             '<span class="standalone-point-chevron" aria-hidden="true">›</span></summary>'
             '<div class="point-evidence-body">'
-            f'<p>{_esc(story.get("why_notable") or "-")}</p></div></details></li>'
+            f'<p>{_esc(story.get("why_notable") or "-")}</p>{_editorial_priority_detail(point)}</div></details></li>'
         )
     standalone_html = (
         f'<section class="standalone-points"><h3>나머지 주요 장면 {len(standalone_links)}개</h3>'

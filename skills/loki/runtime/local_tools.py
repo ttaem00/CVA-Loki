@@ -205,6 +205,8 @@ def validate_command(workspace, executable, argv, tools=None, *, runtime=None):
             raise PermissionError("loki_unadmitted_ffprobe")
         _owned(root, args[-1], media=True, exists=True)
         return kind
+    if len(args) == 17 and args[14:16] == ["-threads:v", "1"]:
+        args = args[:14] + args[16:]
     if len(args) == 15 and args[:5] == ["-hide_banner", "-loglevel", "error", "-y", "-ss"]:
         _number(args[5])
         if args[6] != "-i" or args[8] != "-vf" or args[10:14] != ["-frames:v", "9", "-q:v", "3"]:

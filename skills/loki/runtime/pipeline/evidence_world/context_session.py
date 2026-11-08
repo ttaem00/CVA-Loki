@@ -52,7 +52,8 @@ def act(service, envelope):
         return result
     hierarchy = (getattr(service, "hierarchy", None) or {}).get("projection_hash")
     projection=_projection_contract(envelope)
-    identity=[envelope,hierarchy,*([projection] if projection else [])]
+    navigation=service.navigation_projection(envelope)
+    identity=[envelope,hierarchy,*([projection] if projection else []),*([navigation] if navigation else [])]
     path = service.run_root / "context-actions" / (digest(identity) + ".json")
     with build_lock(path.parent):
         if path.exists():

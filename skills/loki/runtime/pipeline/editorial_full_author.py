@@ -26,6 +26,8 @@ CONTRACT = "editorial.full-author.v302"
 RESPONSE_FIELDS = {"base_revision", "summary", "summary_evidence_refs", "ranges", "points",
                    "stories", "proposals", "group_outcomes", "unresolved_questions"}
 
+OPTIONAL_RESPONSE_FIELDS = {'collaboration_periods'}
+
 def build_broadcast_flow_context(*, source, base_revision, existing_broadcast_map=None,
                                  activity_context=None, orientations=()):
     """Bind the writer's actual inputs, without inventing an activity inventory.
@@ -218,7 +220,8 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
     from .highlight_story_window import build_editorial_highlight_set
     from .editorial_author_source import NATIVE_RANGE_CONTRACT
     from .outline.schema import seconds_to_hms
-    if not isinstance(payload, dict) or set(payload) != RESPONSE_FIELDS:
+    if (not isinstance(payload, dict) or not RESPONSE_FIELDS <= set(payload)
+            or set(payload) - RESPONSE_FIELDS - OPTIONAL_RESPONSE_FIELDS):
         raise ValueError("full_author_response_shape")
     if payload["base_revision"] != base_revision:
         raise ValueError("full_author_base_revision_changed")
@@ -231,6 +234,13 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
         raise ValueError("full_author_outcome_invalid")
     _, evidence = full_source_context(source=source, packet=packet)
     catalog = _delivered_evidence_catalog(evidence, delivered_source_refs)
+    authored_collaboration = None
+    if 'collaboration_periods' in payload:
+        from .chatgpt_export.contract.collaboration_periods import authored_collaboration_periods
+        with _author_item(['collaboration_periods']):
+            authored_collaboration = authored_collaboration_periods(payload['collaboration_periods'], duration_sec)
+            for period in authored_collaboration:
+                _refs(period['evidence_refs'], catalog)
     summary_refs = payload["summary_evidence_refs"]
     with _author_item(["summary_evidence_refs"] if isinstance(summary_refs, list)
                       and all(isinstance(ref, str) for ref in summary_refs) else None):
@@ -292,7 +302,7 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
                 source_spans=[dict(zip(("start_sec", "end_sec"), _range_times(row, catalog)))])
     for index, row in enumerate(payload["points"]):
         required = {"id", "title", "content", "d2_ref", "start_evidence_ref", "evidence_refs"}
-        if not isinstance(row, dict) or not required <= set(row) or not set(row) <= required | {"timestamp"}:
+        if not isinstance(row, dict) or not required <= set(row) or not set(row) <= required | {"timestamp", "editorial_priority"}:
             raise ValueError("full_author_point_shape")
         with _author_item(["points", index]):
             _refs(row["evidence_refs"], catalog)
@@ -306,7 +316,15 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
                 raise ValueError("full_author_point_requires_authored_d2")
             _text(row["title"], "point_title")
             _text(row["content"], "point_content")
-        points.append({**{k:row[k] for k in ("id", "title", "content")}, "timestamp":timestamp})
+            if 'editorial_priority' in row:
+                from .editorial_contract import validate_editorial_priority
+                priority = validate_editorial_priority(row['editorial_priority'])
+                if priority is not None and priority['basis'] != 'author':
+                    raise ValueError('full_author_priority_author_only')
+        point = {**{k:row[k] for k in ("id", "title", "content")}, "timestamp":timestamp}
+        if 'editorial_priority' in row:
+            point['editorial_priority'] = priority
+        points.append(point)
         point_inputs[row["id"]] = row
     outline = dict(ranges=ranges, points=points, candidates=[])
     try:
@@ -370,6 +388,12 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
     cut_evidence = {**evidence, "evidence_catalog":cut_catalog}
     revision = digest(dict(base_revision=base_revision, source_revision=source["sha256"],
                            outline=outline, summary=summary, selection=selection))
+    for index, proposal in enumerate(payload['proposals']):
+        if isinstance(proposal, dict) and 'editorial_priority' in proposal:
+            with _author_item(['proposals', index]):
+                priority = proposal['editorial_priority']
+                if isinstance(priority, dict) and priority.get('basis') in ('manager', 'display_review'):
+                    raise ValueError('full_author_priority_author_only')
     result = build_editorial_highlight_set(broadcast_map=outline, authority_revision_id=revision,
         proposals=payload["proposals"], highlight_producer_run_ref=highlight_producer_run_ref or "full-author-302:" + digest(payload),
         source_duration_sec=duration_sec, story_requirements=requirements, composition_evidence=cut_evidence)
@@ -429,7 +453,9 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
             summary=summary, story_shadow=shadow, unresolved_questions=questions,
             broadcast_flow_review=dict(context_sha256=digest(flow_context),
                 outcomes=deepcopy([row for row in outcomes if row.get("flow_refs")]),
-                unaddressed_flow_refs=missing_flows)))
+                unaddressed_flow_refs=missing_flows),
+            **(dict(authored_collaboration_periods=authored_collaboration)
+               if authored_collaboration is not None else {})))
     if source_clock:
 
 
@@ -437,6 +463,23 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
         result.update(source_clock=source_clock, vod_seek_authorized=False, cut_export_authorized=False,
             pending_source_conditions=[*result.get("pending_source_conditions", []),
                 "whole_broadcast_coverage_unconfirmed", "vod_mapping_unconfirmed"])
+    return result
+
+def bind_collaboration_lane(result, *, retained, retained_diagnostics, duration_sec):
+    """Merge source-grounded new periods without replacing retained authority."""
+    from .chatgpt_export.contract.collaboration_periods import merge_authored_collaboration_periods
+    projection = result['full_author_projection']
+    authored = projection.get('authored_collaboration_periods')
+    if retained is None and authored is None:
+        if retained_diagnostics is not None:
+            for target in (result, projection['outline']):
+                target['collaboration_diagnostics'] = deepcopy(retained_diagnostics)
+        return result
+    merged = merge_authored_collaboration_periods(retained, authored, duration_sec)
+    for target in (result, projection['outline']):
+        target['collaboration_periods'] = deepcopy(merged['periods'])
+        if retained_diagnostics is not None or merged['diagnostics']:
+            target['collaboration_diagnostics'] = deepcopy([*(retained_diagnostics or []), *merged['diagnostics']])
     return result
 
 def validate_current_conversation_response(payload, *, job, source, packet, duration_sec,

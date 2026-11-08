@@ -14,7 +14,7 @@ from typing import Any, Mapping, Sequence
 
 from pipeline.context_structure.contracts import ContextStructureContractError
 
-from pipeline.editorial_contract import _derive_source_span_structure_refs
+from pipeline.editorial_contract import _derive_source_span_structure_refs, validate_editorial_priority
 
 from pipeline.editorial_span_authoring import _normalize_authored_source_span_boundaries
 
@@ -134,6 +134,11 @@ def _broadcast_map_indexes(broadcast_map: Mapping[str, Any]) -> tuple[dict[str, 
     if any(str(row.get("parent_id") or "") not in d1 for row in d2.values()):
         raise _editorial_error("invalid_frozen_broadcast_map_hierarchy")
     return d1, d2, point
+
+def _editorial_highlight_id(highlight: Mapping[str, Any]) -> str:
+    """Review metadata never changes the identity of an otherwise identical cut."""
+    return "highlight-" + _sha({key: value for key, value in highlight.items()
+                               if key not in {"highlight_id", "editorial_priority"}})
 
 def _normalize_editorial_highlight(
     proposal: Mapping[str, Any],
@@ -571,7 +576,9 @@ def _normalize_editorial_highlight(
         "classification": "editorial_highlight",
         "counts_as_highlight": True,
     }
-    body["highlight_id"] = "highlight-" + _sha(body)
+    body["highlight_id"] = _editorial_highlight_id(body)
+    if "editorial_priority" in proposal:
+        body["editorial_priority"] = validate_editorial_priority(proposal["editorial_priority"])
     return body
 
 def _selected_owner_composition_fields(proposal, revision):
@@ -787,11 +794,11 @@ def build_editorial_highlight_set(
                     if index not in owner_revisions:
                         raise _editorial_error("broadcast_owner_proposal_provenance_incomplete")
                     normalized.update(_selected_owner_composition_fields(proposal, owner_revisions[index]))
-                    normalized["highlight_id"] = "highlight-" + _sha({k:v for k,v in normalized.items() if k != "highlight_id"})
+                    normalized["highlight_id"] = _editorial_highlight_id(normalized)
                 elif composition_evidence.get("e1_selected_owner_revision"):
                     normalized.update(_selected_owner_composition_fields(proposal,
                         composition_evidence["e1_selected_owner_revision"]))
-                    normalized["highlight_id"] = "highlight-" + _sha({k:v for k,v in normalized.items() if k != "highlight_id"})
+                    normalized["highlight_id"] = _editorial_highlight_id(normalized)
                 elif composition_evidence.get("editorial_composition"):
                     from .editorial_marker_desk import composition_fields
                     frozen = composition_evidence.get("frozen_editorial_compositions", {}).get(index)
@@ -807,7 +814,7 @@ def build_editorial_highlight_set(
                     else:
                         normalized.update(composition_fields(proposal, normalized,
                             composition_evidence["editorial_composition"], proposal_catalog))
-                    normalized["highlight_id"] = "highlight-" + _sha({k:v for k,v in normalized.items() if k != "highlight_id"})
+                    normalized["highlight_id"] = _editorial_highlight_id(normalized)
             if context_requirement is not None and context_requirement.get("selection_reason"):
 
 
@@ -817,7 +824,7 @@ def build_editorial_highlight_set(
                 normalized["image"] = selected_frame_image(proposal["image"],
                     frames=(composition_evidence or {}).get("frames", {}),
                     source_spans=normalized["source_spans"])
-                normalized["highlight_id"] = "highlight-" + _sha({k:v for k,v in normalized.items() if k != "highlight_id"})
+                normalized["highlight_id"] = _editorial_highlight_id(normalized)
             for existing in highlights:
                 if not normalized_story_refs.intersection(existing.get("story_refs") or []):
                     continue

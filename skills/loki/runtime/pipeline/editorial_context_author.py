@@ -12,6 +12,144 @@ from .evidence_world.contracts import digest
 
 CONTRACT = "editorial.context-author.v22"
 
+SIGNAL_PRIORITY_PROFILE = 'weighted_signals_v1'
+
+def _signal_priority_context(packet, view):
+    """Project admitted VOD hints; never read originals or change their ranks."""
+    import math
+    from html import escape
+    from .editorial_signal_scoring import DEFAULT_WEIGHTS, MODEL_VERSION, score_candidates
+
+    if packet.get('signal_priority_profile') != SIGNAL_PRIORITY_PROFILE:
+        raise ValueError('unknown_signal_priority_profile')
+    projected_navigation = packet.get('_signal_priority_navigation')
+    navigation = projected_navigation or view.get('navigation_context') or {}
+    navigation_path = ('author_source_context.signal_orientation' if projected_navigation
+        else 'source_material.navigation_context.signal_orientation.first_page')
+    page = (navigation.get('signal_orientation') or {}).get('first_page') or {}
+    states = page.get('family_status') or {}
+    if navigation and (navigation.get('source_id') != view['source']['source_id']
+            or page.get('source_id') != view['source']['source_id']
+            or page.get('world_revision') != navigation.get('world_revision')):
+        raise ValueError('signal_priority_source_binding')
+
+    def number(value):
+        if type(value) in (int, float) and math.isfinite(value):
+            return float(value)
+        return None
+
+    def span(a, b):
+        a, b = number(a), number(b)
+        return (a, b) if a is not None and b is not None and 0 <= a <= b else None
+
+    def overlaps(a, b):
+        if a[0] == a[1]:
+            return a[0] == b[0] if b[0] == b[1] else b[0] <= a[0] < b[1]
+        if b[0] == b[1]:
+            return a[0] <= b[0] < a[1]
+        return max(a[0], b[0]) < min(a[1], b[1])
+
+    peaks, clips, anchors, candidates, paths = [], [], [], [], {}
+
+    def offer(identifier, interval, path):
+        candidates.append(dict(id=identifier, start_sec=interval[0], end_sec=interval[1], features={}))
+        paths[identifier] = path
+
+    # The first page is a frozen overview, not a licence to join a live clock.
+    vod_hints = bool(navigation and not view['source'].get('source_clock'))
+    if vod_hints and states.get('chat') in {'present', 'partial'}:
+        for index, row in enumerate(packet.get('support_proposals') or []):
+            interval = span(row.get('start_sec'), row.get('end_sec'))
+            if interval is not None:
+                peaks.append((interval, row))
+                offer(f'chat-{index}', interval, f'source_material.discovery_signals[{index}]')
+
+
+        if not peaks:
+            for index, row in enumerate(page.get('hints') or []):
+                if row.get('kind') != 'chat_peak_cluster' or row.get('family') != 'chat':
+                    continue
+                interval = row.get('interval_sec') or []
+                interval = span(*interval) if len(interval) == 2 else None
+                if interval is not None:
+                    peaks.append((interval, row.get('stats') or {}))
+                    offer(f'chat-hint-{index}', interval, f'{navigation_path}.hints[{index}]')
+    attention = page.get('clip_attention') or {}
+    if vod_hints and states.get('clip') in {'present', 'partial'}:
+        for index, row in enumerate(attention.get('regions') or []):
+            interval = row.get('interval_sec') or []
+            interval = span(*interval) if len(interval) == 2 else None
+            count = number(row.get('clip_count'))
+            if interval is not None and interval[1] > interval[0] and count is not None and count >= 0:
+                clips.append((interval, count))
+                offer(f'clip-{index}', interval, f'{navigation_path}.clip_attention.regions[{index}]')
+    comments = (view.get('supplemental_sources') or {}).get('timeline_comment_context') or {}
+    comments_known = vod_hints and comments.get('source_status') in {'ok', 'no_comments'}
+    if comments_known:
+        for index, row in enumerate(comments.get('anchors') or []):
+            time = number(row.get('time_sec'))
+            if time is not None and time >= 0:
+                anchors.append(time)
+                offer(f'comment-{index}', (time, time), f'source_material.supplemental_sources.timeline_comment_context.anchors[{index}]')
+
+    clip_complete = (states.get('clip') == 'absent_confirmed' or
+        (states.get('clip') == 'present' and attention.get('total_regions') == len(clips)))
+    for candidate in candidates:
+        interval = (candidate['start_sec'], candidate['end_sec'])
+        features = candidate['features']
+        related = [row for other, row in peaks if overlaps(interval, other)]
+        density = [number(row.get('z_count')) for row in related]
+        density = [max(0.0, value) for value in density if value is not None]
+        features['chat_density'] = max(density) if density else None
+        for family, feature in (('laughter', 'laughter'), ('question', 'question'), ('surprise', 'surprise')):
+            rates = []
+            for row in related:
+                count = number(row.get(f'{family}_count_sum'))
+                windows = row.get('peak_seconds') or []
+                if count is not None and windows:
+                    rates.append(count / (10 * len(windows)))
+                else:
+                    count = number(row.get(f'{family}_count'))
+                    if count is not None:
+                        rates.append(count / 10)
+            features[feature] = max(rates) if rates else None
+        clip_rates = [count * 60 / (other[1] - other[0]) for other, count in clips
+                      if overlaps(interval, other)]
+        features['clips'] = max(clip_rates) if clip_rates else 0.0 if clip_complete else None
+        features['comments'] = (sum(overlaps(interval, (time, time)) for time in anchors)
+            / max(1.0, (interval[1] - interval[0]) / 60)) if comments_known else None
+
+        features['viewers'] = None
+
+    scored = score_candidates(candidates)
+    units = dict(chat_density='positive command-filtered density z',
+        laughter='filtered messages/second over detected 10s peak windows',
+        question='filtered messages/second over detected 10s peak windows',
+        surprise='filtered messages/second over detected 10s peak windows',
+        clips='located clip entries/minute in their original region',
+        comments='selected timed anchors/minute, minimum reference duration 1 minute',
+        viewers='unavailable: viewer VOD clock not admitted')
+    labels = dict(chat_density='밀도 양의z', laughter='웃음/초', question='의문 표현/초',
+                  surprise='놀람/초', clips='클립/분', comments='댓글앵커/기준분')
+    rows = []
+    for row in scored:
+        value = '미산정' if row['score'] is None else f"{row['score']:.1f}/100"
+        observed = ' · '.join(f'{labels[name]} {raw:.2f}' for name, raw in row['raw_features'].items()
+                              if raw is not None and name in labels)
+        text = f'탐색 신호 {value}' + (' · ' + observed if observed else '')
+        rows.append(dict(id=row['id'], start_sec=row['start_sec'], end_sec=row['end_sec'],
+            score=None if row['score'] is None else round(row['score'], 1), coverage=row['coverage'],
+            source_path=paths[row['id']], summary_html='<strong>' + escape(text) + '</strong>'))
+    shared = dict(profile=SIGNAL_PRIORITY_PROFILE, model_version=MODEL_VERSION,
+        status='ready' if rows else 'empty' if vod_hints else 'source_unavailable',
+        source_id=view['source']['source_id'], source_revision=view['source']['source_revision'],
+        world_revision=navigation.get('world_revision'), original_read=False, meaning_complete=False,
+        scope='Existing delivered source hints only; partial overview remains partial. '
+              'Observed support, not editorial value/probability. Missing weight is not redistributed. '
+              'Do not exclude quiet information, reorder original hints, or treat this as final selection.')
+    return ({**shared, 'rows': rows}, {**shared, 'weights': dict(DEFAULT_WEIGHTS),
+        'feature_units': units, 'candidates': scored})
+
 def context_source(*, source, packet):
     if not source:
         raise ValueError("context_author_requires_original_source")
@@ -76,5 +214,8 @@ def context_source(*, source, packet):
         payload['discovery_signals'] = [*payload['discovery_signals'], dict(
             kind='source_signal_orientation', same_request_path='navigation_context.signal_orientation',
             policy='Inspect the supplied derived hints, then originals. These hints do not approve value, meaning, heard audio or clip matches.')]
-    return payload, dict(contract=CONTRACT, native_timing=timing, evidence_catalog=catalog,
-                         independent_source_links=True)
+    evidence = dict(contract=CONTRACT, native_timing=timing, evidence_catalog=catalog,
+                    independent_source_links=True)
+    if packet.get('signal_priority_profile') is not None:
+        payload['signal_priority'], evidence['signal_priority_trace'] = _signal_priority_context(packet, payload)
+    return payload, evidence

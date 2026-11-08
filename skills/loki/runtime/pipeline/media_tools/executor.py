@@ -6,6 +6,8 @@ import hashlib
 
 import json
 
+import math
+
 import os
 
 import shutil
@@ -110,10 +112,11 @@ def _tool_paths() -> tuple[str, str]:
         raise MediaToolError("ffprobe_unavailable", "ffprobe is not available in PATH or the repo runtime")
     return ffmpeg, ffprobe
 
-def _run(command: list[str], *, timeout_sec: int) -> None:
+def _run(command: list[str], *, timeout_sec: int, input_text: str | None = None) -> None:
     try:
         completed = subprocess.run(
             command,
+            input=input_text,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
@@ -150,6 +153,46 @@ def _remote_input_args(ffmpeg: str, url: str) -> list[str]:
         options.extend(_hls_demuxer_args(ffmpeg))
     return options
 
+def _window_input(ffmpeg: str, url: str, start_sec: float, duration_sec: float) -> tuple[list[str], str | None]:
+    options = _remote_input_args(ffmpeg, url)
+    if not urlsplit(url).path.lower().endswith(".m3u8"):
+        return ["-ss", f"{start_sec:.3f}", *options, "-i", url], None
+
+
+
+
+
+    from requests import RequestException
+    from pipeline.downloader import _load_m3u8_playlist
+    from pipeline.live_vod_repair import hls_window
+
+    try:
+        playlist, trim_sec = hls_window(url, _load_m3u8_playlist(url), start_sec, duration_sec)
+    except (RequestException, ValueError):
+        raise MediaToolError("source_unavailable", "the selected HLS window could not be prepared") from None
+    whitelist = options.index("-protocol_whitelist") + 1
+    options[whitelist] += ",pipe"
+    return [*options, "-f", "hls", "-i", "pipe:0", "-ss", f"{trim_sec:.9f}"], playlist
+
+def _hls_video_origin(ffprobe: str, input_args: list[str], playlist: str) -> float:
+    """Account for audio preroll before the selected fragment's video clock."""
+    try:
+        result = subprocess.run([
+            ffprobe, "-v", "error", *input_args, "-show_entries",
+            "format=start_time:stream=codec_type,start_time", "-of", "json",
+        ], input=playlist, capture_output=True, text=True, timeout=60, check=False)
+        if result.returncode:
+            raise ValueError("probe_failed")
+        metadata = json.loads(result.stdout)
+        video_start = next(float(row["start_time"]) for row in metadata["streams"]
+                           if row["codec_type"] == "video")
+        offset = video_start - float(metadata["format"]["start_time"])
+        if not math.isfinite(offset) or offset < -1e-6:
+            raise ValueError("probe_clock_invalid")
+        return max(0.0, offset)
+    except (OSError, ValueError, TypeError, KeyError, StopIteration, subprocess.TimeoutExpired):
+        raise MediaToolError("media_probe_failed", "the HLS video clock could not be verified") from None
+
 def _download_audio(
     request: ToolRequest,
     source: ResolvedChzzkSource,
@@ -162,17 +205,14 @@ def _download_audio(
     extension = {"stt": ".mka", "listen": ".mp3", "archive": ".ogg"}[profile]
     output = cache_dir / f"audio-{profile}{extension}"
     partial = _partial_for(output)
+    input_args, playlist = _window_input(ffmpeg, source.media_url, start_sec, duration_sec)
     command = [
         ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
         "-y",
-        "-ss",
-        f"{start_sec:.3f}",
-        *_remote_input_args(ffmpeg, source.media_url),
-        "-i",
-        source.media_url,
+        *input_args,
         "-t",
         f"{duration_sec:.3f}",
         "-map",
@@ -188,7 +228,7 @@ def _download_audio(
     else:
         command += ["-ac", "1", "-ar", "16000", "-c:a", "libopus", "-b:a", "32k"]
     command.append(str(partial))
-    _run(command, timeout_sec=_timeout(duration_sec))
+    _run(command, timeout_sec=_timeout(duration_sec), input_text=playlist)
     os.replace(partial, output)
     return [output]
 
@@ -200,20 +240,21 @@ def _download_video(
     duration_sec: float,
     *,
     include_audio: bool = True,
+    ffprobe: str | None = None,
 ) -> Path:
     output = cache_dir / "video-window.mp4"
     partial = _partial_for(output)
+    input_args, playlist = _window_input(ffmpeg, source.media_url, start_sec, duration_sec)
+    if playlist is not None and include_audio:
+        origin = _hls_video_origin(ffprobe or _tool_paths()[1], input_args[:-2], playlist)
+        input_args[-1] = f"{float(input_args[-1]) + origin:.9f}"
     command = [
         ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
         "-y",
-        "-ss",
-        f"{start_sec:.3f}",
-        *_remote_input_args(ffmpeg, source.media_url),
-        "-i",
-        source.media_url,
+        *input_args,
         "-t",
         f"{duration_sec:.3f}",
         "-map",
@@ -221,16 +262,20 @@ def _download_video(
     ]
     if include_audio:
         command += ["-map", "0:a:0?"]
+    if playlist is None:
+        command += ["-c", "copy"]
+    else:
+
+
+        command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "copy"]
     command += [
-        "-c",
-        "copy",
         "-avoid_negative_ts",
         "make_zero",
         "-movflags",
         "+faststart",
         str(partial),
     ]
-    _run(command, timeout_sec=_timeout(duration_sec))
+    _run(command, timeout_sec=_timeout(duration_sec), input_text=playlist)
     os.replace(partial, output)
     return output
 
@@ -268,6 +313,7 @@ def _extract_frames(
     output_height: int,
     *,
     local_start_sec: float = 0.0,
+    decode_from_start: bool = False,
 ) -> tuple[list[Path], list[float]]:
     frames_dir = cache_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
@@ -276,18 +322,23 @@ def _extract_frames(
     interval = duration_sec / 9.0
     first = interval / 2.0
     pattern = frames_dir / "frame-%02d.jpg"
+    position = f"{local_start_sec + first:.6f}"
+
+
+
+
+    input_args = ["-i", str(clip)] if decode_from_start else ["-ss", position, "-i", str(clip)]
+    filters = (f"trim=start={position},setpts=PTS-STARTPTS,fps=1/{interval:.9f}:eof_action=pass"
+               if decode_from_start else f"fps=1/{interval:.9f}")
     command = [
         ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
         "-y",
-        "-ss",
-        f"{local_start_sec + first:.6f}",
-        "-i",
-        str(clip),
+        *input_args,
         "-vf",
-        f"fps=1/{interval:.9f},scale=-2:{output_height}",
+        f"{filters},scale=-2:{output_height}",
         "-frames:v",
         "9",
         "-q:v",
@@ -480,7 +531,7 @@ def acquire_request(
                 observed = _probe_duration(paths[0], ffprobe)
                 _validate_duration(duration_sec, observed)
             elif request.action == "video":
-                paths = [_download_video(source, cache_dir, ffmpeg, start_sec, duration_sec, include_audio=True)]
+                paths = [_download_video(source, cache_dir, ffmpeg, start_sec, duration_sec, include_audio=True, ffprobe=ffprobe)]
                 kinds = ["video"]
                 observed = _probe_duration(paths[0], ffprobe)
                 _validate_duration(duration_sec, observed)

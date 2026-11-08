@@ -66,7 +66,7 @@ _SAFE_THUMB_SCHEMES = ("http://", "https://")
 
 _BADGE_LOWER_PLAY_MIN_V1 = 300
 
-VIEWER_EDITOR_TOOLS_RENDER_VERSION = "persisted-scene-images-first-look-v13"
+VIEWER_EDITOR_TOOLS_RENDER_VERSION = "occurrence-first-density-v15"
 
 from .render_primitives import (
     _audio_peak_delta_text,
@@ -251,9 +251,9 @@ def _viewer_editor_guidance_from_flags(flags: Any, kind: str = "") -> list[dict[
             add("자막 참고 구간", "긴 자막이 잡힌 장면입니다. 최종 하이라이트라는 뜻은 아니고, 앞뒤 맥락을 확인하기 좋은 위치입니다.")
         elif flag in {"chat_bucket_supporting_signal", "chat_peak_supporting_signal"}:
             if kind == "chat_laughter":
-                add("웃음/놀람 채팅", "웃기거나 놀란 반응이 채팅에 많이 잡힌 구간입니다. 리액션 컷 후보로 보고, 정확한 장면 내용은 자막과 요약으로 확인하세요.")
+                add("웃음·놀람·의문 표현", "웃음·놀람·의문 표현이 관측된 후보입니다. 서로 다른 분류이며 함께 나타날 수 있습니다. 리액션 컷 후보로 보고, 정확한 장면 내용은 자막과 요약으로 확인하세요.")
             elif kind == "chat_surprise":
-                add("채팅 급증 구간", "채팅량이 갑자기 늘어난 구간입니다. 무슨 일이 났는지 찾는 출발점으로 보고, 웃긴 장면인지 이슈 장면인지는 자막과 화면 흐름으로 확인하세요.")
+                add("고채팅량 후보", "같은 방송에서 채팅 수가 높거나 시간대를 대표하는 후보입니다. 인접 구간 대비 증가를 입증한 값은 아닙니다. 무슨 일이 났는지 찾는 출발점으로 보고, 웃긴 장면인지 이슈 장면인지는 자막과 화면 흐름으로 확인하세요.")
             else:
                 add("채팅 반응 신호", "시청자 반응이 몰린 구간입니다. 방송 내용의 사실 판단은 자막이나 기존 요약과 함께 보세요.")
         elif flag in {"viewer_interest_signal_not_ground_truth", "injected_viewer_clip_anchor"}:
@@ -285,9 +285,9 @@ def _viewer_editor_guidance_from_flags(flags: Any, kind: str = "") -> list[dict[
 
     if not messages and kind in {"chat", "chat_laughter", "chat_surprise"}:
         if kind == "chat_laughter":
-            add("웃음/놀람 채팅", "웃기거나 놀란 반응이 채팅에 많이 잡힌 구간입니다. 리액션 컷 후보로 보고, 정확한 장면 내용은 자막과 요약으로 확인하세요.")
+            add("웃음·놀람·의문 표현", "웃음·놀람·의문 표현이 관측된 후보입니다. 서로 다른 분류이며 함께 나타날 수 있습니다. 리액션 컷 후보로 보고, 정확한 장면 내용은 자막과 요약으로 확인하세요.")
         elif kind == "chat_surprise":
-            add("채팅 급증 구간", "채팅량이 갑자기 늘어난 구간입니다. 무슨 일이 났는지 찾는 출발점으로 보고, 웃긴 장면인지 이슈 장면인지는 자막과 화면 흐름으로 확인하세요.")
+            add("고채팅량 후보", "같은 방송에서 채팅 수가 높거나 시간대를 대표하는 후보입니다. 인접 구간 대비 증가를 입증한 값은 아닙니다. 무슨 일이 났는지 찾는 출발점으로 보고, 웃긴 장면인지 이슈 장면인지는 자막과 화면 흐름으로 확인하세요.")
         else:
             add("채팅 반응 신호", "채팅이 몰린 위치입니다. 장면 내용은 자막이나 기존 요약과 함께 확인하세요.")
     return messages
@@ -630,7 +630,7 @@ def _viewer_editor_event_from_audio_peak(peak: dict[str, Any], index: int) -> di
     if "chat_audio_overlap" in labels:
         title = "소리와 채팅이 함께 튄 구간"
     elif "voice_reaction_candidate" in labels:
-        title = "목소리 리액션이 커진 구간"
+        title = "음량·자막 변화 후보"
     else:
         title = "소리가 크게 튄 구간"
     evidence_text = ", ".join(labels) if labels else "supporting_signal_only"
@@ -689,6 +689,7 @@ def _viewer_editor_event_from_workbench(row: dict[str, Any]) -> dict[str, Any] |
         "title": str(row.get("label") or lane_label),
         "evidence": evidence[:6],
         "guidance": _viewer_editor_guidance_from_flags(row.get("risk_flags"), lane),
+        **{key: row[key] for key in ("source_identity_key", "source_identity_kind", "source_identity_confidence", "source_clock_ref", "source_interval_sec", "source_refs", "signal_family", "signal_measurement") if key in row},
         **({
             "source_identity_key": str(row.get("source_identity_key")),
             "source_identity_kind": str(row.get("source_identity_kind") or ""),
@@ -789,11 +790,14 @@ def _build_viewer_editor_tools_payload(
         source_parent = Path(srt_path).parent
         if source_parent.name == str(evidence_video_no or vod_info.video_no or ""):
             work_path = source_parent.parent
-    if work_path is not None:
+    if work_path is not None or chats is not None:
         try:
             from ..signal_timeline_workbench import build_signal_timeline_workbench
 
             signal_video_no = str(evidence_video_no or vod_info.video_no or "")
+
+
+            admitted_chats = chats if signal_video_no == str(vod_info.video_no or "") else None
             workbench_meta = {
                 **sec,
 
@@ -802,7 +806,7 @@ def _build_viewer_editor_tools_payload(
                 "video_no": signal_video_no,
                 "title": str(vod_info.title or ""),
                 "duration": int(vod_info.duration or 0),
-                **({"total_chats": len(chats)} if chats is not None else {}),
+                **({"total_chats": len(admitted_chats)} if admitted_chats is not None else {}),
             }
             workbench = build_signal_timeline_workbench(
                 workbench_meta,
@@ -810,23 +814,28 @@ def _build_viewer_editor_tools_payload(
                 work_dir=work_path,
                 draft_dir=None,
                 max_events=220,
+                chats=admitted_chats,
             )
-            if isinstance(workbench, dict) and workbench.get("events"):
+            if isinstance(workbench, dict) and isinstance(workbench.get("events"), list):
                 payload = _build_viewer_editor_tools_payload_from_workbench(
                     workbench,
                     edit_export_preview=edit_preview,
                 )
+                if not payload.get("subtitles") and signal_video_no == str(vod_info.video_no or ""):
+                    subtitles = _viewer_editor_subtitles_from_srt(srt_path)
+                    payload["subtitles"] = _thin_viewer_editor_subtitles(subtitles)
+                    payload.setdefault("summary", {})["subtitle_context_count"] = len(subtitles)
 
 
-                if chats is not None:
-                    chat_buckets = _viewer_editor_chat_buckets(chats)
+                if admitted_chats is not None:
+                    chat_buckets = _viewer_editor_chat_buckets(admitted_chats)
                     payload["chat_buckets"] = _thin_viewer_editor_chat_buckets(chat_buckets)
                     stats = payload.get("stats")
                     payload["stats"] = dict(stats) if isinstance(stats, dict) else {}
-                    payload["stats"]["total_chats"] = len(chats)
+                    payload["stats"]["total_chats"] = len(admitted_chats)
                     summary = payload.get("summary")
                     payload["summary"] = dict(summary) if isinstance(summary, dict) else {}
-                    payload["summary"]["total_chats"] = len(chats)
+                    payload["summary"]["total_chats"] = len(admitted_chats)
                     payload["summary"]["chat_bucket_count"] = len(chat_buckets)
                 audio_waveform = _thin_viewer_editor_audio_waveform(sec.get("audio_waveform"))
                 if audio_waveform:
@@ -929,7 +938,7 @@ def _viewer_editor_subtitles_from_srt(srt_path: str, *, max_rows: int = 900) -> 
     if not srt_path:
         return []
     try:
-        from .chunker import parse_srt
+        from ..chunker import parse_srt
 
         cues = parse_srt(srt_path)
     except Exception:
@@ -1145,7 +1154,7 @@ def _project_public_viewer_editor_tools_payload(payload: dict[str, Any]) -> dict
 
     projected["chat_buckets"] = [
         {key: value for key, value in row.items()
-         if key not in {"reaction_count", "laughter_count", "surprise_count", "hot"}}
+         if key not in {"reaction_count", "laughter_count", "surprise_count", "question_count", "hot"}}
         for row in (projected.get("chat_buckets") or [])
         if isinstance(row, dict)
     ]
@@ -1159,6 +1168,8 @@ def _project_public_viewer_editor_tools_payload(payload: dict[str, Any]) -> dict
     aggregate_keys = (
         "cluster_id", "start_sec", "end_sec", "timecode", "signal_count",
         "family_count", "viewer_clip_count", "confidence", "overflow_event_count",
+        "independent_signal_count", "known_independent_signal_count",
+        "independent_family_count", "independence_status",
         "video_no", "source_video_no", "seek_sec", "end_seek_sec", "vod_label",
     )
     public_clusters = []
@@ -1268,6 +1279,9 @@ def _build_viewer_editor_tools_payload_from_workbench(
             total_chats += int(bucket.get("count") or 0)
         except (TypeError, ValueError):
             continue
+    coverage = (workbench.get("summary") or {}).get("chat_coverage") or {}
+    if not raw_buckets and coverage.get("status") == "missing":
+        total_chats = None
     audio_waveform = _thin_viewer_editor_audio_waveform(workbench.get("audio_waveform"))
     event_counts = _viewer_editor_event_counts_by_kind(events)
     lanes = []
