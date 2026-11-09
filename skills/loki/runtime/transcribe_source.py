@@ -31,9 +31,12 @@ def _owned(root, path):
 
 
 def _media_paths(root, work, video_path, output_path):
+    from pipeline.source_platforms import valid_work_id
+
     video = _owned(root, video_path)
     output = _owned(root, output_path)
-    if (not video.is_relative_to(work) or not video.relative_to(work).parts[0].isdigit()
+    if (video == work or not video.is_relative_to(work)
+            or not valid_work_id(video.relative_to(work).parts[0])
             or video.suffix.lower() not in {".mp4", ".mkv", ".mov", ".webm"} or not video.is_file()):
         raise ValueError("speech_source_owned_video_required")
     if output.parent != video.parent or output.suffix.lower() != ".srt":

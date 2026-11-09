@@ -11,6 +11,7 @@ import math
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import time
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
@@ -159,6 +160,22 @@ def _youtube_rows(paths, duration, max_messages, deadline, meta):
     return rows
 
 
+def _new_file_bytes(cwd, before):
+    total = 0
+    for path in cwd.rglob("*"):
+        try:
+            if path.resolve() in before:
+                continue
+            item = path.stat()
+        except FileNotFoundError:
+
+
+            continue
+        if stat.S_ISREG(item.st_mode):
+            total += item.st_size
+    return total
+
+
 def _bounded_runner(max_bytes, deadline):
     """Bound actual yt-dlp output bytes while its downloader is running."""
     from pipeline.replay_continuity.preparation import _owned_process_tree
@@ -173,14 +190,12 @@ def _bounded_runner(max_bytes, deadline):
                                     start_new_session=os.name != "nt")
             with _owned_process_tree(proc):
                 while proc.poll() is None:
-                    size = sum(path.stat().st_size for path in cwd.rglob("*")
-                               if path.is_file() and path.resolve() not in before)
-                    if size > max_bytes:
+                    if _new_file_bytes(cwd, before) > max_bytes:
                         raise ChatCollectionError("byte_limit")
                     if time.monotonic() >= until:
                         raise ChatCollectionError("time_limit")
                     time.sleep(.05)
-        if sum(path.stat().st_size for path in cwd.rglob("*") if path.is_file() and path.resolve() not in before) > max_bytes:
+        if _new_file_bytes(cwd, before) > max_bytes:
             raise ChatCollectionError("byte_limit")
         return subprocess.CompletedProcess(command, proc.returncode, stdout.read_text(encoding="utf-8", errors="replace"), "")
     return run

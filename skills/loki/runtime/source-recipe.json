@@ -7148,7 +7148,7 @@
     },
     {
       "source_path": "vendor/chat-analyze-engine/config/loki_versions.json",
-      "source_sha256": "19c94ce9af26d022f0b0d65c56832bf7ed8bab60b7ad762b30812777b3f49e80"
+      "source_sha256": "24d85db4cc6c1c5aa43f5cb8c16a7536d809a9b2b544c0023715f2b302b088de"
     }
   ],
   "external_imports": [
@@ -7235,7 +7235,7 @@
     "yt_dlp",
     "zlib"
   ],
-  "source_commit": "d9ada34868284015bbd00acb1f2b346001db5b70",
+  "source_commit": "f267289ce28725b29a998b54df502359b10c950f",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",

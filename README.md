@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.7 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.7.2 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.7</h1>
-<p align="center">정식 요약 메커니즘 Loki 3.0.7</p>
+<h1 align="center">CVA-Loki 3.0.7.2</h1>
+<p align="center">정식 요약 메커니즘 Loki 3.0.7.2</p>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.7" src="https://img.shields.io/badge/버전-3.0.7-8B5CF6?style=flat-square" /></a>
+  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.7.2" src="https://img.shields.io/badge/버전-3.0.7.2-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
   <a href="#codex-integration"><img alt="코덱스 플러그인과 스킬" src="https://img.shields.io/badge/코덱스-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
   <a href="#docker-install"><img alt="도커 한 명령 설치" src="https://img.shields.io/badge/도커-한%20명령%20설치-2496ED?style=flat-square" /></a>
@@ -45,7 +45,7 @@
 
 YouTube·SOOP 로고도 공식 원본의 형태·색상·비율을 유지합니다. 로고의 권리와 사용 조건은 각 권리자에게 있으며, [원본 출처와 제3자 고지](THIRD_PARTY_NOTICES.md#플랫폼-로고)를 확인하세요.
 
-현재 `main` 소스 설치에서는 공개 치지직 VOD 번호, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex 또는 명시적으로 선택한 ChatGPT가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다. YouTube·SOOP 원자료 준비는 현재 소스 설치에 포함되며, 기존 v3.0.7 ZIP에는 포함되지 않습니다.
+정식 배포본에서는 공개 치지직 VOD 번호, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex 또는 명시적으로 선택한 ChatGPT가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다.
 
 ### ChatGPT 자체 Linux에서 사용
 
@@ -91,16 +91,9 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 ### 1. 배포 폴더를 준비하세요
 
-YouTube Live 다시보기·SOOP VOD를 준비하려면 아래 명령으로 [원본 저장소의 현재 `main` 소스](https://github.com/ttaem00/CVA-Loki/tree/main)를 clone한 뒤, 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+[CVA-Loki-3.0.7.2.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.7.2/CVA-Loki-3.0.7.2.zip) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
 
-[기존 v3.0.7 배포 파일](https://github.com/ttaem00/CVA-Loki/releases/tag/v3.0.7)의 `CVA-Loki-3.0.7.zip`은 치지직 원자료 준비를 포함한 고정 배포본입니다. 이 ZIP과 태그는 그대로 보존하며, 현재 소스에 추가된 YouTube·SOOP 원자료 준비는 포함하지 않습니다.
-
-배포·플러그인·스킬·요약 메커니즘 버전은 모두 **3.0.7**이며, 새 작업의 `latest`도 **Loki 3.0.7**을 선택합니다. 기존 작업의 메커니즘 식별자와 결과 이력은 보존합니다. 이미 설치한 이전 버전의 작업공간을 덮어쓰지 말고 새 배포본은 새 작업공간에 설치하세요.
-
-```sh
-git clone --branch main --single-branch https://github.com/ttaem00/CVA-Loki.git
-cd CVA-Loki
-```
+배포·플러그인·스킬·요약 메커니즘은 **3.0.7.2**이며, 새 작업의 `latest`도 **Loki 3.0.7.2**를 선택합니다. 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
 
 ### 2. 설치할 곳을 선택하세요
 
@@ -154,7 +147,7 @@ docker compose run --build --rm loki
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 요약 메커니즘 3.0.7 동작 |
+| 기능 | 요약 메커니즘 3.0.7.2 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
@@ -269,11 +262,9 @@ AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지�
 <a id="native-install"></a>
 ## 로컬 설치
 
-현재 `main` 소스를 clone해 설치합니다. 기존 v3.0.7 ZIP을 해제한 경우에는 그 배포본에 포함된 치지직 원자료 준비를 사용합니다.
+3.0.7.2 정식 ZIP을 해제해 설치합니다.
 
 ```sh
-git clone --branch main --single-branch https://github.com/ttaem00/CVA-Loki.git
-cd CVA-Loki
 python install.py --workspace ../loki-workspace --mode skill
 ```
 
@@ -345,8 +336,8 @@ python install.py --workspace ../loki-plugin-workspace --mode plugin
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.7` |
-| 요약 메커니즘 | `3.0.7` · `latest`는 `loki_3_0_7` 선택 |
+| 배포 버전 | `3.0.7.2` |
+| 요약 메커니즘 | `3.0.7.2` · `latest`는 `loki_3_0_7_2` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
 | skill | `loki` / 명시 호출 `$loki` |
@@ -678,7 +669,12 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 <a id="release-version-policy"></a>
 ### 버전 정책
 
-현재 정식 배포는 **3.0.7**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 같은 버전을 씁니다. 공개한 태그·ZIP과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
+현재 정식 배포는 **3.0.7.2**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 같은 버전을 씁니다. 공개한 태그·ZIP과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
+
+### 3.0.7.2의 주요 변경
+
+- 공개 YouTube Live 다시보기와 SOOP VOD의 영상·다시보기 채팅·로컬 자막 준비를 정식 ZIP에 포함했습니다.
+- SOOP 분할 다시보기를 하나의 영상으로 준비하고 파트별 채팅 시각을 전체 영상에 맞춥니다.
 
 ### 3.0.7의 주요 변경
 
@@ -863,7 +859,7 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 아닙니다. 로컬 검색 encoder입니다. 현재 대화의 Codex가 원문·이미지를 직접 읽고 판단·작성합니다.
 
 **VOD URL만 주면 되나요?**  
-현재 소스의 전체 설치에서는 익명 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL로 source 준비부터 시작할 수 있습니다. 기존 v3.0.7 ZIP의 온라인 원자료 준비는 치지직 대상입니다. 준비 이후 현재 Codex의 실제 읽기·작성·제출이 필요하며 인증이 필요한 VOD는 수집하지 않습니다.
+정식 배포본의 전체 설치에서는 익명 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL로 source 준비부터 시작할 수 있습니다. 준비 이후 현재 Codex의 실제 읽기·작성·제출이 필요하며 인증이 필요한 VOD는 수집하지 않습니다.
 
 **GPU 없이 사용할 수 있나요?**  
 네. 호환 GPU가 없거나 명시 CPU를 선택하면 가능합니다. Docker에서는 CPU override도 함께 사용하세요. 긴 STT 작업은 처리 시간과 메모리 요구를 고려해야 합니다.
