@@ -186,6 +186,25 @@ def collect_chat(network, video, duration, target):
     return dict(status=status, path=str(target), meta_path=str(meta_path))
 
 
+def _move_stt_intermediates(root, source, attempt, media):
+    """Keep the transcriber's derived part files outside admitted source inputs."""
+
+    pattern = re.compile(re.escape(media.stem) + r"_part[0-9]{3}(?:" + re.escape(media.suffix) + r"|\.wav)")
+
+    cache = owned(root, root / ".cache" / "source-preparation" / f"vod-{source.name}" / attempt.name)
+    for path in media.parent.iterdir():
+        if not pattern.fullmatch(path.name):
+            continue
+        part = owned(root, path)
+        if not part.is_file():
+            continue
+        target = owned(root, cache / path.name)
+        if target.exists():
+            raise FileExistsError("loki_source_intermediate_cache_collision")
+        cache.mkdir(parents=True, exist_ok=True)
+        part.rename(target)
+
+
 def run(workspace, vod, *, height=480, max_download_seconds=21600):
     from pipeline.source_platforms import resolve_source
     reference = resolve_source(vod)
@@ -296,12 +315,14 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
         phase = "local_stt"
         if "speech" not in state:
             from transcribe_source import run as transcribe
-            state["speech"] = transcribe(root, media, attempt / "source.srt")
+            state["speech"] = transcribe(root, media, media.with_name("source.srt"))
             save(checkpoint, state)
         srt = owned(root, state["speech"]["srt_path"])
         if not srt.is_relative_to(attempt) or ("srt_sha256" in state and digest(srt) != state["srt_sha256"]):
             raise ValueError("loki_source_cached_srt_changed")
         state["srt_sha256"] = digest(srt)
+        phase = "source_finalize"
+        _move_stt_intermediates(root, source, attempt, media)
         metadata = state["metadata"]
         vod_info = dict(video_no=video, title=metadata["title"], channel_id=metadata["channelId"],
             channel_name=metadata["channelName"], duration=math.ceil(state["clock"]["duration_sec"]),

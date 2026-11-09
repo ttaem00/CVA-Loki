@@ -1,7 +1,7 @@
 {
   "name": "loki",
-  "version": "3.0.7",
-  "description": "현재 Codex가 치지직 원문과 장면을 직접 읽고 요약·타임라인·하이라이트를 작성하는 비공식 도구입니다.",
+  "version": "3.0.7.2",
+  "description": "현재 Codex가 치지직·YouTube·SOOP 다시보기 원문과 장면을 직접 읽고 요약·타임라인·하이라이트를 작성하는 비공식 도구입니다.",
   "author": {
     "name": "CVA contributors"
   },
@@ -17,7 +17,7 @@
   "interface": {
     "displayName": "CVA-Loki",
     "shortDescription": "치지직 원문과 장면을 읽고 요약·편집하기",
-    "longDescription": "현재 대화의 Codex가 공개 치지직 다시보기 원자료를 준비하고, 원문과 추출 이미지를 직접 확인해 보고서를 작성합니다. GPU 자동 설치, 로컬 전사·멀티모달 탐색, 기존 보고서 검토·편집 화면을 제공합니다. 네이버·치지직의 공식·제휴 프로젝트가 아닙니다.",
+    "longDescription": "현재 대화의 Codex가 공개 치지직·YouTube·SOOP 다시보기 원자료를 준비하고, 원문과 추출 이미지를 직접 확인해 보고서를 작성합니다. GPU 자동 설치, 로컬 전사·멀티모달 탐색, 기존 보고서 검토·편집 화면을 제공합니다. 네이버·치지직의 공식·제휴 프로젝트가 아닙니다.",
     "developerName": "CVA contributors",
     "category": "Productivity",
     "capabilities": [

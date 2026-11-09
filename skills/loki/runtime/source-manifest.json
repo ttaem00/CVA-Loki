@@ -7515,8 +7515,8 @@
     },
     {
       "source_path": "vendor/chat-analyze-engine/config/loki_versions.json",
-      "source_sha256": "19c94ce9af26d022f0b0d65c56832bf7ed8bab60b7ad762b30812777b3f49e80",
-      "export_sha256": "19c94ce9af26d022f0b0d65c56832bf7ed8bab60b7ad762b30812777b3f49e80"
+      "source_sha256": "24d85db4cc6c1c5aa43f5cb8c16a7536d809a9b2b544c0023715f2b302b088de",
+      "export_sha256": "24d85db4cc6c1c5aa43f5cb8c16a7536d809a9b2b544c0023715f2b302b088de"
     },
     {
       "source_path": "loki.py",
@@ -7630,26 +7630,26 @@
     },
     {
       "source_path": "transcribe_source.py",
-      "source_sha256": "91a5eafea9208581dd5bedac91f7a27d65a4f671d23f341da541d95914f23cc5",
-      "export_sha256": "b3c2400b712117e2c85fca1f21310d5d379f5458a316289b8d349e2fb8db5770",
+      "source_sha256": "0bf094ba21675769878f5f507ce13ea65dc1ebba5af88adf65a5e42408e7dd55",
+      "export_sha256": "d75b5b522a8c426fc110d1524ef5540bdded67fc4a4e40e53023eab85388d7d6",
       "origin": "release_support",
-      "extracted_sha256": "91a5eafea9208581dd5bedac91f7a27d65a4f671d23f341da541d95914f23cc5",
+      "extracted_sha256": "0bf094ba21675769878f5f507ce13ea65dc1ebba5af88adf65a5e42408e7dd55",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "source_acquire.py",
-      "source_sha256": "7f388003123642773b827aa104930941dfa3cc0aeaf49344fc9ce832cf396aca",
-      "export_sha256": "d20d6b2c0ae81b5821f343503bb9dcd9feebe66190b99f299b884547a115311c",
+      "source_sha256": "eeaec1c6becf57e8c7d854852a75bbc5c1a290634a494cc0fcaa323603405647",
+      "export_sha256": "2a89a8f8bd30935549dcded1960384771ca91c126e02b5f6de5cf0ea30a8d79b",
       "origin": "release_support",
-      "extracted_sha256": "7f388003123642773b827aa104930941dfa3cc0aeaf49344fc9ce832cf396aca",
+      "extracted_sha256": "eeaec1c6becf57e8c7d854852a75bbc5c1a290634a494cc0fcaa323603405647",
       "export_policy": "public-commentary-v1"
     },
     {
       "source_path": "source_adapters.py",
-      "source_sha256": "9df5acb5541f2ef0d1d4c9b48461a5f48136d84636dba734082e959c16c8da51",
-      "export_sha256": "02d12f56f2d37b6000ec590cf5842df9086f8560164f74740cea3932382dcaf6",
+      "source_sha256": "66d58e66d50f96fe96d2a5aa0ab6d0a89d9919e084c79aad594c4fd79264367d",
+      "export_sha256": "1bb2c7c1238ba3e9578071bfb585f255855ca3baf9863587e60bf6c3bf9fbd86",
       "origin": "release_support",
-      "extracted_sha256": "9df5acb5541f2ef0d1d4c9b48461a5f48136d84636dba734082e959c16c8da51",
+      "extracted_sha256": "66d58e66d50f96fe96d2a5aa0ab6d0a89d9919e084c79aad594c4fd79264367d",
       "export_policy": "public-commentary-v1"
     },
     {
@@ -7761,6 +7761,6 @@
     "yt_dlp",
     "zlib"
   ],
-  "source_commit": "d9ada34868284015bbd00acb1f2b346001db5b70",
-  "version": "3.0.7"
+  "source_commit": "f267289ce28725b29a998b54df502359b10c950f",
+  "version": "3.0.7.2"
 }
