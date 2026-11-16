@@ -7809,6 +7809,6 @@
     "yt_dlp",
     "zlib"
   ],
-  "source_commit": "8243847b7935aca0f542fa9d27d982da5a836bc8",
+  "source_commit": "34362ed7a212ea40a07a0452ba17fbf89cb8598e",
   "version": "3.0.8"
 }
