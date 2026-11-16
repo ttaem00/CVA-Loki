@@ -150,6 +150,7 @@ def _normalize_editorial_highlight(
     highlight_producer_run_ref: str,
     source_duration_sec: float,
     story_requirement: Mapping[str, Any] | None = None,
+    range_native_bounds: Mapping[str, tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(proposal, Mapping):
         raise _editorial_error("highlight_proposal_must_be_an_object")
@@ -241,7 +242,8 @@ def _normalize_editorial_highlight(
             raise _editorial_error("source_span_point_refs_escape_highlight")
         try:
             derived_d1_refs, derived_d2_refs = _derive_source_span_structure_refs(
-                start=start, end=end, d1_index=d1_index, d2_index=d2_index)
+                start=start, end=end, d1_index=d1_index, d2_index=d2_index,
+                range_native_bounds=range_native_bounds)
         except ValueError as exc:
             raise _editorial_error(str(exc)) from exc
         if (not set(span_d1_refs).issubset(derived_d1_refs)
@@ -409,6 +411,7 @@ def _normalize_editorial_highlight(
                 end=float(span["end_sec"]),
                 d1_index=d1_index,
                 d2_index=d2_index,
+                range_native_bounds=range_native_bounds,
             )
         except ValueError as exc:
             raise _editorial_error(str(exc)) from exc
@@ -610,6 +613,7 @@ def build_editorial_highlight_set(
     story_requirements: Mapping[str, Mapping[str, Any]] | None = None,
     context_requirements: Mapping[str, Mapping[str, Any]] | None = None,
     composition_evidence: Mapping[str, Any] | None = None,
+    range_native_bounds: Mapping[str, tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     """Validate Highlights; legacy review windows are never persisted."""
 
@@ -761,6 +765,7 @@ def build_editorial_highlight_set(
                 highlight_producer_run_ref=producer,
                 source_duration_sec=duration,
                 story_requirement=combined_requirement,
+                range_native_bounds=range_native_bounds,
             )
             normalized_story_refs = set(normalized.get("story_refs") or [])
             if composition_evidence is not None:

@@ -9,13 +9,19 @@ from __future__ import annotations
 
 import json
 
+import os
+
+import sys
+
 import time
 
 from copy import deepcopy
 
-from contextlib import nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 
 from functools import lru_cache
+
+from pathlib import Path
 
 from .evidence_world.contracts import EvidenceError, digest, native_path
 
@@ -26,6 +32,121 @@ SCHEMA = 'ew.gemma2_lance.v1'
 FAMILIES = ('stt', 'chat')
 
 _RUNTIME_UNSET = object()
+
+_VECTOR_BYTES = 768 * 4
+
+_NAVIGATION_MAX_SLOTS = 4
+
+def _navigation_headroom():
+    from .editorial_multimodal_navigation import _memory
+
+    try:
+        available = _memory()[2]
+    except (OSError, ValueError):
+        available = None
+    cpus = os.cpu_count() or 1
+    if hasattr(os, 'sched_getaffinity'):
+        try:
+            cpus = min(cpus, len(os.sched_getaffinity(0)))
+        except OSError:
+            pass
+    if sys.platform.startswith('linux'):
+        mount = Path('/sys/fs/cgroup').resolve()
+        try:
+            relative = next(line[3:] for line in Path('/proc/self/cgroup').read_text().splitlines()
+                            if line.startswith('0::'))
+        except (OSError, StopIteration):
+            relative = '/'
+        group = (mount / relative.lstrip('/')).resolve()
+        if not group.is_relative_to(mount):
+            group = mount
+        for folder in (group, *group.parents):
+            if not folder.is_relative_to(mount):
+                break
+            try:
+                limit = (folder / 'memory.max').read_text().strip()
+                if limit != 'max':
+                    headroom = max(0, int(limit) - int((folder / 'memory.current').read_text()))
+                    available = headroom if available is None else min(available, headroom)
+            except (OSError, ValueError):
+                pass
+            try:
+                quota, period = (folder / 'cpu.max').read_text().split()
+                if quota != 'max':
+                    cpus = min(cpus, max(1, int(quota) // int(period)))
+            except (OSError, ValueError, ZeroDivisionError):
+                pass
+    return available, cpus
+
+def _document_read_batch(available):
+
+    return 64 if available is None else max(1, min(1024, available // (256 * _VECTOR_BYTES)))
+
+def document_unit_count(db):
+    return db.execute("SELECT COUNT(*) FROM units WHERE family IN ('stt','chat')").fetchone()[0]
+
+@contextmanager
+def document_navigation_admission(source_dir, unit_count, *, max_units, cpu_threads,
+                                  unavailable=None, cold_index=False):
+    """Reserve one optional lane across independent finalizer processes."""
+    available, cpus = _navigation_headroom()
+    batch = _document_read_batch(available)
+
+    working_bytes = 64 * 1024**2 + unit_count * (4 * _VECTOR_BYTES + 4096)
+    if cold_index:
+
+        working_bytes += 512 * 1024**2 + unit_count * (8 * _VECTOR_BYTES)
+    slots = min(_NAVIGATION_MAX_SLOTS, max(1, cpus // cpu_threads),
+                (available or 0) // (4 * working_bytes))
+    status = dict(unit_count=unit_count, available_bytes=available, cpu_capacity=cpus,
+                  batch_rows=batch, slot_capacity=slots, active_slots=None,
+                  estimated_working_bytes=working_bytes,
+                  in_flight_pages_per_slot=1, admitted=False)
+    reason = unavailable
+    if max_units is not None and unit_count > max_units:
+        reason = 'cluster_unit_limit'
+    elif not slots and reason is None:
+        reason = 'cluster_memory_pressure'
+    if reason:
+        yield {**status, 'reason': reason}
+        return
+
+
+    lock_root = native_path(source_dir).resolve().parent / '_embedding-queries' / 'document-navigation'
+    with ExitStack() as reservation:
+        selected = False
+        active = 0
+        reason = None
+        try:
+
+
+            with build_lock(lock_root):
+                for number in range(_NAVIGATION_MAX_SLOTS):
+                    slot = lock_root / str(number)
+                    try:
+                        if not selected:
+                            reservation.enter_context(build_lock(slot))
+                            selected = True
+                        else:
+                            with build_lock(slot):
+                                pass
+                    except EvidenceError as exc:
+                        if str(exc) != 'world_build_locked':
+                            raise
+                        active += 1
+                if not selected or active >= slots:
+                    reason = 'cluster_slots_busy'
+        except EvidenceError as exc:
+            if str(exc) != 'world_build_locked':
+                raise
+            active = None
+            reason = 'cluster_slots_busy'
+        except OSError:
+            active = None
+            reason = 'cluster_slot_unavailable'
+        if reason:
+            reservation.close()
+        yield {**status, 'active_slots': active, 'reason': reason, 'admitted': reason is None}
 
 def fuse_score_frontier(lexical, dense_scores, native_order):
     """Opt-in DBSF on the measured 20+20 frontier, retaining the full tail.
@@ -212,7 +333,8 @@ def prepare(service, *, source_dir, runtime, cached_only=False, index_root=None)
         for asset in service.assets.values():assert_asset_fresh(asset)
     return cfg
 
-def prepare_optional(service,*,source_dir,runtime,cached_only=True,index_root=None,status_root=None):
+def prepare_optional(service,*,source_dir,runtime,cached_only=True,index_root=None,status_root=None,
+                     report_status=True):
     """New authoring reuses settled vectors; lexical originals need no encoder."""
     if runtime is None:return None
     root=native_path(index_root) if index_root is not None else native_path(source_dir)/'embedding-index'
@@ -222,9 +344,12 @@ def prepare_optional(service,*,source_dir,runtime,cached_only=True,index_root=No
     except Exception as exc:
 
 
-        atomic_json(status/'preparation-status.json',dict(status='unavailable',
-            reason=type(exc).__name__,original_search_available=True))
+        if report_status:
+            atomic_json(status/'preparation-status.json',dict(status='unavailable',
+                reason=type(exc).__name__,original_search_available=True))
         return None
+    if not report_status:
+        return result
     if result is None:
         atomic_json(status/'preparation-status.json',dict(status='unavailable',
             reason='index_not_prepared',original_search_available=True))
@@ -245,7 +370,7 @@ def _saved_table(config, *, db, index_root, max_units=None):
     if max_units is not None:
         if type(max_units) is not int or not 1 <= max_units <= 30000:
             raise EvidenceError('gemma_index_unit_limit')
-        count=db.execute("SELECT COUNT(*) FROM units WHERE family IN ('stt','chat')").fetchone()[0]
+        count=document_unit_count(db)
         if count>max_units:
             raise EvidenceError('gemma_index_unit_limit')
     rows=units(db)
@@ -266,27 +391,45 @@ def _saved_table(config, *, db, index_root, max_units=None):
         raise EvidenceError('gemma_index_unit_limit')
     return rows,saved,table
 
-def read_saved_documents(config, *, db, index_root, max_units=30000):
+def read_saved_documents(config, *, db, index_root, max_units=30000, batch_rows=None,
+                         materialize=True):
     """Read exact source-bound document vectors; no encoder or query runtime."""
     import numpy as np
+    import pyarrow as pa
     rows,saved,table=_saved_table(config,db=db,index_root=index_root,max_units=max_units)
     columns=['unit_id','family','start_us','end_us','members_json','vector']
-    stored=table.search().select(columns).limit(len(rows)).to_list() if rows else []
-    by_id={row['unit_id']:row for row in stored}
-    if len(stored)!=len(rows) or len(by_id)!=len(rows) or set(by_id)!={row['unit_id'] for row in rows}:
+    batch_rows = _document_read_batch(_navigation_headroom()[0]) if batch_rows is None else batch_rows
+
+
+    table.checkout(saved['table_version'])
+    positions = {row['unit_id']: position for position, row in enumerate(rows)}
+    vectors = np.empty((len(rows), 768), dtype=np.float32) if materialize else None
+    for offset in range(0, len(rows), batch_rows):
+        offsets = list(range(offset, min(offset + batch_rows, len(rows))))
+        with table.take_offsets(offsets).select(columns).to_batches(max_batch_length=batch_rows) as batches:
+            for batch in batches:
+                slots = []
+                for row in batch.select(columns[:-1]).to_pylist():
+                    position = positions.pop(row['unit_id'], None)
+                    if position is None or any(row[key] != rows[position][key] for key in columns[:-1]):
+                        raise EvidenceError('gemma_index_member_changed')
+                    slots.append(position)
+                column = batch.column('vector')
+                if (not pa.types.is_fixed_size_list(column.type) or column.type.list_size != 768
+                        or not pa.types.is_float32(column.type.value_type) or column.null_count):
+                    raise EvidenceError('gemma_index_vector_changed')
+                try:
+                    values = column.flatten()
+                    page = values.to_numpy(zero_copy_only=True).reshape(len(slots), 768)
+                except (TypeError, ValueError, pa.ArrowInvalid) as exc:
+                    raise EvidenceError('gemma_index_vector_changed') from exc
+                if (page.shape != (len(slots), 768) or not np.isfinite(page).all()
+                        or not np.allclose(np.linalg.norm(page, axis=1), 1., atol=.005)):
+                    raise EvidenceError('gemma_index_vector_changed')
+                if vectors is not None:
+                    vectors[slots] = page
+    if positions:
         raise EvidenceError('gemma_index_member_changed')
-    for row in rows:
-        if any(by_id[row['unit_id']][key]!=row[key] for key in columns[:-1]):
-            raise EvidenceError('gemma_index_member_changed')
-    try:
-        vectors=np.asarray([by_id[row['unit_id']]['vector'] for row in rows],dtype=np.float32)
-    except (TypeError,ValueError) as exc:
-        raise EvidenceError('gemma_index_vector_changed') from exc
-    if not rows:
-        vectors=np.empty((0,768),dtype=np.float32)
-    if (vectors.shape!=(len(rows),768) or not np.isfinite(vectors).all()
-            or not np.allclose(np.linalg.norm(vectors,axis=1),1.,atol=.005)):
-        raise EvidenceError('gemma_index_vector_changed')
     return dict(rows=rows,vectors=vectors,manifest=saved)
 
 class SavedGemmaSearch:
@@ -334,6 +477,7 @@ class SavedGemmaSearch:
     def calculate(self,db,query,lexical,*,deadline):
         from .evidence_world.query import _scoped_text
         ranked={}
+        batch_rows = _document_read_batch(_navigation_headroom()[0])
         for text in [query['text'],*query.get('variants',[])]:
             search=self._table.search(self.query_vector(text,deadline=deadline)).distance_type('cosine')
             search=search.where('family IN ('+','.join("'"+f+"'" for f in query['families'])+')')
@@ -341,13 +485,36 @@ class SavedGemmaSearch:
 
             if self._partitions:
                 search=search.nprobes(self._partitions)
-            for hit in search.select(['unit_id','_distance']).limit(len(self._rows)).to_list():
-                uid=hit['unit_id']
-                ranked[uid]=max(ranked.get(uid,-2.),1.-hit['_distance'])
+            columns = ['unit_id', '_distance']
+            with search.select(columns).limit(len(self._rows)).to_batches(batch_size=batch_rows) as batches:
+                for batch in batches:
+                    for hit in batch.select(columns).to_pylist():
+                        uid=hit['unit_id']
+                        ranked[uid]=max(ranked.get(uid,-2.),1.-hit['_distance'])
         scoped={}
-        for uid in ranked:
-            _,members=_scoped_text(db,self._rows[uid],query)
-            if members:scoped[uid]=members
+        if (not query.get('intervals_sec') and 'record_ids' not in query
+                and not query.get('must_phrases') and not query.get('exclude_terms')
+                and query.get('include_unlocated', True)):
+
+
+
+            remaining = set()
+            for uid in ranked:
+                members = json.loads(self._rows[uid]['members_json'])
+                if members:
+                    scoped[uid] = members
+                    remaining.update(member['record_id'] for member in members)
+            if remaining:
+                for record_id, in db.execute('SELECT record_id FROM records'):
+                    remaining.discard(record_id)
+                    if not remaining:
+                        break
+            if remaining:
+                raise EvidenceError('unit_record_missing')
+        else:
+            for uid in ranked:
+                _,members=_scoped_text(db,self._rows[uid],query)
+                if members:scoped[uid]=members
         ids=sorted(scoped,key=lambda k:(-ranked[k],k))
         lexical_ids=[h['unit_id'] for h in lexical]
         for uid in lexical_ids:

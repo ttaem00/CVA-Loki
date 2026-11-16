@@ -69,7 +69,8 @@
 
   function completionNotice(state) {
     const packet = state.packet || {};
-    const groups = (packet.unresolved_group_outcomes || []).length;
+    const outcomes = Array.isArray(packet.unresolved_group_outcomes) ? packet.unresolved_group_outcomes : [];
+    const groups = outcomes.length;
     const proposals = (packet.unresolved_proposals || []).length;
     const questions = [];
     for (const question of Array.isArray(packet.unresolved_questions) ? packet.unresolved_questions : []) {
@@ -77,10 +78,15 @@
       if (typeof text === 'string' && text.trim()) questions.push(text);
     }
     const progress = state.report && state.report.manager_outline_review_progress;
-    if (progress && progress.pipeline_complete === true
-        && progress.completion_disposition === 'context_unverified_preserved') {
-      return '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.'
-        + (questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '');
+    const questionNotice = questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '';
+    if (progress && progress.pipeline_complete === true) {
+      return progress.completion_disposition === 'context_unverified_preserved' || questions.length
+        ? '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.' + questionNotice : '';
+    }
+    if (progress?.pipeline_complete === false && progress.stop_reason === 'partial_pending_context') {
+      const count = outcomes.filter(row => row?.terminal_state === 'context_unresolved').length;
+      return '요약 저장됨 · 맥락' + (count ? ` ${count}건` : '')
+        + ` 미확정. 기존 Highlight ${state.highlights.length}개는 검토·편집·저장할 수 있습니다.` + questionNotice;
     }
     if (!String(packet.completion_state || '').startsWith('partial_') && !groups && !proposals && !questions.length) return '';
     const pending = [];
@@ -88,7 +94,7 @@
     if (proposals) pending.push(`작성 보완 ${proposals}건`);
     if (questions.length) pending.push(`내용 확인 ${questions.length}건`);
     return `일부 결과입니다. ${pending.length ? pending.join(' · ') + '이 남아 있습니다.' : '아직 확인되지 않은 내용이 남아 있습니다.'} 기존 Highlight ${state.highlights.length}개는 검토·편집·저장할 수 있습니다.`
-      + (questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '');
+      + questionNotice;
   }
 
   function itemStart(type, item, spanIndex = 0) {

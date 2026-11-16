@@ -333,6 +333,7 @@ def _commit_generated_report_artifacts(
     producer_code_version: str = "",
     summary_local_vector_index: Optional[dict] = None,
     work_dir: str | Path | None = None,
+    announce_proposal_source: bool = True,
 ) -> tuple[str, str, str]:
     """Commit the generated report family and its best-effort side records."""
 
@@ -442,8 +443,9 @@ def _commit_generated_report_artifacts(
         except Exception:
             logger.warning("VOD search persistence status unavailable (code=SEARCH_STATUS_WRITE_FAILED)")
 
-    from ..vod_proposals import source_ready
-    source_ready(vod_info, "summary", meta_path)
+    if announce_proposal_source:
+        from ..vod_proposals import source_ready
+        source_ready(vod_info, "summary", meta_path)
     return md_path, html_path, meta_path
 
 def _highlight_peak_evidence_metadata(highlight: dict[str, Any]) -> dict[str, Any]:
@@ -503,6 +505,7 @@ def generate_reports(
     report_projection_source: Optional[dict] = None,
     work_dir: str | Path | None = None,
     artifact_discriminator: str = "",
+    announce_proposal_source: bool = True,
 ) -> tuple[str, str, str]:
     """Markdown + HTML + metadata JSON 저장"""
     os.makedirs(output_dir, exist_ok=True)
@@ -1048,4 +1051,5 @@ def generate_reports(
         producer_code_version=producer_code_version,
         summary_local_vector_index=summary_local_vector_index,
         work_dir=work_dir,
+        announce_proposal_source=announce_proposal_source,
     )

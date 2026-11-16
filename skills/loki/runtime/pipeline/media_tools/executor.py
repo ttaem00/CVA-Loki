@@ -326,10 +326,11 @@ def _extract_frames(
 
 
 
-
     input_args = ["-i", str(clip)] if decode_from_start else ["-ss", position, "-i", str(clip)]
-    filters = (f"trim=start={position},setpts=PTS-STARTPTS,fps=1/{interval:.9f}:eof_action=pass"
-               if decode_from_start else f"fps=1/{interval:.9f}")
+
+    sample_frames = f"fps=1/{interval:.9f}:eof_action=pass"
+    filters = (f"trim=start={position},setpts=PTS-STARTPTS,{sample_frames}"
+               if decode_from_start else sample_frames)
     command = [
         ffmpeg,
         "-hide_banner",

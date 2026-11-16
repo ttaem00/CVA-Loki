@@ -206,15 +206,79 @@ def _flow_outcome_findings(payload, catalog, flow_context):
                     "Leave unsupported relations unresolved. Unrelated items are frozen."))
     return findings
 
+def _validate_authored_range_geometry(outline, authored_ranges, duration_sec, *, collect=False):
+    from .outline.check import validate_structured_manager_outline
+
+    try:
+        validate_structured_manager_outline(outline, duration_sec=duration_sec, collect_range_conflicts=collect)
+    except ValueError as error:
+        related = getattr(error, "range_ids", ())
+        if related:
+            indexes = {str(row["id"]): index for index, row in enumerate(authored_ranges)}
+            projected = {str(row["id"]): row for row in outline["ranges"]}
+            by_range = {}
+            for message, ids in getattr(error, "range_conflicts", ((str(error), related),)):
+                targets = list(ids)
+                if collect and message == "D1 ranges must be ordered and non-overlapping":
+                    left, right = (projected[range_id] for range_id in ids)
+                    overlap_start = max(_seconds(left["start"]), _seconds(right["start"]))
+                    overlap_end = min(_seconds(left["end"]), _seconds(right["end"]))
+
+
+                    for child in projected.values():
+                        if (overlap_start < overlap_end and child.get("parent_id") in ids
+                                and _seconds(child["start"]) < overlap_end and _seconds(child["end"]) > overlap_start):
+                            targets.append(str(child["id"]))
+                for range_id in targets:
+                    entry = by_range.setdefault(range_id, dict(path=["ranges", indexes[range_id]], error=message,
+                        related_range_ids=[], instruction="Recheck these related ranges together against exact delivered "
+                            "originals and native boundaries. Preserve each ID, level and parent; all unrelated items "
+                            "are frozen. Do not sort, clip, merge or move parents to make the geometry pass. "
+                            "Request needed originals, or leave an unsupported relationship unresolved."))
+                    for peer in targets:
+                        if peer not in entry["related_range_ids"]:
+                            entry["related_range_ids"].append(peer)
+            error.range_findings = list(by_range.values())
+            error.item_path = error.range_findings[0]["path"]
+        raise
+
+def _project_shared_child_boundaries(ranges, native_bounds):
+    """Use an already authored native child seam for its parent display only."""
+    if any(not isinstance(row["id"], str) or row["id"] not in native_bounds
+           or row["level"] == "D2" and not isinstance(row["parent_id"], str) for row in ranges):
+        return {}
+    d1 = [row for row in ranges if row["level"] == "D1"]
+    children = {}
+    for row in ranges:
+        if row["level"] == "D2":
+            children.setdefault(row["parent_id"], []).append(row)
+    original_ends = {}
+    for left, right in zip(d1, d1[1:]):
+        start, end = native_bounds[left["id"]]
+        seam, right_end = native_bounds[right["id"]]
+        left_children, right_children = children.get(left["id"]), children.get(right["id"])
+        if not (int(start) < int(seam) < int(end) < int(right_end)
+                and _seconds(left["end"]) > int(seam) and left_children and right_children
+                and native_bounds[left_children[-1]["id"]][1] == seam
+                and native_bounds[right_children[0]["id"]][0] == seam
+                and all(native_bounds[child["id"]][1] <= seam for child in left_children)
+                and all(native_bounds[child["id"]][0] >= seam for child in right_children)):
+            continue
+        if left.get("image"):
+            continue
+        original_ends[left["id"]] = left["end"]
+        left["end"] = right["start"]
+    return original_ends
+
 def validate_response(payload, *, base_revision, source, packet, duration_sec, highlight_producer_run_ref=None,
-                      delivered_source_refs=None, broadcast_flow_context=None, range_boundary_contract=None):
+                      delivered_source_refs=None, broadcast_flow_context=None, range_boundary_contract=None,
+                      collect_range_conflicts=False, project_shared_boundaries=True):
     """Validate meaning-bearing model output; never infer a Point or Story.
 
     Native subtitle clocks license text-based navigation only. Pixel/audio
     verification remains absent and is not upgraded by these structural checks.
     """
     from .editorial_context_author import context_source
-    from .outline.check import validate_structured_manager_outline
     from .story_packet_selector import materialize_story_point_selection, audit_primary_evidence_dispositions, ROLE_KEYS
     from .editorial_highlight_candidate_discovery import _approved_story_highlight_inputs
     from .highlight_story_window import build_editorial_highlight_set
@@ -230,6 +294,8 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
     for key in ("ranges", "points", "stories", "proposals", "group_outcomes", "unresolved_questions"):
         if not isinstance(payload[key], list):
             raise ValueError("full_author_response_shape")
+    if any(not isinstance(row, dict) for row in payload["stories"]):
+        raise ValueError("full_author_story_invalid")
     if any(not isinstance(row, dict) for row in payload["group_outcomes"]):
         raise ValueError("full_author_outcome_invalid")
     _, evidence = full_source_context(source=source, packet=packet)
@@ -258,6 +324,7 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
 
             summary += ' 참고 스토리 타임라인: ' + ' · '.join(links) + '.'
     ranges, points, point_inputs, range_errors = [], [], {}, []
+    range_native_bounds = {}
     for index, row in enumerate(payload["ranges"]):
         anchored = "start_evidence_ref" in row or "end_evidence_ref" in row if isinstance(row, dict) else False
         native_required = range_boundary_contract == NATIVE_RANGE_CONTRACT
@@ -288,6 +355,7 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
         projected_range = {k:v for k,v in row.items() if k not in {"evidence_refs", "image"}}
         if anchored:
             projected_range.update(start=seconds_to_hms(int(start)), end=seconds_to_hms(int(end)))
+            range_native_bounds[str(row["id"])] = (start, end)
         ranges.append(projected_range)
     if range_errors:
         range_errors[0].range_findings = [dict(path=error.item_path, error=str(error),
@@ -300,6 +368,10 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
             from .editorial_visual_input import selected_frame_image
             projected_range["image"] = selected_frame_image(row["image"], frames=evidence.get("frames", {}),
                 source_spans=[dict(zip(("start_sec", "end_sec"), _range_times(row, catalog)))])
+    original_range_ends = {}
+    if collect_range_conflicts and project_shared_boundaries and range_boundary_contract == NATIVE_RANGE_CONTRACT:
+        original_range_ends = _project_shared_child_boundaries(ranges, range_native_bounds)
+    outside_d2 = None
     for index, row in enumerate(payload["points"]):
         required = {"id", "title", "content", "d2_ref", "start_evidence_ref", "evidence_refs"}
         if not isinstance(row, dict) or not required <= set(row) or not set(row) <= required | {"timestamp", "editorial_priority"}:
@@ -313,7 +385,10 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
             timestamp = f"{sec//3600:02d}:{sec%3600//60:02d}:{sec%60:02d}"
             d2 = next((r for r in ranges if r["id"] == row["d2_ref"] and r["level"] == "D2"), None)
             if not d2 or not _seconds(d2["start"]) <= sec <= _seconds(d2["end"]):
-                raise ValueError("full_author_point_requires_authored_d2")
+                if not collect_range_conflicts:
+                    raise ValueError("full_author_point_requires_authored_d2")
+                if outside_d2 is None:
+                    outside_d2 = index
             _text(row["title"], "point_title")
             _text(row["content"], "point_content")
             if 'editorial_priority' in row:
@@ -327,21 +402,10 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
         points.append(point)
         point_inputs[row["id"]] = row
     outline = dict(ranges=ranges, points=points, candidates=[])
-    try:
-        validate_structured_manager_outline(outline, duration_sec=duration_sec)
-    except ValueError as error:
-        related = getattr(error, "range_ids", ())
-        if related:
-            indexes = {str(row["id"]): index for index, row in enumerate(payload["ranges"])}
-            error.range_findings = [dict(path=["ranges", indexes[range_id]], error=str(error),
-                related_range_ids=list(related),
-                instruction="Recheck these related ranges together against exact delivered originals and native boundaries. "
-                    "Preserve each ID, level and parent; all unrelated items are frozen. "
-                    "Do not sort, clip, merge or move parents to make the geometry pass. "
-                    "Request needed originals, or leave an unsupported relationship unresolved.")
-                for range_id in related]
-            error.item_path = error.range_findings[0]["path"]
-        raise
+    _validate_authored_range_geometry(outline, payload["ranges"], duration_sec, collect=collect_range_conflicts)
+    if outside_d2 is not None:
+        with _author_item(["points", outside_d2]):
+            raise ValueError("full_author_point_requires_authored_d2")
     if not ranges or not any(r["level"] == "D1" for r in ranges):
         raise ValueError("full_author_broadcast_map_missing")
     story_rows = payload["stories"]
@@ -396,7 +460,22 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
                     raise ValueError('full_author_priority_author_only')
     result = build_editorial_highlight_set(broadcast_map=outline, authority_revision_id=revision,
         proposals=payload["proposals"], highlight_producer_run_ref=highlight_producer_run_ref or "full-author-302:" + digest(payload),
-        source_duration_sec=duration_sec, story_requirements=requirements, composition_evidence=cut_evidence)
+        source_duration_sec=duration_sec, story_requirements=requirements, composition_evidence=cut_evidence,
+        range_native_bounds=range_native_bounds)
+    if original_range_ends:
+
+
+        spans = [span for highlight in result["highlights"] for span in highlight["source_spans"]]
+        unsafe_projection = False
+        for row in ranges:
+            previous_end = original_range_ends.get(row["id"])
+            if previous_end and (result["rejected_proposals"]
+                                 or any(span["start_sec"] < _seconds(previous_end)
+                                        and span["end_sec"] > _seconds(row["end"]) for span in spans)):
+                row["end"] = previous_end
+                unsafe_projection = True
+        if unsafe_projection:
+            _validate_authored_range_geometry(outline, payload["ranges"], duration_sec, collect=True)
     outcomes = payload["group_outcomes"]
     flow_context = _bound_flow_context(source, base_revision, packet, broadcast_flow_context)
     flow_inputs = {row["ref"]: row for row in flow_context["inputs"]}
@@ -412,6 +491,9 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
     addressed = {ref for ref, item in flow_inputs.items()
                  if item["kind"] == "prior_range"
                  and any(all(row.get(key) == item["range"].get(key) for key in body_fields)
+                         or row["id"] in original_range_ends
+                         and all((original_range_ends[row["id"]] if key == "end" else row.get(key))
+                                 == item["range"].get(key) for key in body_fields)
                          for row in ranges)}
     represented = addressed | {ref for row in outcomes if row["terminal_state"] == "represented"
                                for ref in row.get("flow_refs", [])}

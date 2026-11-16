@@ -50,16 +50,41 @@ def prepare_local_source_files(*, vod, spec, source_dir, root):
             comment_dir, clip_dir / 'user_clips.json')
 
 def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
-                                retrieval=None, hierarchy=None, read_index_root=None):
+                                retrieval=None, hierarchy=None, read_index_root=None,
+                                retained_index_root=None, cached_only=False):
     """Prepare one new owner's navigation without writing retained source caches."""
-    from .evidence_world.contracts import digest
+    from .evidence_world.contracts import EvidenceError, digest
     from .evidence_world.index import atomic_json, build_lock
-    from .editorial_embedding_index import prepare, prepare_optional, read_saved_documents
+    from .editorial_embedding_index import (
+        document_navigation_admission, document_unit_count,
+        prepare, prepare_optional, read_saved_documents,
+    )
     from .evidence_world.vector_clusters import build_navigation, DOCUMENT_COSINE_NAVIGATION
     from pathlib import Path
 
     root = native_path(derived_root).resolve()
+    strict_retrieval = retrieval is not None or read_index_root is not None
     selected_manifest = None
+    retained_validation_error = None
+    cache_data_errors = {'gemma_index_member_changed', 'gemma_index_vector_changed'}
+
+    def read_candidate(config, path, *, materialize, strict, batch_rows=None):
+        with service.open() as db:
+            try:
+                if materialize:
+                    return read_saved_documents(config, db=db, index_root=path, batch_rows=batch_rows), None
+                read_saved_documents(config, db=db, index_root=path, max_units=None,
+                                     batch_rows=batch_rows, materialize=False)
+                return True, None
+            except EvidenceError as exc:
+                if strict or str(exc) not in cache_data_errors:
+                    raise
+                return None, str(exc)
+            except MemoryError:
+                if strict or materialize:
+                    raise
+                return None, 'document_index_validation_memory'
+
     index_root = native_path(source_dir) / 'embedding-index'
     if read_index_root is not None:
         if not isinstance(read_index_root, str) or not read_index_root.strip():
@@ -81,6 +106,27 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
         retrieval = verified
         manifest_path = index_root / 'manifests' / (retrieval['table'][6:] + '.json')
         selected_manifest = dict(path=str(manifest_path), sha256=file_hash(manifest_path))
+    if retained_index_root is not None:
+        from .editorial_multimodal_navigation import _sha
+        retained = native_path(retained_index_root).resolve()
+        prior_job = retained.parent.parent
+        if (read_index_root is not None or retained.name != 'embedding-index' or retained.parent.name != 'derived'
+                or prior_job.parent != root.parent.parent or prior_job == root.parent
+                or not _sha(prior_job.name) or not _sha(root.parent.name)
+                or not retained.is_relative_to(native_path(source_dir).resolve())):
+            raise ValueError('navigation_retained_index_outside_owner')
+        if runtime is not None and retrieval is None:
+            verified = prepare_optional(service, source_dir=source_dir, runtime=runtime, cached_only=True,
+                                        index_root=retained, report_status=False)
+            if verified is not None:
+                manifest_path = retained / 'manifests' / (verified['table'][6:] + '.json')
+                manifest_hash = file_hash(manifest_path)
+                valid, retained_validation_error = read_candidate(verified, retained, materialize=False, strict=False)
+                if valid:
+                    if file_hash(manifest_path) != manifest_hash:
+                        raise ValueError('navigation_read_index_manifest_changed')
+                    index_root, retrieval = retained, verified
+                    selected_manifest = dict(path=str(manifest_path), sha256=manifest_hash)
     identity = dict(profile=NAVIGATION_PROFILE, source_id=service.source_id,
         world_revision=service.world_revision, runtime=runtime,
         vector_role='document', dimension=768, normalization='l2',
@@ -103,38 +149,166 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
                 raise ValueError('navigation_derived_identity_changed')
         else:
             atomic_json(marker, identity)
+    clusters = None
+    cluster_reader = None
+    grouping_complete = None
+    owned_index = root / 'embedding-index'
     if runtime is not None and retrieval is None:
 
 
-        retrieval = prepare_optional(service, source_dir=source_dir, runtime=runtime,
-            index_root=index_root, status_root=root / 'status', cached_only=True)
-        if retrieval is None:
-            index_root = root / 'embedding-index'
-            from .editorial_multimodal_navigation import _local_runtime_assets
-            _, unavailable = _local_runtime_assets(runtime)
-            retrieval = prepare_optional(service, source_dir=source_dir, runtime=runtime,
-                index_root=index_root, status_root=root / 'status', cached_only=unavailable is not None)
-    clusters = None
-    cluster_reader = None
-    if retrieval is not None:
-        with service.open() as db:
-            documents = read_saved_documents(retrieval, db=db, index_root=index_root)
+        for candidate in (index_root, owned_index):
+            if candidate.is_dir():
+                retrieval = prepare_optional(service, source_dir=source_dir, runtime=runtime,
+                    index_root=candidate, status_root=root / 'status', cached_only=True)
+                if retrieval is not None:
+                    index_root = candidate
+                    break
+    if cached_only:
+        from .editorial_production_job import SCHEMA as PRODUCTION_SCHEMA
+        if retrieval is not None and (selected_manifest is None or read_index_root is not None):
+            _, invalid_cache = read_candidate(retrieval, index_root, materialize=False,
+                strict=strict_retrieval or selected_manifest is not None)
+            if invalid_cache:
+                retrieval = None
+        candidates = [root]
+        if retained_index_root is not None:
+            candidates.append(native_path(retained_index_root).resolve().parent)
+        cached_group_error = False
+        for prepared_root in candidates:
+            budget_path = prepared_root.parent / 'budget' / 'budget.json'
+            if not budget_path.is_file():
+                continue
+            try:
+                budget = json.loads(budget_path.read_text(encoding='utf-8'))
+                state = budget['budget']
+                binding = state['identity']
+                feature_ref = binding.get('source_scope', {}).get('editorial_navigation_features')
+                if feature_ref is None:
+                    continue
+                feature_path = prepared_root.parent / 'navigation-features.json'
+                if (budget.get('sha256') != digest(state)
+                        or binding.get('schema_version') != PRODUCTION_SCHEMA
+                        or binding.get('video_no') != service.video_no
+                        or native_path(binding['root']).resolve() != budget_path.parent
+                        or native_path(feature_ref['path']).resolve() != feature_path
+                        or file_hash(feature_path) != feature_ref['sha256']):
+                    raise ValueError('navigation_read_features_changed')
+                saved = json.loads(feature_path.read_text(encoding='utf-8'))
+                saved_identity = json.loads((prepared_root / 'navigation-identity.json').read_text(encoding='utf-8'))
+                if saved.get('identity_sha256') != digest(saved_identity):
+                    raise ValueError('navigation_derived_identity_changed')
+                current_basis = {key: item for key, item in identity.items() if key != 'read_index_binding'}
+                saved_basis = {key: item for key, item in saved_identity.items() if key != 'read_index_binding'}
+                if saved_basis != current_basis:
+                    continue
+                reader = saved.get('cluster_reader')
+                if reader is None:
+                    continue
+                cluster_path = prepared_root / 'document-navigation.json'
+                if (native_path(reader['artifact']['path']).resolve() != cluster_path
+                        or saved['clusters'] != dict(path=str(cluster_path), sha256=reader['artifact']['sha256'],
+                            profile=DOCUMENT_COSINE_NAVIGATION['profile'], original_read=False)):
+                    raise ValueError('navigation_clusters_changed')
+                if not cluster_path.is_file():
+                    continue
+                groups = json.loads(cluster_path.read_text(encoding='utf-8'))
+                saved_grouping_complete = groups['grouping_complete']
+                selected_hierarchy = saved['hierarchy']
+                service.configure_cluster_reader(reader, defer_details=True)
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+
+                cached_group_error = True
+                continue
+            clusters, cluster_reader = saved['clusters'], reader
+            grouping_complete = saved_grouping_complete
+            if hierarchy is None:
+                hierarchy = selected_hierarchy
+            break
         if selected_manifest is not None and file_hash(selected_manifest['path']) != selected_manifest['sha256']:
             raise ValueError('navigation_read_index_manifest_changed')
-        clusters = build_navigation(documents['rows'], documents['vectors'],
-            source_id=service.source_id, world_revision=service.world_revision)
-        cluster_path = root / 'document-navigation.json'
-        with build_lock(root):
-            if cluster_path.is_file():
-                if json.loads(cluster_path.read_text(encoding='utf-8')) != clusters:
-                    raise ValueError('navigation_clusters_changed')
-            else:
-                atomic_json(cluster_path, clusters)
-        if hierarchy is None:
-            hierarchy = clusters['hierarchy']
-        clusters = dict(path=str(cluster_path), sha256=file_hash(cluster_path),
-                        profile=clusters['profile'], original_read=False)
-        cluster_reader = descriptor(service,cluster_path)
+        reason = 'cached_document_groups_unavailable' if cached_group_error else 'document_groups_not_prepared'
+        if clusters:
+            reason = 'cluster_comparison_limit' if grouping_complete is False else None
+        atomic_json(root / 'status' / 'document-navigation-status.json', dict(
+            status='partial' if grouping_complete is False else 'ready' if clusters else 'deferred',
+            reason=reason,
+            admitted=False, grouping_complete=grouping_complete,
+            retrieval_configured='dense_and_originals' if retrieval is not None else 'lexical_and_originals'))
+        return dict(profile=NAVIGATION_PROFILE, derived_root=str(root),
+            index_root=str(index_root) if retrieval is not None else None,
+            query_root=str(root / 'queries'), retrieval=retrieval, hierarchy=hierarchy,
+            clusters=clusters, identity_sha256=digest(identity),
+            **(dict(cluster_reader=cluster_reader) if cluster_reader is not None else {}),
+            **(dict(selected_index_manifest=selected_manifest) if selected_manifest is not None else {}))
+    if runtime is not None or retrieval is not None:
+        with service.open() as db:
+            unit_count = document_unit_count(db)
+        cluster_limit = DOCUMENT_COSINE_NAVIGATION['max_units']
+        cold_index = retrieval is None
+        cpu_threads = (runtime or {}).get('limits', {}).get('cpu_threads', 1)
+        unavailable = None
+        if cold_index:
+            from .editorial_multimodal_navigation import _local_runtime_assets
+            _, unavailable = _local_runtime_assets(runtime)
+        with document_navigation_admission(source_dir, unit_count,
+                max_units=None if cold_index else cluster_limit, cpu_threads=cpu_threads,
+                unavailable=unavailable, cold_index=cold_index) as admission:
+            reason = admission['reason']
+            if reason is None and retrieval is None:
+                index_root = owned_index
+                retrieval = prepare_optional(service, source_dir=source_dir, runtime=runtime,
+                    index_root=index_root, status_root=root / 'status', cached_only=False)
+            if reason is None and retrieval is not None and unit_count > cluster_limit:
+                reason = 'cluster_unit_limit'
+            if retrieval is not None and reason is None:
+                try:
+                    documents, invalid_cache = read_candidate(retrieval, index_root, materialize=True,
+                        strict=strict_retrieval or selected_manifest is not None, batch_rows=admission['batch_rows'])
+                    if invalid_cache:
+                        retrieval, reason = None, invalid_cache
+                    else:
+                        groups = build_navigation(documents['rows'], documents['vectors'],
+                            source_id=service.source_id, world_revision=service.world_revision)
+                        cluster_path = root / 'document-navigation.json'
+                        with build_lock(root):
+                            if cluster_path.is_file():
+                                if json.loads(cluster_path.read_text(encoding='utf-8')) != groups:
+                                    raise ValueError('navigation_clusters_changed')
+                            else:
+                                atomic_json(cluster_path, groups)
+                        cluster_reader = descriptor(service, cluster_path)
+                        if hierarchy is None:
+                            hierarchy = groups['hierarchy']
+                        grouping_complete = groups['grouping_complete']
+                        clusters = dict(path=str(cluster_path), sha256=cluster_reader['artifact']['sha256'],
+                                        profile=groups['profile'], original_read=False)
+                except MemoryError:
+                    reason = 'cluster_memory_pressure'
+                finally:
+                    documents = None
+            if (clusters is None and retrieval is not None
+                    and (selected_manifest is None or read_index_root is not None)):
+
+
+
+                _, invalid_cache = read_candidate(retrieval, index_root, materialize=False,
+                    strict=strict_retrieval, batch_rows=admission['batch_rows'])
+                if invalid_cache:
+                    retrieval, reason = None, invalid_cache
+            if selected_manifest is not None and file_hash(selected_manifest['path']) != selected_manifest['sha256']:
+                raise ValueError('navigation_read_index_manifest_changed')
+            if grouping_complete is False:
+                reason = 'cluster_comparison_limit'
+            elif clusters is None and reason is None:
+                reason = 'document_index_not_prepared'
+            if reason in cache_data_errors or reason == 'document_index_validation_memory':
+                atomic_json(root / 'status' / 'preparation-status.json',
+                    dict(status='unavailable', reason=reason, original_search_available=True))
+            atomic_json(root / 'status' / 'document-navigation-status.json',
+                {**admission, 'status': 'partial' if grouping_complete is False else 'ready' if clusters else 'deferred',
+                 'reason': reason, 'grouping_complete': grouping_complete,
+                 **({'retained_index_validation': retained_validation_error} if retained_validation_error else {}),
+                 'retrieval_configured': 'dense_and_originals' if retrieval is not None else 'lexical_and_originals'})
     return dict(profile=NAVIGATION_PROFILE, derived_root=str(root),
         index_root=str(index_root) if retrieval is not None else None,
         query_root=str(root / 'queries'), retrieval=retrieval, hierarchy=hierarchy,
@@ -197,6 +371,47 @@ def frozen_source_snapshot(spec, *, source_dir, root):
         media['path'] if media else None, by_family.get('chat', {}).get('path'),
         root / 'comment-source', root / 'clip-source' / 'user_clips.json')
     return sources, saved
+
+def frozen_navigation_features(snapshot, *, service, source_dir, derived_root):
+    """Reuse a frozen index and available groups with this author's query state."""
+    from .editorial_embedding_index import prepare
+    from .editorial_multimodal_navigation import _sha
+
+    saved = snapshot.get('navigation_features')
+    if not saved or not saved.get('retrieval'):
+        return None
+    runtime = snapshot['multimodal_runtime']
+    index_root = native_path(saved['index_root']).resolve()
+    native_sources = source_dir / 'current-conversation'
+    if (index_root.name != 'embedding-index'
+            or (index_root != source_dir / 'embedding-index' and not index_root.is_relative_to(native_sources))):
+        raise ValueError('current_conversation_snapshot_navigation_outside_source')
+    features = deepcopy(saved)
+    if reader := features.get('cluster_reader'):
+        cluster = native_path(reader['artifact']['path']).resolve()
+        if cluster.name != 'document-navigation.json' or not cluster.is_relative_to(native_sources):
+            raise ValueError('current_conversation_snapshot_navigation_outside_source')
+        if not cluster.is_file():
+            del features['cluster_reader']
+            features.update(clusters=None, hierarchy=None)
+    if not native_path(runtime['model_ref']['path']).is_file():
+        return None
+    retrieval = saved['retrieval']
+    table = retrieval.get('table')
+    if not isinstance(table, str) or not table.startswith('units_') or not _sha(table[6:]):
+        raise ValueError('navigation_read_index_config_changed')
+    manifest = index_root / 'manifests' / (table[6:] + '.json')
+    if not manifest.is_file() or not (index_root / 'lance').is_dir():
+        return None
+    binding = dict(path=str(manifest), sha256=file_hash(manifest))
+    if saved.get('selected_index_manifest', binding) != binding:
+        raise ValueError('navigation_read_index_manifest_changed')
+    if prepare(service, source_dir=source_dir, runtime=runtime, cached_only=True, index_root=index_root) != retrieval:
+        raise ValueError('navigation_read_index_config_changed')
+    if file_hash(manifest) != binding['sha256']:
+        raise ValueError('navigation_read_index_manifest_changed')
+    return dict(features, derived_root=str(derived_root), query_root=str(derived_root / 'queries'),
+                selected_index_manifest=binding)
 
 def assert_snapshot_sources(saved, assets, bundle, world_assets):
     """Reject newly discovered or changed support before delivering author input."""
