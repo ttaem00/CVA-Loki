@@ -260,7 +260,7 @@ def media_scope(cfg, source=None, *, owner_root=None, _verify_window_bytes=True)
             raise ValueError("editorial_media_source_changed")
     return deepcopy(spec), catalog
 
-def _validate_window(window, catalog, folder, *, _fresh_acquisition=False):
+def _validate_window(window, catalog, folder, *, _fresh_acquisition=False, verified=None):
     """Bind newly acquired bytes to this source and the existing tool's receipt."""
     if window.get("kind") == "timeline_preview":
         saved = json.loads((native_path(folder) / "receipt.json").read_text(encoding="utf-8"))
@@ -273,7 +273,8 @@ def _validate_window(window, catalog, folder, *, _fresh_acquisition=False):
             raise ValueError("editorial_media_source_changed")
         return
     if window in catalog["windows"]:
-        if file_hash(window["path"]) != window["sha"]:
+        from .editorial_production_job import job_file_hash
+        if job_file_hash(window["path"], verified, hash_file=file_hash) != window["sha"]:
             raise ValueError("editorial_media_source_changed")
         if window.get('kind') == 'collected_vod_v1':
             original = window['original_media']
@@ -323,7 +324,7 @@ def _validate_window(window, catalog, folder, *, _fresh_acquisition=False):
             raise MediaToolError(ACQUISITION_REVISION_UNAVAILABLE, "bounded source acquisition revision differs")
         raise ValueError("editorial_media_acquisition_source_changed")
 
-def _acquire_window(request, catalog, folder):
+def _acquire_window(request, catalog, folder, *, allow_download=True):
     from .media_tools import execute_tool_call
     from .media_tools.contracts import MediaToolError
     acquisition_root = folder / "acquisition"
@@ -331,6 +332,8 @@ def _acquire_window(request, catalog, folder):
     if path.exists():
         receipt = json.loads(path.read_text(encoding="utf-8"))
     else:
+        if not allow_download:
+            raise MediaToolError("source_unavailable", "retained acquisition receipt is missing")
         receipt = execute_tool_call(dict(action="video", video_no=catalog["video_no"],
             start_sec=request.start_sec, duration_sec=request.duration_sec), acquisition_root)
         preserve(path, receipt)
@@ -368,6 +371,8 @@ class AuthorMediaSession:
         self.active, self.frames, self.requests, self.pending = {}, {}, set(), []
         self.cursors = set()
         self.active_grid = None
+        from .editorial_production_job import production_verified_sources
+        self._verified_windows = production_verified_sources(cfg)
 
     def context(self):
         result = dict(schema_version=SCHEMA, manifest_revision=self.spec["manifest"]["sha256"],
@@ -439,7 +444,8 @@ class AuthorMediaSession:
     def validate_active(self):
         windows = {digest([frame["media"], frame["receipt"]]): frame for frame in self.active.values()}
         for frame in windows.values():
-            _validate_window(frame["media"], self.catalog, native_path(frame["receipt"]["path"]).parent)
+            _validate_window(frame["media"], self.catalog, native_path(frame["receipt"]["path"]).parent,
+                             verified=self._verified_windows)
         if self.active_grid:
             receipt = native_path(next(iter(self.active.values()))["receipt"]["path"])
             saved = json.loads(receipt.read_text(encoding="utf-8"))
@@ -457,17 +463,48 @@ class AuthorMediaSession:
             "image_sha256": self.active_grid["image"]["sha256"]}
 
     def dispatch(self, action):
+        return self._dispatch_with_receipt(action)
+
+    def _action_path(self, action, *, recovered=False):
         action_key = action if self.page_policy == "chronological_v1" else [self.page_policy, action]
         if self.page_size != 3:
             action_key = [action_key, "page_size", self.page_size]
-        path = self.root / "actions" / (digest(action_key)+".json")
+        if recovered:
+            action_key = ["settled_scene_recovery_v1", action_key]
+        return self.root / "actions" / (digest(action_key)+".json")
+
+    def _read_action(self, path, action):
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        body = saved["payload"]
+        if (saved["sha256"] != digest(body) or body["scope"] != self.spec or body["action"] != action
+                or body.get("page_policy", "chronological_v1") != self.page_policy
+                or body.get("page_size", 3) != self.page_size):
+            raise ValueError("editorial_media_action_receipt_changed")
+        return body
+
+    def recover_failed_scene(self, action):
+        """Retry a settled decoder failure without changing its action or source."""
+        if action.get("action") != "read_frames" or action.get("args", {}).get("inspection_mode") != "scene":
+            raise ValueError("editorial_media_recovery_action_invalid")
+        old_path = self._action_path(action)
+        if not old_path.is_file():
+            return None
+        old = self._read_action(old_path, action)
+        if old["result"] != dict(status="pending", error_code="frame_count_mismatch",
+                                 question_id=action["question_id"]):
+            return None
+        result = self._dispatch_with_receipt(action, recovered=True)
+        if not result.get("frame_refs"):
+            return None
+        self.validate_active()
+        return dict(action=action, prior_sha256=digest(old), recovery_result=result,
+                    frame_sha256={ref: self.active[ref]["image"]["sha256"] for ref in result["frame_refs"]},
+                    source_positions=[self.active[ref]["source_sec"] for ref in result["frame_refs"]])
+
+    def _dispatch_with_receipt(self, action, *, recovered=False):
+        path = self._action_path(action, recovered=recovered)
         if path.is_file():
-            saved = json.loads(path.read_text(encoding="utf-8"))
-            body = saved["payload"]
-            if (saved["sha256"] != digest(body) or body["scope"] != self.spec or body["action"] != action
-                    or body.get("page_policy", "chronological_v1") != self.page_policy
-                    or body.get("page_size", 3) != self.page_size):
-                raise ValueError("editorial_media_action_receipt_changed")
+            body = self._read_action(path, action)
             self.frames.update(body["frames"])
             self.active = {r:self.frames[r] for r in body["active_refs"]}
             self.active_grid = body.get("active_preview_grid")
@@ -476,7 +513,18 @@ class AuthorMediaSession:
             self.pending += [p for p in body["pending"] if p not in self.pending]
             self.validate_active()
             return body["result"]
-        result = self._dispatch(action)
+        result = self._dispatch(action, recovered=recovered)
+        if recovered and result.get("frame_refs"):
+            receipt = self.active[result["frame_refs"][0]]["receipt"]
+            ordered = sorted((ref for ref, frame in self.frames.items() if frame["receipt"] == receipt),
+                             key=lambda ref: self.frames[ref]["source_sec"])
+            if len(ordered) != 9:
+                raise ValueError("editorial_media_recovery_frame_count_invalid")
+            positions = {1: (8,), 2: (0, 8), 3: (0, 4, 8)}[self.page_size]
+            sample = [ordered[i] for i in positions]
+            self.active = {ref: self.frames[ref] for ref in sample}
+            result = dict(status="sample_page_complete", frame_refs=sample,
+                          pixels="attached on next author request; not yet interpreted", audio_listened=False)
         body = dict(scope=self.spec, action=action, result=result, frames=self.frames,
             active_refs=list(self.active), requests=sorted(self.requests), cursors=sorted(self.cursors), pending=self.pending)
         if self.active_grid:
@@ -488,7 +536,7 @@ class AuthorMediaSession:
         preserve(path, dict(payload=body, sha256=digest(body)))
         return result
 
-    def _dispatch(self, action):
+    def _dispatch(self, action, *, recovered=False):
         from .media_tools.contracts import ToolRequest
         from .media_tools.preserved import extract_preserved_frames
         from PIL import Image
@@ -543,7 +591,7 @@ class AuthorMediaSession:
                     return self._pending(action, ACQUISITION_REVISION_UNAVAILABLE)
                 from .media_tools.contracts import MediaToolError
                 try:
-                    window = _acquire_window(request,self.catalog,folder)
+                    window = _acquire_window(request,self.catalog,folder,allow_download=not recovered)
                 except MediaToolError as exc:
                     return self._pending(action,exc.code)
             windows = {"acquired":window}
@@ -564,14 +612,15 @@ class AuthorMediaSession:
         else:
             from .media_tools.contracts import MediaToolError
             try:
-                receipt = extract_preserved_frames(request, media=window, output_root=folder)
+                decode_root = folder / "recovered-scene-v1" if recovered else folder
+                receipt = extract_preserved_frames(request, media=window, output_root=decode_root)
             except MediaToolError as exc:
                 if exc.code == "source_revision_changed":
                     raise
                 return self._pending(action, exc.code)
             frames = {}
             for row, sec in zip(receipt["artifacts"], receipt["frame_timestamps_sec"]):
-                image_path = folder / row["relative_path"]
+                image_path = decode_root / row["relative_path"]
                 image = owned_images([str(image_path)], self.cfg["codex_cli_required_runtime_root"])[0]
                 with Image.open(image["path"]) as pixels:
                     dimensions = list(pixels.size)

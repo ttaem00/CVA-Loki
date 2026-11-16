@@ -18,7 +18,7 @@ import re
 
 import time
 
-from .evidence_world.contracts import SourcePolicy, canonical_json, digest, file_hash, native_path
+from .evidence_world.contracts import EvidenceError, SourcePolicy, canonical_json, digest, file_hash, native_path
 
 from .evidence_world.index import build_lock
 
@@ -222,6 +222,7 @@ def prepare(spec):
         from .loki_version_policy import new_job_defaults, select_new_pipeline
         selected_pipeline = select_new_pipeline(spec.get("summary_pipeline_version", "latest"))
         spec = dict(spec)
+        requested_feature_profile = spec.get('feature_profile')
         for key, value in new_job_defaults(selected_pipeline).items():
             spec.setdefault(key, value)
         from .editorial_current_sources import NAVIGATION_PROFILE
@@ -271,10 +272,20 @@ def prepare(spec):
         service.configure_read(read_page_policy)
         service.configure_hierarchy(spec.get('hierarchy'))
         from .evidence_world.summary_hints import vod_hint_configuration
-        summary_hints = (deepcopy(spec['summary_hints']) if spec.get('summary_hints') is not None
-                         else vod_hint_configuration(spec['srt_path'], video, vod.duration))
+        requested_hints = spec.get('summary_hints')
+        summary_hints = (deepcopy(requested_hints) if requested_hints is not None
+                         else vod_hint_configuration(spec['srt_path'], video, vod.duration,
+                                                     optional=selected_pipeline == 'loki_3_0_8'))
         if summary_hints:
-            service.configure_summary_hints(**{k:v for k,v in summary_hints.items() if k != 'profile'})
+            try:
+                service.configure_summary_hints(**{k:v for k,v in summary_hints.items() if k != 'profile'})
+            except EvidenceError as error:
+
+
+                if (selected_pipeline != 'loki_3_0_8' or requested_hints is not None
+                        or str(error) != 'loom_hints_node_unavailable'):
+                    raise
+                summary_hints = None
         assets = [dict(family=a.family, path=a.source_locator["path"], sha256=a.bytes_sha256)
                   for a in service.assets.values() if a.bytes_sha256 is not None]
         assets.append(dict(family="metadata", path=str(root / "source-identity.json"),
@@ -374,25 +385,32 @@ def prepare(spec):
         multimodal_context = None
         from .editorial_multimodal_navigation import resolve_local_runtime, LocalNavigationSession
         frozen_features = snapshot is not None and feature_profile is None
+        reuse_navigation = (selected_pipeline == 'loki_3_0_8' and requested_feature_profile == NAVIGATION_PROFILE
+                            and snapshot is not None and snapshot.get('feature_profile') == feature_profile
+                            and not {'multimodal_runtime', 'retrieval', 'hierarchy', 'read_index_root'} & spec.keys())
         if frozen_features and any(key in spec and spec[key] != snapshot.get(key)
                 for key in ('multimodal_runtime', 'retrieval')):
             raise ValueError('current_conversation_snapshot_runtime_changed')
         multimodal_runtime = (deepcopy(snapshot.get('multimodal_runtime'))
-            if frozen_features else resolve_local_runtime(spec.get('multimodal_runtime')))
+            if frozen_features or reuse_navigation else resolve_local_runtime(spec.get('multimodal_runtime')))
         retrieval = (deepcopy(snapshot.get('retrieval')) if frozen_features
                      else spec.get('retrieval'))
         hierarchy = deepcopy(spec.get('hierarchy'))
         features = None
         if feature_profile is not None:
-            from .editorial_current_sources import prepare_navigation_features
-            features = prepare_navigation_features(service=service, source_dir=source_dir,
-                runtime=multimodal_runtime, derived_root=root / 'derived',
-                retrieval=retrieval, hierarchy=hierarchy,
-                **(dict(read_index_root=spec['read_index_root']) if 'read_index_root' in spec else {}))
+            from .editorial_current_sources import frozen_navigation_features, prepare_navigation_features
+            if reuse_navigation:
+                features = frozen_navigation_features(snapshot, service=service, source_dir=source_dir,
+                                                      derived_root=root / 'derived')
+            if features is None:
+                features = prepare_navigation_features(service=service, source_dir=source_dir,
+                    runtime=None if reuse_navigation else multimodal_runtime, derived_root=root / 'derived',
+                    retrieval=retrieval, hierarchy=hierarchy,
+                    **(dict(read_index_root=spec['read_index_root']) if 'read_index_root' in spec else {}))
             retrieval, hierarchy = features['retrieval'], features['hierarchy']
             service.configure_hierarchy(hierarchy)
             if features.get('cluster_reader'):
-                service.configure_cluster_reader(features['cluster_reader'])
+                service.configure_cluster_reader(features['cluster_reader'], defer_details=reuse_navigation)
             if features.get('selected_index_manifest'):
                 orientation_artifacts.append(dict(kind='cached_document_index_manifest',
                     **features['selected_index_manifest']))
@@ -404,10 +422,10 @@ def prepare(spec):
             from .editorial_multimodal_navigation import _local_runtime_assets
 
 
-
+            explicit_lexical = selected_pipeline == 'loki_3_0_8' and spec.get('search_mode') == 'lexical'
             _, missing_asset = _local_runtime_assets(multimodal_runtime)
             retrieval=prepare_optional(service,source_dir=source_dir,runtime=multimodal_runtime,
-                                       cached_only=missing_asset is not None)
+                                       cached_only=explicit_lexical or missing_asset is not None)
         service.configure_retrieval(retrieval, search_mode=search_mode,
             **(dict(runtime=multimodal_runtime, index_root=features['index_root'],
                     query_root=features['query_root']) if features else {}))

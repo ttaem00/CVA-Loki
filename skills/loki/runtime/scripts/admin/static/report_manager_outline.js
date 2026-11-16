@@ -1555,12 +1555,20 @@
         if (typeof text === 'string' && text.trim()) questions.push(text);
       }
       const questionNotice = questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '';
-      if (progress && progress.pipeline_complete === true
-          && progress.completion_disposition === 'context_unverified_preserved') {
-        return '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.' + questionNotice;
+      if (progress && progress.pipeline_complete === true) {
+        if (progress.completion_disposition === 'context_unverified_preserved' || questions.length) {
+          return '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.' + questionNotice;
+        }
+        return packet?.source_exploration?.coverage_complete === false
+          ? '이번 후보 분석은 끝났어요. 방송 전체 원문을 전수 판정한 결과는 아닙니다.' : '';
       }
       if (progress && progress.schema_version === 'manager_outline.review_progress.v1'
           && progress.review_available === true && progress.pipeline_complete === false) {
+        if (progress.stop_reason === 'partial_pending_context') {
+          const outcomes = Array.isArray(packet?.unresolved_group_outcomes) ? packet.unresolved_group_outcomes : [];
+          const count = outcomes.filter(row => row?.terminal_state === 'context_unresolved').length;
+          return '요약 저장됨 · 맥락' + (count ? ` ${count}건` : '') + ' 미확정. 현재 목차와 Point는 검토·수정할 수 있어요.' + questionNotice;
+        }
         return '기본 요약 준비 · 장면 분석 미완. 현재 목차와 Point는 검토·수정할 수 있어요. '
           + '남은 장면의 원문 확인과 편집 구간 구성은 아직 끝나지 않았습니다. '
           + '미검토 후보를 가치 없다고 판단한 결과는 아닙니다.' + questionNotice;

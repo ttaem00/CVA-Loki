@@ -9,15 +9,19 @@ from __future__ import annotations
 
 from .config import FULL_AUTHOR_PIPELINES
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import json
+
+import os
 
 import re
 
 from .evidence_world.contracts import canonical_json, file_hash, native_path
 
 KEY = "_editorial_production_job"
+
+SCHEMA = "chzz.editorial_production_job.v1"
 
 _MINT = object()
 
@@ -108,6 +112,7 @@ class _ProductionJob:
     run_root: str
     authority: object
     recovery: _NormalTransportRecovery | None = None
+    verified_sources: dict = field(default_factory=dict, repr=False, compare=False)
 
     def __deepcopy__(self, memo):
         return self
@@ -212,12 +217,39 @@ def _source_paths(assets, video_no, work_root):
         raise ValueError("production_job_sources_incomplete")
     return sorted(rows, key=lambda row: row["family"])
 
-def _sources(assets, video_no, work_root):
+def job_file_hash(path, verified, *, hash_file=file_hash):
+    """Reuse a verified digest only within this job and unchanged file identity."""
+    if verified is None or os.name == "nt":
+
+        return hash_file(path)
+    path = native_path(path)
+
+    def revision():
+        s = path.stat()
+        return s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns
+
+    before = revision()
+    cached = verified.get(path)
+    if before[1] and cached is not None and cached[0] == before:
+        return cached[1]
+    actual = hash_file(path)
+    if revision() != before:
+        raise ValueError("source_changed_during_hash")
+    if before[1]:
+        verified[path] = before, actual
+    return actual
+
+def _sources(assets, video_no, work_root, verified=None):
     rows = _source_paths(assets, video_no, work_root)
     for asset in rows:
-        if file_hash(native_path(asset["path"])) != asset["sha256"]:
+        path = native_path(asset["path"])
+        if job_file_hash(path, verified, hash_file=file_hash) != asset["sha256"]:
             raise ValueError("production_job_source_changed")
     return rows
+
+def production_verified_sources(cfg):
+    job = cfg.get(KEY)
+    return job.verified_sources if type(job) is _ProductionJob and job.authority is _MINT else None
 
 def production_media_root(cfg):
     """Containment from the minted owner; this is not spending permission.

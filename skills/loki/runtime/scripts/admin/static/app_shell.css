@@ -272,6 +272,7 @@
 .app-shell-notice-items [data-level="warning"] .app-shell-notice-kind { color: #f2cc8f; }
 .app-shell-notice-items [data-level="error"] .app-shell-notice-kind { color: #ffafbd; }
 #app-shell-notice-list .app-shell-notice-items a { display: block; padding: 12px; }
+#app-shell-notice-list .app-shell-notice-more { display: inline-flex; padding: 6px 0; color: var(--shell-accent); font-size: 13px; }
 .app-shell-notice-items p { margin: 8px 0 12px; color: var(--shell-text); font-size: 13px; line-height: 1.55; }
 .app-shell-notice-item-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 12px; }
 .app-shell-notice-item-foot time { color: var(--shell-muted); font-variant-numeric: tabular-nums; }

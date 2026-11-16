@@ -70,6 +70,8 @@ def resolve_session(*, generation_root, channel_uid, live_id, cold_archive_root=
         _require(db, "broadcasts", ("broadcast_id", "channel_uid", "live_id", "session_relpath"))
         rows = db.execute("SELECT broadcast_id,channel_uid,live_id,session_relpath FROM broadcasts "
                           "WHERE broadcast_id=?", (source_id,)).fetchall()
+        if not rows:
+            raise EvidenceError("temporal_session_missing")
         if len(rows) != 1 or rows[0]["channel_uid"] != channel_uid or rows[0]["live_id"] != live_id:
             raise EvidenceError("temporal_catalog_identity_mismatch")
         rel = rows[0]["session_relpath"]

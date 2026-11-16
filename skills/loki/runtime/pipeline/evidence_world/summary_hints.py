@@ -34,16 +34,31 @@ _HISTORICAL_UNCERTAINTY = ('Historical model interpretation, not current evidenc
     'permanent channel traits or permission. Preserve negation, quotes and game context. '
     'Omitted material remains unknown.')
 
-def vod_hint_configuration(srt_path, video_no, duration_sec):
+def vod_hint_configuration(srt_path, video_no, duration_sec, *, optional=False):
     root = os.environ.get('CHZZ_LIVE_RUNTIME_ROOT')
     if not root:
         return None
     from ..collected_vod_media import collected_clock
-    if collected_clock(srt_path, video_no, duration_sec) is None:
+    clock = collected_clock(srt_path, video_no, duration_sec)
+    if clock is None:
         return None
+    cold_root = os.environ.get('CHZZ_COLD_ARCHIVE_ROOT') or None
+    if optional:
+
+
+        node = shutil.which('node')
+        if not node:
+            return None
+        channel, live_id = clock['archive'].split('-', 1)
+        try:
+            resolve_session(generation_root=root, channel_uid=channel, live_id=live_id,
+                cold_archive_root=cold_root, node_executable=node)
+        except EvidenceError as error:
+            if str(error) not in {'temporal_catalog_missing', 'temporal_session_missing'}:
+                raise
+            return None
     return dict(profile=PROFILE, generation_root=root,
-        **(dict(cold_archive_root=os.environ['CHZZ_COLD_ARCHIVE_ROOT'])
-           if os.environ.get('CHZZ_COLD_ARCHIVE_ROOT') else {}))
+        **(dict(cold_archive_root=cold_root) if cold_root else {}))
 
 def _context_as_of_ms(service):
     """Bound historical background to this immutable world's original clocks."""

@@ -211,7 +211,7 @@ def validate_command(workspace, executable, argv, tools=None, *, runtime=None):
         _number(args[5])
         if args[6] != "-i" or args[8] != "-vf" or args[10:14] != ["-frames:v", "9", "-q:v", "3"]:
             raise PermissionError("loki_unadmitted_frame_decode")
-        match = re.fullmatch(r"fps=1/([0-9.]+),scale=-2:([0-9]+)", args[9])
+        match = re.fullmatch(r"fps=1/([0-9.]+)(?::eof_action=pass)?,scale=-2:([0-9]+)", args[9])
         if not match or not 0 < _number(match[1], 120) or not 2 <= int(match[2]) <= 4096:
             raise PermissionError("loki_unadmitted_frame_filter")
         _owned(root, args[7], media=True, exists=True)

@@ -103,6 +103,7 @@ def _derive_source_span_structure_refs(
     end: float,
     d1_index: Mapping[str, Mapping[str, Any]],
     d2_index: Mapping[str, Mapping[str, Any]],
+    range_native_bounds: Mapping[str, tuple[float, float]] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Resolve span membership from frozen ranges without using D2 as a clip."""
 
@@ -111,8 +112,10 @@ def _derive_source_span_structure_refs(
     ) -> list[tuple[float, float, str]]:
         values = []
         for ref, row in index.items():
-            range_start = _clock_seconds(row.get("start"))
-            range_end = _clock_seconds(row.get("end"))
+            bounds = (range_native_bounds or {}).get(ref)
+            if bounds is None:
+                bounds = _clock_seconds(row.get("start")), _clock_seconds(row.get("end"))
+            range_start, range_end = bounds
             if range_start < end and start < range_end:
                 values.append((range_start, range_end, ref))
         return sorted(values, key=lambda item: (item[0], item[1], item[2]))
