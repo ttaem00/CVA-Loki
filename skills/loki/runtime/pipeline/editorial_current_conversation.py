@@ -18,6 +18,8 @@ import re
 
 import time
 
+from .loki_version_policy import uses_loki_308_profile
+
 from .evidence_world.contracts import EvidenceError, SourcePolicy, canonical_json, digest, file_hash, native_path
 
 from .evidence_world.index import build_lock
@@ -275,14 +277,14 @@ def prepare(spec):
         requested_hints = spec.get('summary_hints')
         summary_hints = (deepcopy(requested_hints) if requested_hints is not None
                          else vod_hint_configuration(spec['srt_path'], video, vod.duration,
-                                                     optional=selected_pipeline == 'loki_3_0_8'))
+                                                     optional=uses_loki_308_profile(selected_pipeline)))
         if summary_hints:
             try:
                 service.configure_summary_hints(**{k:v for k,v in summary_hints.items() if k != 'profile'})
             except EvidenceError as error:
 
 
-                if (selected_pipeline != 'loki_3_0_8' or requested_hints is not None
+                if (not uses_loki_308_profile(selected_pipeline) or requested_hints is not None
                         or str(error) != 'loom_hints_node_unavailable'):
                     raise
                 summary_hints = None
@@ -385,7 +387,7 @@ def prepare(spec):
         multimodal_context = None
         from .editorial_multimodal_navigation import resolve_local_runtime, LocalNavigationSession
         frozen_features = snapshot is not None and feature_profile is None
-        reuse_navigation = (selected_pipeline == 'loki_3_0_8' and requested_feature_profile == NAVIGATION_PROFILE
+        reuse_navigation = (uses_loki_308_profile(selected_pipeline) and requested_feature_profile == NAVIGATION_PROFILE
                             and snapshot is not None and snapshot.get('feature_profile') == feature_profile
                             and not {'multimodal_runtime', 'retrieval', 'hierarchy', 'read_index_root'} & spec.keys())
         if frozen_features and any(key in spec and spec[key] != snapshot.get(key)
@@ -422,7 +424,7 @@ def prepare(spec):
             from .editorial_multimodal_navigation import _local_runtime_assets
 
 
-            explicit_lexical = selected_pipeline == 'loki_3_0_8' and spec.get('search_mode') == 'lexical'
+            explicit_lexical = uses_loki_308_profile(selected_pipeline) and spec.get('search_mode') == 'lexical'
             _, missing_asset = _local_runtime_assets(multimodal_runtime)
             retrieval=prepare_optional(service,source_dir=source_dir,runtime=multimodal_runtime,
                                        cached_only=explicit_lexical or missing_asset is not None)
@@ -1014,6 +1016,16 @@ def submit(job_root, response_path, *, expected_revision):
         bind_collaboration_lane(result, retained=retained.get('collaboration_periods'),
             retained_diagnostics=retained.get('collaboration_diagnostics'),
             duration_sec=prepared['vod_info']['duration'])
+        if uses_loki_308_profile(prepared['identity']['selected_pipeline']) and any(
+                not row.get('image') for row in result.get('highlights', [])):
+            from .editorial_media_request import current_conversation_media_session, fill_highlight_images
+            from .highlight_story_window import _editorial_highlight_id
+
+
+            media = current_conversation_media_session(root=root, prepared=prepared)
+            result['highlights'] = fill_highlight_images(result['highlights'], media)
+            for row in result['highlights']:
+                row['highlight_id'] = _editorial_highlight_id(row)
         preview = build_qg1_preview(broadcast_map=projected["outline"], editorial_result=result,
             quality=quality, story_selection=projected["story_shadow"]["story_point_selection"],
             source_broadcast_map=projected["outline"], projection_mode="qg1_review_candidate")

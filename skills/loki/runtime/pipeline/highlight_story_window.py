@@ -830,6 +830,13 @@ def build_editorial_highlight_set(
                     frames=(composition_evidence or {}).get("frames", {}),
                     source_spans=normalized["source_spans"])
                 normalized["highlight_id"] = _editorial_highlight_id(normalized)
+            elif index not in (composition_evidence or {}).get("frozen_editorial_compositions", {}):
+                from .editorial_visual_input import automatic_frame_image
+                image = automatic_frame_image(frames=(composition_evidence or {}).get("frames", {}),
+                    source_spans=normalized["source_spans"])
+                if image is not None:
+                    normalized["image"] = image
+                    normalized["highlight_id"] = _editorial_highlight_id(normalized)
             for existing in highlights:
                 if not normalized_story_refs.intersection(existing.get("story_refs") or []):
                     continue

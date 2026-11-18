@@ -68,7 +68,7 @@ _SAFE_THUMB_SCHEMES = ("http://", "https://")
 
 _BADGE_LOWER_PLAY_MIN_V1 = 300
 
-VIEWER_EDITOR_TOOLS_RENDER_VERSION = "occurrence-first-density-v15"
+VIEWER_EDITOR_TOOLS_RENDER_VERSION = "occurrence-first-density-v16"
 
 from .render_primitives import (
     _audio_peak_delta_text,

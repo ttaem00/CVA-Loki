@@ -1,6 +1,7 @@
 """Synthetic install contract check using this installed Loki runtime.
 
-This fixed fixture checks source reads, response validation and rendering.
+This core fixture checks source reads, response validation and text rendering.
+Actual Highlight pixels are checked by media_selftest with installed FFmpeg.
 It is not a model-authored report or editorial quality evidence.
 """
 from __future__ import annotations
@@ -186,6 +187,11 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     call("remember", *identity, "--note", write("note.json", note))
     recalled = call("memory", *identity, "--query", "rebuttal")
     require(len(recalled["notes"]) == 1 and recalled["provider_calls"] == 0, "selftest_note_recall_failed")
+
+
+    call("submit", *identity, "--response", response, error="editorial_highlight_image_unavailable")
+    payload["proposals"] = []
+    response = write("text-response.json", payload)
     submitted = call("submit", *identity, "--response", response)
     require(submitted["external_transport_calls"] == 0 and not submitted["manager_saved"] and not submitted["published"],
             "selftest_submission_authority_changed")
@@ -205,13 +211,12 @@ def run(runtime, workspace, *, author_mode="current_codex"):
             "selftest_report_file_missing")
     html = Path(paths["html"]).read_text(encoding="utf-8")
     require("Quiet reply" in html and "A later quiet reply" in html, "selftest_rendered_content_missing")
-    require('Source-linked review priority for the quiet rebuttal.' in html
-            and 'Review the original guest reply.' in html, 'selftest_priority_not_rendered')
+    require('Source-linked review priority for the quiet rebuttal.' in html, 'selftest_priority_not_rendered')
     metadata = json.loads(Path(paths["metadata"]).read_text(encoding="utf-8-sig"))
     require(isinstance(metadata, dict), "selftest_report_metadata_invalid")
     packet = metadata['editorial_review_packet']
     require(packet['broadcast_map']['points'][0]['editorial_priority'] == payload['points'][0]['editorial_priority']
-            and packet['editorial_highlights'][0]['editorial_priority'] == payload['proposals'][0]['editorial_priority']
+            and packet['editorial_highlights'] == []
             and packet['collaboration_periods'] == payload['collaboration_periods'],
             'selftest_optional_review_metadata_lost')
     report_pipeline = metadata.get("summary_pipeline", {})
@@ -238,7 +243,8 @@ def run(runtime, workspace, *, author_mode="current_codex"):
                   "cited_stt_ref_count": len(set(payload["summary_evidence_refs"])),
                   "record_ids": [row["record_id"] for row in records]},
               "checks": ["installed runtime CLI", "doctor ready with no missing dependencies", "prepare replay",
-                         "unread citation rejection", "complete original texts and source-bound receipt",
+                         "unread citation rejection", "Highlight without media rejected",
+                         "core text report without Highlights", "complete original texts and source-bound receipt",
                          "source-linked note and recall", "synthetic fixture response contract validation",
                          "opt-in advisory status and frozen terminal clock", "source-linked optional review metadata",
                          "normal HTML/Markdown/metadata renderer", "submit replay", "changed settled response conflict",

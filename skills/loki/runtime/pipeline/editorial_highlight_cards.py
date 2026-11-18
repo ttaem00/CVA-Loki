@@ -10,6 +10,12 @@ from __future__ import annotations
 
 import base64
 
+import binascii
+
+from collections import OrderedDict
+
+import hashlib
+
 import html
 
 from io import BytesIO
@@ -18,13 +24,17 @@ import math
 
 import re
 
+import threading
+
 from collections.abc import Mapping
 
 from decimal import Decimal
 
 from typing import Any
 
-from PIL import Image
+import warnings
+
+from PIL import Image, ImageOps, features
 
 from .utils import sec_to_hms
 
@@ -254,16 +264,107 @@ def _source_url_at(video_no: str, seconds: float) -> str:
     except ValueError:
         return ""
 
+_SCENE_IMAGE_MAX_BYTES = 2_000_000
+
+_SCENE_IMAGE_MAX_PIXELS = 40_000_000
+
+_SCENE_IMAGE_MAX_DIMENSION = 16_384
+
+_SCENE_IMAGE_EDGE = 1600
+
+_SCENE_IMAGE_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP", "image/gif": "GIF"}
+
+_SCENE_IMAGE_CACHE: OrderedDict[tuple[str, bytes], str] = OrderedDict()
+
+_SCENE_IMAGE_CACHE_LOCK = threading.Lock()
+
+_SCENE_IMAGE_CACHE_BYTES = 4 * 1024 * 1024
+
+def _clean_scene_webp(raw: bytes) -> bool:
+    """Only preserve pixel chunks, without trailing bytes or metadata chunks."""
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WEBP" or int.from_bytes(raw[4:8], "little") + 8 != len(raw):
+        return False
+    offset = 12
+    while offset + 8 <= len(raw):
+        if raw[offset:offset + 4] not in {b"VP8X", b"VP8 ", b"VP8L", b"ALPH"}:
+            return False
+        size = int.from_bytes(raw[offset + 4:offset + 8], "little")
+        offset += 8 + size + (size % 2)
+    return offset == len(raw)
+
 def editorial_scene_image_data_url(data_url: str) -> str:
-    """Encode display pixels without changing the selected source evidence."""
+    """Verify and prepare bounded public pixels, preserving source evidence."""
+    max_encoded = 4 * ((_SCENE_IMAGE_MAX_BYTES + 2) // 3)
+    if not isinstance(data_url, str) or len(data_url) > max_encoded + 32:
+        raise ValueError("editorial_scene_image_invalid")
+    header, separator, payload = data_url.partition(",")
+    mime = header.removeprefix("data:").removesuffix(";base64")
+    if not separator or header != f"data:{mime};base64" or mime not in _SCENE_IMAGE_FORMATS or len(payload) > max_encoded:
+        raise ValueError("editorial_scene_image_invalid")
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (ValueError, binascii.Error):
+        raise ValueError("editorial_scene_image_invalid") from None
+    if not raw or len(raw) > _SCENE_IMAGE_MAX_BYTES:
+        raise ValueError("editorial_scene_image_invalid")
+    key = (mime, hashlib.sha256(raw).digest())
+    with _SCENE_IMAGE_CACHE_LOCK:
+        cached = _SCENE_IMAGE_CACHE.get(key)
+        if cached is not None:
+            _SCENE_IMAGE_CACHE.move_to_end(key)
+            return cached
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(raw)) as image:
+                if (image.format != _SCENE_IMAGE_FORMATS[mime] or min(image.size) < 1
+                        or max(image.size) > _SCENE_IMAGE_MAX_DIMENSION
+                        or image.width * image.height > _SCENE_IMAGE_MAX_PIXELS
+                        or getattr(image, "n_frames", 1) != 1):
+                    raise ValueError("editorial_scene_image_invalid")
+                image.verify()
+            with Image.open(BytesIO(raw)) as image:
+                image.load()
+                if (image.format == "WEBP" and max(image.size) <= _SCENE_IMAGE_EDGE
+                        and not any(image.info.get(name) for name in ("exif", "xmp", "icc_profile"))
+                        and _clean_scene_webp(raw)):
+                    result = data_url
+                else:
+                    pixels = ImageOps.exif_transpose(image)
+                    mode = "RGBA" if pixels.mode in {"RGBA", "LA"} or "transparency" in pixels.info else "RGB"
+                    profile = pixels.info.get("icc_profile")
+                    if profile:
+                        if len(profile) > 65536 or not features.check("littlecms2"):
+                            raise ValueError("editorial_scene_image_color_profile_invalid")
+                        from PIL import ImageCms
+                        try:
+                            pixels = ImageCms.profileToProfile(pixels, ImageCms.ImageCmsProfile(BytesIO(profile)),
+                                ImageCms.createProfile("sRGB"), outputMode=mode)
+                        except ImageCms.PyCMSError:
+                            raise ValueError("editorial_scene_image_color_profile_invalid") from None
+                    else:
+                        pixels = pixels.convert(mode)
+                    pixels.thumbnail((_SCENE_IMAGE_EDGE, _SCENE_IMAGE_EDGE), Image.Resampling.LANCZOS)
+                    pixels.info.clear()
+                    encoded = BytesIO()
+                    pixels.save(encoded, format="WEBP", quality=85)
+                    delivery = encoded.getvalue()
+                    if len(delivery) > _SCENE_IMAGE_MAX_BYTES:
+                        raise ValueError("editorial_scene_image_invalid")
+                    with Image.open(BytesIO(delivery)) as verified:
+                        if verified.format != "WEBP" or verified.size != pixels.size:
+                            raise ValueError("editorial_scene_image_invalid")
+                        verified.load()
+                    result = "data:image/webp;base64," + base64.b64encode(delivery).decode("ascii")
+    except (OSError, EOFError, SyntaxError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        raise ValueError("editorial_scene_image_invalid") from None
 
-
-    if data_url.startswith("data:image/webp;base64,"):
-        return data_url
-    encoded = BytesIO()
-    with Image.open(BytesIO(base64.b64decode(data_url.split(",", 1)[1]))) as pixels:
-        pixels.save(encoded, format="WEBP", quality=85)
-    return "data:image/webp;base64," + base64.b64encode(encoded.getvalue()).decode("ascii")
+    with _SCENE_IMAGE_CACHE_LOCK:
+        _SCENE_IMAGE_CACHE[key] = result
+        _SCENE_IMAGE_CACHE.move_to_end(key)
+        while len(_SCENE_IMAGE_CACHE) > 32 or sum(map(len, _SCENE_IMAGE_CACHE.values())) > _SCENE_IMAGE_CACHE_BYTES:
+            _SCENE_IMAGE_CACHE.popitem(last=False)
+    return result
 
 def render_editorial_scene_image(image: object, *, video_no: str) -> str:
     """Display the author's persisted selection; never choose another image."""
