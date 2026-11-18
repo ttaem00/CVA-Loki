@@ -355,6 +355,121 @@ def _acquire_window(request, catalog, folder, *, allow_download=True):
     _validate_window(window,catalog,folder,_fresh_acquisition=True)
     return window
 
+def _decoded_frame_body(request, receipt, *, decode_root, receipt_path, window, catalog, cfg, manifest):
+    from PIL import Image
+    frames = {}
+    for row, sec in zip(receipt["artifacts"], receipt["frame_timestamps_sec"]):
+        image_path = decode_root / row["relative_path"]
+        image = owned_images([str(image_path)], cfg["codex_cli_required_runtime_root"])[0]
+        with Image.open(image["path"]) as pixels:
+            dimensions = list(pixels.size)
+        ref = "frame:" + digest([catalog["source_id"], sec, image["sha256"]])[:24]
+        frames[ref] = dict(image=image, source_sec=sec, delivered_dimensions=dimensions,
+            source_height=window["saved_height"], media=window, receipt=dict(path=str(receipt_path)),
+            time_binding=receipt["time_binding"], uncertainty=["single_frame", "audio_not_listened",
+                "decode_position_from_window_receipt_not_verified_pts"])
+    return dict(manifest=manifest, source_id=catalog["source_id"],
+        source_revision=catalog["source_revision"], request=request.canonical_payload(),
+        frames=frames, decode_receipt=receipt)
+
+def fill_highlight_images(highlights, session):
+    """Prepare display pixels without adding an author read or changing its budget."""
+    from .editorial_visual_input import automatic_frame_image
+    from .media_tools.contracts import MediaToolError, ToolRequest
+    from .media_tools.preserved import extract_preserved_frames_batch
+
+    result = deepcopy(highlights)
+    missing = [index for index, row in enumerate(result) if row.get("image") is None]
+    if not missing:
+        return result
+    if session is None:
+        raise ValueError("editorial_highlight_image_unavailable")
+    media_scope(session.cfg, session.source, owner_root=session.owner_root, _verify_window_bytes=False)
+    checked, groups = set(), {}
+
+    def validate_frame(frame):
+        key = digest(frame["media"])
+        if key not in checked:
+            _validate_window(frame["media"], session.catalog, native_path(frame["receipt"]["path"]).parent,
+                             verified=session._verified_windows)
+            checked.add(key)
+
+    for index in missing:
+        spans = result[index]["source_spans"]
+        selected = automatic_frame_image(frames=session.frames, source_spans=spans)
+        if selected is not None:
+            validate_frame(session.frames[selected["frame_ref"]])
+            result[index]["image"] = selected
+            continue
+        remaining = sum(span["end_sec"] - span["start_sec"] for span in spans) / 2
+        for span in spans:
+            length = span["end_sec"] - span["start_sec"]
+            if remaining < length:
+                break
+            remaining -= length
+        duration = min(1.0, length)
+        start = max(span["start_sec"], min(span["start_sec"] + remaining - duration / 2,
+                                          span["end_sec"] - duration))
+        request = ToolRequest.from_mapping(dict(action="frames", video_no=session.catalog["video_no"],
+            start_sec=start, duration_sec=duration, inspection_mode="scene"))
+        folder = session.root / "highlight-images" / digest([request.canonical_payload(), session.spec["manifest"]])
+        path = folder / "receipt.json"
+        if path.is_file():
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            body = saved["payload"]
+            if (saved["sha256"] != digest(body) or body["manifest"] != session.spec["manifest"]
+                    or body["source_id"] != session.catalog["source_id"]
+                    or body["source_revision"] != session.catalog["source_revision"]
+                    or body["request"] != request.canonical_payload()):
+                raise ValueError("editorial_media_receipt_binding_changed")
+            selected = automatic_frame_image(frames=body["frames"], source_spans=spans)
+            if selected is None:
+                raise ValueError("editorial_highlight_image_unavailable")
+            validate_frame(body["frames"][selected["frame_ref"]])
+            result[index]["image"] = selected
+            continue
+        covered = [window for window in session.catalog["windows"]
+                   if window["start"] <= start and start + duration <= window["end"]
+                   and window["saved_height"] >= 2]
+        best_height = max((window["saved_height"] for window in covered), default=None)
+        windows = {digest([window["sha"], window["start"], window["end"]]): window for window in covered
+                   if window["saved_height"] == best_height}
+        if not windows and session.catalog.get("original_source"):
+            if start + duration > session.catalog["original_source"]["duration_sec"]:
+                raise ValueError("editorial_highlight_image_unavailable")
+            try:
+                window = _acquire_window(request, session.catalog, folder)
+            except MediaToolError as exc:
+                raise ValueError("editorial_highlight_image_unavailable") from exc
+            windows = {"acquired": window}
+        if len(windows) != 1:
+            raise ValueError("editorial_highlight_image_unavailable")
+        window = next(iter(windows.values()))
+        if window["saved_height"] < 2:
+            raise ValueError("editorial_highlight_image_unavailable")
+        group = groups.setdefault(digest(window), dict(window=window, items=[]))
+        group["items"].append((index, request, folder, path))
+
+    for key, group in groups.items():
+        decode_root = session.root / "highlight-images" / "decoded" / key
+        try:
+            receipts = extract_preserved_frames_batch([item[1] for item in group["items"]],
+                media=group["window"], output_root=decode_root)
+        except MediaToolError as exc:
+            raise ValueError("editorial_highlight_image_unavailable") from exc
+        if len(receipts) != len(group["items"]):
+            raise ValueError("editorial_highlight_image_unavailable")
+        for (index, request, folder, path), receipt in zip(group["items"], receipts):
+            body = _decoded_frame_body(request, receipt,
+                decode_root=decode_root / digest(request.canonical_payload()), receipt_path=path,
+                window=group["window"], catalog=session.catalog, cfg=session.cfg, manifest=session.spec["manifest"])
+            preserve(path, dict(payload=body, sha256=digest(body)))
+            selected = automatic_frame_image(frames=body["frames"], source_spans=result[index]["source_spans"])
+            if selected is None:
+                raise ValueError("editorial_highlight_image_unavailable")
+            result[index]["image"] = selected
+    return result
+
 class AuthorMediaSession:
     def __init__(self, *, cfg, source, root, page_policy="chronological_v1", owner_root=None):
         if page_policy not in {"chronological_v1", "temporal_overview_v1"}:
@@ -539,7 +654,6 @@ class AuthorMediaSession:
     def _dispatch(self, action, *, recovered=False):
         from .media_tools.contracts import ToolRequest
         from .media_tools.preserved import extract_preserved_frames
-        from PIL import Image
         media_scope(self.cfg, self.source, owner_root=self.owner_root, _verify_window_bytes=False)
         args = action["args"]
         if action["action"] == "read_frame_page":
@@ -618,20 +732,9 @@ class AuthorMediaSession:
                 if exc.code == "source_revision_changed":
                     raise
                 return self._pending(action, exc.code)
-            frames = {}
-            for row, sec in zip(receipt["artifacts"], receipt["frame_timestamps_sec"]):
-                image_path = decode_root / row["relative_path"]
-                image = owned_images([str(image_path)], self.cfg["codex_cli_required_runtime_root"])[0]
-                with Image.open(image["path"]) as pixels:
-                    dimensions = list(pixels.size)
-                ref = "frame:" + digest([self.catalog["source_id"], sec, image["sha256"]])[:24]
-                frames[ref] = dict(image=image, source_sec=sec, delivered_dimensions=dimensions,
-                    source_height=window["saved_height"], media=window, receipt=dict(path=str(path)),
-                    time_binding=receipt["time_binding"], uncertainty=["single_frame", "audio_not_listened",
-                        "decode_position_from_window_receipt_not_verified_pts"])
-            body = dict(manifest=self.spec["manifest"], source_id=self.catalog["source_id"],
-                source_revision=self.catalog["source_revision"], request=request.canonical_payload(),
-                frames=frames, decode_receipt=receipt)
+            body = _decoded_frame_body(request, receipt, decode_root=decode_root, receipt_path=path,
+                window=window, catalog=self.catalog, cfg=self.cfg, manifest=self.spec["manifest"])
+            frames = body["frames"]
             if preserved_preview:
                 ordered = sorted(frames, key=lambda ref:frames[ref]['source_sec'])
                 step = request.duration_sec / len(ordered)

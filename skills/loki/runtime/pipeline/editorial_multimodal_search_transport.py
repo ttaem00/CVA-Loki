@@ -45,6 +45,15 @@ def _read(ref, resolver):
     local = dict(ref, path=str(resolver(ref['path'])))
     return mm._bound_json(local, max_bytes=64_000_000)[0]
 
+def _validate_original_job(prepared, *, original_root, video_no, job_id, stt_sha256):
+    identity = prepared.get('identity') or {}
+    if (prepared.get('schema_version') != 'chzz.current_conversation_prepared.v1'
+            or digest({k:v for k,v in prepared.items() if k != 'prepared_revision'}) != prepared.get('prepared_revision')
+            or identity.get('run_root') != original_root or identity.get('video_no') != video_no
+            or identity.get('job_id') != job_id
+            or prepared.get('source', {}).get('asset', {}).get('bytes_sha256') != stt_sha256):
+        raise ValueError('search_transport_job_changed')
+
 def _project(origin, mapping, runtime):
     """Closed field whitelist; all original occurrences and vector refs stay exact."""
     spec, material, result = (deepcopy(origin[k]) for k in ('spec', 'input', 'result'))
@@ -123,15 +132,12 @@ def _validate_projection(request, resolver, *, verify_copies=False):
                 or tie['prepared_ref']['path'] != str(path(tie['cold_root'])/'prepared.json')):
             raise ValueError('search_transport_job_changed')
         prepared = _read(tie['prepared_ref'], resolver)
-        identity = prepared.get('identity') or {}
-        if (prepared.get('schema_version') != 'chzz.current_conversation_prepared.v1'
-                or digest({k:v for k,v in prepared.items() if k != 'prepared_revision'}) != prepared.get('prepared_revision')
-                or identity.get('run_root') != tie['original_root']
-                or identity.get('video_no') != origin['spec']['source']['asset']['video_no']
-                or prepared.get('source', {}).get('asset', {}).get('bytes_sha256') != original['binding']['stt_sha256']
-                or path(tie['cold_root']).parts[-3:-1] != (identity['video_no'], 'current-conversation')
-                or path(tie['cold_root']).name != identity.get('job_id')):
+        cold_job = path(tie['cold_root'])
+        video_no = origin['spec']['source']['asset']['video_no']
+        if cold_job.parts[-3:-1] != (video_no, 'current-conversation'):
             raise ValueError('search_transport_job_changed')
+        _validate_original_job(prepared, original_root=tie['original_root'], video_no=video_no,
+                               job_id=cold_job.name, stt_sha256=original['binding']['stt_sha256'])
     return True
 
 def validate_projection(request):

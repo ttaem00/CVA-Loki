@@ -36,7 +36,7 @@ def media_policy(policy):
     return value
 
 
-def checked_image(metadata, selected):
+def checked_image(metadata, selected, *, timeline=True):
     """Require the exact delivered frame bytes, hash, clock and reference in a report."""
     packet = metadata["editorial_review_packet"]
     image = packet["editorial_highlights"][0]["image"]
@@ -48,8 +48,9 @@ def checked_image(metadata, selected):
     require(image["frame_ref"] == selected["frame_ref"]
             and image["source_sec"] == selected["source_sec"]
             and image["time_binding"] == selected["time_binding"], "media_selftest_report_clock_changed")
-    require(packet["broadcast_map"]["d2"][0]["image"] == image,
-            "media_selftest_timeline_image_changed")
+    if timeline:
+        require(packet["broadcast_map"]["d2"][0]["image"] == image,
+                "media_selftest_timeline_image_changed")
     return image
 
 
@@ -80,27 +81,33 @@ def checked_html_image(html, image, rendered_data_url):
     return hashlib.sha256(base64.b64decode(rendered_data_url.split(",", 1)[1], validate=True)).hexdigest()
 
 
-def response(prepared, selected):
-    image = dict(frame_ref=selected["frame_ref"], alt="Synthetic test frame", caption="Fixed media fixture")
-    return {"base_revision": prepared["base_revision"],
+def response(prepared, selected=None):
+    payload = {"base_revision": prepared["base_revision"],
         "summary": "A later quiet reply changes the initial claim.", "summary_evidence_refs": ["e1", "e3"],
         "ranges": [
             dict(id="d1", level="D1", title="Conversation", content="A claim and later reply",
                  start="00:00:00", end="00:00:20", evidence_refs=["e1", "e3"]),
             dict(id="d2", level="D2", parent_id="d1", title="Reply", content="The later reply",
-                 start="00:00:09", end="00:00:20", evidence_refs=["e3"], image=image)],
+                 start="00:00:09", end="00:00:20", evidence_refs=["e3"])],
         "points": [dict(id="p", title="Quiet reply", content="A contradiction", timestamp="00:00:10",
                         d2_ref="d2", start_evidence_ref="e3", evidence_refs=["e3"])],
         "stories": [dict(story_ref="s", point_ref="p", title="Quiet reply", why_notable="The claim changes",
                          used_evidence_ids=["e3"], roles=dict(setup=[], performance=[], event=["e3"], reaction=[], result=[]))],
         "proposals": [dict(story_refs=["s"], point_refs=["p"], title="Reply", story_summary="quiet rebuttal",
-            selection_reason="understand the changed claim", image=image,
+            selection_reason="understand the changed claim",
             source_spans=[dict(start_sec=10, end_sec=12, story_roles=["conversation"], evidence_refs=["e3"], reason="actual reply")],
             story_beats=[dict(role="core_event", span_indexes=[0], evidence_refs=["e3"], reason="reply")],
             estimated_edited_duration=dict(min_sec=2, max_sec=2, category="short"), missing_information=[], uncertainties=[])],
         "group_outcomes": [dict(terminal_state="represented", flow_refs=["broadcast"], range_refs=["d1", "d2"],
             reason="The conversation retains the initial claim and later quiet rebuttal.", evidence_refs=["e1", "e3"])],
         "unresolved_questions": []}
+    payload["proposals"][0]["editorial_priority"] = dict(tier="normal", basis="author",
+        reason="Review the original guest reply.")
+    if selected is not None:
+        image = dict(frame_ref=selected["frame_ref"], alt="Synthetic test frame", caption="Fixed media fixture")
+        payload["ranges"][1]["image"] = image
+        payload["proposals"][0]["image"] = image
+    return payload
 
 
 def run(runtime, workspace):
@@ -198,7 +205,9 @@ def run(runtime, workspace):
                 and sha(frame["image"]["path"]) == frame["image"]["sha256"]
                 and 10 <= frame["source_sec"] <= 12 for frame in frames), "media_selftest_frame_custody_invalid")
     selected = frames[4]
-    submitted = call("submit", *identity, "--response", write("response.json", response(prepared, selected)))
+    explicit_response = response(prepared, selected)
+    explicit_path = write("response.json", explicit_response)
+    submitted = call("submit", *identity, "--response", explicit_path)
     require(submitted["external_transport_calls"] == 0 and not submitted["published"] and not submitted["manager_saved"],
             "media_selftest_authority_changed")
     paths = submitted["paths"]
@@ -206,11 +215,63 @@ def run(runtime, workspace):
     metadata = json.loads(Path(paths["metadata"]).read_text(encoding="utf-8-sig"))
     image = checked_image(metadata, selected)
     from pipeline.editorial_highlight_cards import editorial_scene_image_data_url
-    html_image_hash = checked_html_image(Path(paths["html"]).read_text(encoding="utf-8"), image,
-                                        editorial_scene_image_data_url(image["data_url"]))
+    html = Path(paths["html"]).read_text(encoding="utf-8")
+    html_image_hash = checked_html_image(html, image, editorial_scene_image_data_url(image["data_url"]))
+    require(metadata["editorial_review_packet"]["editorial_highlights"][0]["editorial_priority"]
+            == explicit_response["proposals"][0]["editorial_priority"]
+            and "Review the original guest reply." in html, "media_selftest_priority_not_rendered")
     authored = json.loads((Path(prepared["job_root"]) / "result.json").read_text(encoding="utf-8-sig"))["full_author_receipt"]
     require(authored["pixels_seen"] == "UNVERIFIED" and authored["external_transport_calls"] == 0,
             "media_selftest_pixel_interpretation_claimed")
+    require(call("submit", *identity, "--response", explicit_path) == submitted, "media_selftest_submit_replay_changed")
+    explicit_reports = {path: sha(path) for path in paths.values()}
+
+
+
+    automatic = call("prepare", "--spec", write("automatic-spec.json", dict(spec, job_id="synthetic-media-auto-fixture")))
+    require(automatic["job_root"] != prepared["job_root"], "media_selftest_auto_job_not_distinct")
+    auto_identity = ["--job-root", automatic["job_root"], "--expected-revision", automatic["prepared_revision"]]
+    auto_action = dict(envelope, source_id=automatic["source_id"], world_revision=automatic["world_revision"],
+                       action="read_evidence", args=dict(intervals_sec=[[0, 20]], families=["stt"], context_cues=0, max_bytes=16000))
+    auto_originals = call("read", *auto_identity, "--action", write("automatic-original-action.json", auto_action))
+    auto_records = original_records(auto_originals)
+    require(auto_originals.get("original_loaded") is True and auto_originals.get("status") == "complete"
+            and auto_originals.get("next_cursor") is None and len(auto_records) == len(records)
+            and [row.get("raw_text") for row in auto_records] == [row.get("raw_text") for row in records],
+            "media_selftest_auto_originals_incomplete")
+    auto_response = response(automatic)
+    auto_response_path = write("automatic-response.json", auto_response)
+    auto_response_hash = sha(auto_response_path)
+    auto_submitted = call("submit", *auto_identity, "--response", auto_response_path)
+    require(auto_submitted["external_transport_calls"] == 0 and not auto_submitted["published"]
+            and not auto_submitted["manager_saved"], "media_selftest_authority_changed")
+    auto_paths = auto_submitted["paths"]
+    auto_metadata = json.loads(Path(auto_paths["metadata"]).read_text(encoding="utf-8-sig"))
+    auto_image = auto_metadata["editorial_review_packet"]["editorial_highlights"][0]["image"]
+    from pipeline.evidence_world.contracts import digest
+    matching = []
+    for path in (Path(automatic["job_root"]) / "requested-media/highlight-images").glob("*/receipt.json"):
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        require(saved["sha256"] == digest(saved["payload"])
+                and saved["payload"]["source_id"] == automatic["source_id"], "media_selftest_auto_receipt_changed")
+        if auto_image["frame_ref"] in saved["payload"]["frames"]:
+            matching.append(dict(saved["payload"]["frames"][auto_image["frame_ref"]], frame_ref=auto_image["frame_ref"]))
+    require(len(matching) == 1 and 10 <= auto_image["source_sec"] < 12, "media_selftest_auto_frame_missing")
+    checked_image(auto_metadata, matching[0], timeline=False)
+    auto_html = Path(auto_paths["html"]).read_text(encoding="utf-8")
+    auto_html_hash = checked_html_image(auto_html, auto_image, editorial_scene_image_data_url(auto_image["data_url"]))
+    require(auto_metadata["editorial_review_packet"]["editorial_highlights"][0]["editorial_priority"]
+            == auto_response["proposals"][0]["editorial_priority"]
+            and "Review the original guest reply." in auto_html, "media_selftest_priority_not_rendered")
+    auto_authored = json.loads((Path(automatic["job_root"]) / "result.json").read_text(encoding="utf-8-sig"))["full_author_receipt"]
+    require(auto_authored["returned_frame_refs"] == [] and auto_authored["pixels_delivered"] is False
+            and auto_authored["pixels_seen"] is False and auto_authored["external_transport_calls"] == 0,
+            "media_selftest_auto_pixel_interpretation_claimed")
+    auto_report_hashes = {path: sha(path) for path in auto_paths.values()}
+    require(call("submit", *auto_identity, "--response", auto_response_path) == auto_submitted
+            and all(sha(path) == value for path, value in auto_report_hashes.items())
+            and sha(auto_response_path) == auto_response_hash, "media_selftest_auto_replay_changed")
+    require(all(sha(path) == value for path, value in explicit_reports.items()), "media_selftest_explicit_report_changed")
     require(original_config.read_bytes() == config_bytes and all(sha(path) == value for path, value in preserved.items()),
             "media_selftest_original_changed")
     result = dict(status="PASS", kind=KIND, semantic_author=SEMANTIC_AUTHOR, pixels_interpreted="not_claimed",
@@ -223,8 +284,13 @@ def run(runtime, workspace):
         frame_read_pages=[str(proof / ("frame-page-" + str(i) + ".json")) for i in range(3)],
         original_read=dict(path=original_path, read_id=originals["read_id"], source_id=originals["source_id"],
                            world_revision=originals["world_revision"], complete_record_count=len(records)),
+        automatic_highlight=dict(report_paths=auto_paths, frame_ref=auto_image["frame_ref"],
+            frame_sha256=auto_image["sha256"], html_image_sha256=auto_html_hash,
+            writer_frame_reads=0, submitted_without_image=True, reopen_preserved=True),
         source_hashes=preserved, checks=["real synthetic MP4 with audio", "nine JPEGs in three pages", "original STT read",
-        "selected report data URL bytes/hash/clock", "normal HTML Markdown metadata", "source base config preserved"])
+        "selected report data URL bytes/hash/clock", "Highlight priority rendered", "automatic real Highlight pixels",
+        "automatic image not an author read", "explicit and automatic submit replay",
+        "normal HTML Markdown metadata", "source base config preserved"])
     write("media-selftest-result.json", result)
     return result
 

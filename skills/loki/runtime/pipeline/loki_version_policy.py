@@ -32,6 +32,10 @@ def pipelines_for(*kinds: str) -> frozenset[str]:
     return frozenset(name for name, row in load_loki_version_policy()["pipelines"].items()
                      if not kinds or row["kind"] in kinds)
 
+def uses_loki_308_profile(value: object) -> bool:
+    """Share reviewed execution behavior without changing concrete job identity."""
+    return isinstance(value, str) and value in {"loki_3_0_8", "loki_3_0_8_1"}
+
 def normalize_pipeline(value: str) -> str:
     policy = load_loki_version_policy()
     if value == "latest":

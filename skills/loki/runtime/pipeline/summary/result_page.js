@@ -125,7 +125,6 @@
     const hero = document.querySelector('body > header:not(.site-header):not(.cva-site-header)');
     const footer = element('footer', 'cva-result-footer');
     const identity = document.getElementById('summaryPipelineIdentity');
-    if (identity) footer.append(identity);
     if (hero) {
       hero.classList.add('cva-report-hero');
       const inner = hero.querySelector(':scope > .bleed-inner');
@@ -146,6 +145,10 @@
           }
           copy.append(meta);
         } else if (crumb) copy.append(crumb);
+        if (identity) {
+          identity.removeAttribute('style');
+          (meta || copy).append(identity);
+        }
         const entry = inner.querySelector('[data-editor-entry]');
         if (entry) {
           entry.classList.add('cva-hero-actions');

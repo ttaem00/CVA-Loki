@@ -90,3 +90,37 @@ def selected_frame_image(selection, *, frames, source_spans):
     if normalized_fields <= set(selection) and selection != result:
         raise ValueError("editorial_selected_image_changed")
     return result
+
+def automatic_frame_image(*, frames, source_spans):
+    """Prefer the largest admitted pixels, then the cut midpoint, or keep text."""
+    if not frames or not source_spans:
+        return None
+    from io import BytesIO
+    from PIL import Image
+
+    remaining = sum(span["end_sec"] - span["start_sec"] for span in source_spans) / 2
+    midpoint = source_spans[-1]["end_sec"]
+    for span in source_spans:
+        duration = span["end_sec"] - span["start_sec"]
+        if remaining < duration:
+            midpoint = span["start_sec"] + remaining
+            break
+        remaining -= duration
+    candidates = [(abs(frame["source_sec"] - midpoint), ref) for ref, frame in frames.items()
+        if isinstance(ref, str) and isinstance(frame, dict)
+        and type(frame.get("source_sec")) in (int, float) and math.isfinite(frame["source_sec"])]
+    best, best_area = None, 0
+    for _, ref in sorted(candidates):
+        try:
+
+
+            selected = selected_frame_image(dict(frame_ref=ref,
+                alt="하이라이트 구간의 프레임", caption="하이라이트 구간에서 자동 선택한 프레임"),
+                frames=frames, source_spans=source_spans)
+            with Image.open(BytesIO(base64.b64decode(selected["data_url"].split(",", 1)[1]))) as pixels:
+                area = pixels.width * pixels.height
+            if area > best_area:
+                best, best_area = selected, area
+        except (ValueError, OSError, KeyError, TypeError):
+            continue
+    return best

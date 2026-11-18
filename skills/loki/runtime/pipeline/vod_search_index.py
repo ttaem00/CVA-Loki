@@ -15,6 +15,8 @@ import hashlib
 
 import json
 
+from itertools import islice
+
 from pathlib import Path
 
 import re
@@ -40,6 +42,8 @@ from .summary_local_vector_index import EMBEDDING_MODEL, EMBEDDING_REVISION, val
 SCHEMA = "vod_search_index.v1"
 
 DATABASE_NAME = "vod-search.sqlite"
+
+MAX_EXACT_REPORT_KEYS = 256
 
 RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -319,7 +323,7 @@ def register_report(*, database_path, roots, metadata_path, markdown_path, html_
                 vector_count=len(vector["items"]) if vector else 0, provider_calls=0)
 
 def list_registered_reports(*, database_path, roots, base=None, video_no=None, catalog_cache=False,
-                            include_context=False, exclude_bases=()):
+                            include_context=False, exclude_bases=(), report_keys=None):
     """Internal current report locations, independent of old vector freshness.
 
     A normal committed Save may replace the family at its registered paths.
@@ -327,8 +331,21 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
     Resolved paths are private and must not be serialized to HTTP.
     Optional source_sha256 is the initial producer's STT binding, not a claim
     that the current STT or stored vector body passed freshness validation.
+    An exact key selection validates each registration independently, including
+    when multiple registrations point to the same current report files.
     """
     from .report_artifact_family import ReportArtifactFamilyError, validate_report_artifact_family
+    keys = None
+    if report_keys is not None:
+        if isinstance(report_keys, (str, bytes)):
+            raise ValueError("search_report_identity_invalid")
+        try:
+            keys = tuple(islice(report_keys, MAX_EXACT_REPORT_KEYS + 1))
+        except TypeError as error:
+            raise ValueError("search_report_identity_invalid") from error
+        if len(keys) > MAX_EXACT_REPORT_KEYS or any(
+                not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{64}", key) for key in keys):
+            raise ValueError("search_report_identity_invalid")
     excluded = frozenset(exclude_bases)
     if any(not isinstance(value, str) or not value or any(c in value for c in '/\\\x00')
            for value in excluded):
@@ -349,6 +366,10 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
                 raise ValueError("search_report_identity_invalid")
             query += " AND video_no=?"
             parameters += (video_no,)
+        if keys is not None:
+            placeholders = ",".join("?" for _ in keys)
+            query += f" AND report_key IN ({placeholders})"
+            parameters += keys
         query += " ORDER BY video_no,base,report_key"
 
 
@@ -373,6 +394,7 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
             if (len({path.parent for path in paths.values()}) != 1
                     or names not in (expected, ("report.md", "report.html", "metadata.json"))):
                 raise ValueError("search_report_location_invalid")
+            identity = (row["video_no"], row["base"], *paths.values())
             cache_key = (str(database_path), row['report_key'], row['binding_json'],
                          tuple(str(paths[name]) for name in ('metadata', 'markdown', 'html')))
             before = tuple(_report_file_revision(path) for path in paths.values())
@@ -383,7 +405,7 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
                     alias_path, signature, cached_record = cached
                     current_signature = before + ((_report_file_revision(alias_path),) if alias_path else ())
                     if current_signature == signature:
-                        return dict(cached_record), None, None
+                        return dict(cached_record), identity, None
             captured = {name: _capture(path, roots) for name, path in paths.items()}
             current_files = {name: value[0] for name, value in captured.items()}
             metadata = json.loads(captured["metadata"][1].decode("utf-8"))
@@ -404,7 +426,6 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
             alias_after = _report_file_revision(alias_path) if alias_path else None
             if before != after or alias_before != alias_after:
                 raise ValueError('search_source_revision_changed')
-            identity = (row["video_no"], row["base"], *paths.values())
             record = dict(video_no=row["video_no"], base=row["base"], report_key=row["report_key"],
                 family_id=current["generation_id"], tier=tier, vector_status=row["vector_status"],
                 metadata_path=paths["metadata"], markdown_path=paths["markdown"], html_path=paths["html"])
@@ -433,7 +454,7 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
             if record is None:
                 unavailable += 1
                 continue
-            if identity is not None:
+            if keys is None:
                 if identity in seen:
                     continue
                 seen.add(identity)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar
+
 from dataclasses import asdict, dataclass
 
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
@@ -49,8 +51,15 @@ def file_hash(path):
     with native_path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
+_origin_path_resolver = ContextVar('evidence_origin_path_resolver', default=None)
+
 def native_path(path):
     """Keep full identity paths without relying on host-global long-path policy."""
+    resolve = _origin_path_resolver.get()
+    if resolve is not None:
+        selected = resolve(path)
+        if selected is not None:
+            path = selected
     value = str(Path(path).absolute())
     if os.name == "nt" and not value.startswith("\\\\?\\"):
         value = "\\\\?\\UNC\\" + value[2:] if value.startswith("\\\\") else "\\\\?\\" + value
