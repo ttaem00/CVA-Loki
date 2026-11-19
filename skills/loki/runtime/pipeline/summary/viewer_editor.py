@@ -1174,6 +1174,7 @@ def _project_public_viewer_editor_tools_payload(payload: dict[str, Any]) -> dict
         "independent_family_count", "independence_status",
         "video_no", "source_video_no", "seek_sec", "end_seek_sec", "vod_label",
     )
+    navigation_keys = ("video_no", "source_video_no", "seek_sec", "end_seek_sec", "vod_label")
     public_clusters = []
     for row in (clusters.get("clusters") or []):
         if not isinstance(row, dict):
@@ -1181,13 +1182,17 @@ def _project_public_viewer_editor_tools_payload(payload: dict[str, Any]) -> dict
         aggregate = {key: copy.deepcopy(row[key]) for key in aggregate_keys if key in row}
 
 
-        for event_id in row.get("event_ids") or []:
-            source = source_events.get(str(event_id), {})
-            for key in ("video_no", "source_video_no", "seek_sec", "end_seek_sec", "vod_label"):
-                if key not in aggregate and source.get(key) is not None:
-                    aggregate[key] = copy.deepcopy(source[key])
-            if source:
-                break
+        event_ids = row.get("event_ids") or []
+        navigation_ids = [event_id for event_id in event_ids if str(event_id) in public_ids] or event_ids
+
+        if not any(key in aggregate for key in navigation_keys):
+            for event_id in navigation_ids:
+                source = source_events.get(str(event_id), {})
+                for key in navigation_keys:
+                    if source.get(key) is not None:
+                        aggregate[key] = copy.deepcopy(source[key])
+                if source:
+                    break
         aggregate["signal_families"] = [key for key in (row.get("signal_families") or []) if key not in hidden]
         aggregate["event_ids"] = [key for key in (row.get("event_ids") or []) if str(key) in public_ids]
         aggregate["representative_events"] = [

@@ -329,6 +329,26 @@ def prepare_report_artifact_family(
     family["metadata_payload_sha256"] = _metadata_payload_hash(prepared)
     return prepared, generation_id
 
+def retained_editor_paths(output_dir: str | Path, base: str, report_key: str) -> tuple[Path, Path, Path]:
+    """Locate a private working family for one admitted retention registration."""
+    from .vod_search_index import _resolve
+
+    if not re.fullmatch(r"[0-9a-f]{64}", report_key):
+        raise ValueError("invalid retained report key")
+    roots = {"output": Path(output_dir).resolve()}
+    return tuple(_resolve({"root": "output", "relative": f"_retained_reports/{report_key}/{base}{suffix}"},
+                          roots) for suffix in (".md", ".html", "_metadata.json"))
+
+def retained_editor_family(paths, *, video_no: str, report_key: str) -> dict[str, Any] | None:
+    """An ordinary hot file or an interrupted first save cannot grant authority."""
+    if not any(path.exists() for path in paths):
+        return None
+    family = validate_report_artifact_family(*paths)
+    metadata = family["metadata"]
+    if str(metadata.get("video_no")) != video_no or metadata.get("retained_report_key") != report_key:
+        raise ReportArtifactFamilyError("working report does not match the active retained report")
+    return family
+
 def validate_report_artifact_family(
     markdown_path: str | Path,
     html_path: str | Path,
@@ -515,15 +535,23 @@ def commit_next_report_artifact_family(
     html_text: str,
     metadata: dict[str, Any],
     authority_revision_id: str = "",
+    retained_parent: tuple[int, str] | None = None,
+    lock_dir: str | Path | None = None,
+    assert_current=None,
 ) -> str:
     """Resolve and commit the next VOD generation under one process lock."""
 
     output_dir = Path(metadata_path).parent
-    with _report_family_lock(output_dir, video_no=video_no):
+    with _report_family_lock(lock_dir or output_dir, video_no=video_no):
+        if assert_current is not None:
+            assert_current()
         generation_sequence, parent_generation_id = next_generation_lineage(
             output_dir,
             video_no=video_no,
         )
+        if generation_sequence == 1 and retained_parent is not None:
+            parent_sequence, parent_generation_id = retained_parent
+            generation_sequence = parent_sequence + 1
         return commit_report_artifact_family(
             markdown_path=markdown_path,
             html_path=html_path,

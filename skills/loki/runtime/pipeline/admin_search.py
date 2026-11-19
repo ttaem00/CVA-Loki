@@ -14,9 +14,88 @@ from __future__ import annotations
 
 import json
 
+import re
+
+from dataclasses import dataclass
+
 from pathlib import Path
 
 from typing import Iterable
+
+_TIMELINE_HEADER_RE = re.compile(r"\[(\d{1,2}):(\d{2}):(\d{2})\]")
+
+_SNIPPET_RADIUS = 60
+
+@dataclass
+class SearchMatch:
+    source: str
+    snippet: str
+    timestamp: str = ""
+    ts_ms: int = 0
+    section: str = ""
+
+def _hms_to_ms(h: int, m: int, s: int, ms: int = 0) -> int:
+    return ((h * 3600) + (m * 60) + s) * 1000 + ms
+
+def _make_snippet(text: str, start: int, end: int) -> str:
+    """매치 위치 ±radius 컨텍스트 추출 — 단일 라인."""
+    lo = max(0, start - _SNIPPET_RADIUS)
+    hi = min(len(text), end + _SNIPPET_RADIUS)
+    snippet = text[lo:hi].replace("\n", " ").replace("\r", " ").strip()
+    if lo > 0:
+        snippet = "…" + snippet
+    if hi < len(text):
+        snippet = snippet + "…"
+
+    return re.sub(r"\s+", " ", snippet)
+
+def _search_summary(md_text: str, needle_lower: str, cap: int) -> list[SearchMatch]:
+    """요약 markdown 에서 substring 매치 + 가장 가까운 섹션 헤더 컨텍스트."""
+    matches: list[SearchMatch] = []
+    if not md_text or not needle_lower:
+        return matches
+
+    md_lower = md_text.lower()
+    cursor = 0
+    while len(matches) < cap:
+        idx = md_lower.find(needle_lower, cursor)
+        if idx < 0:
+            break
+
+        section = ""
+        ts_ms = 0
+        timestamp = ""
+        scan_lo = md_text.rfind("\n", 0, idx)
+        head = md_text[: scan_lo if scan_lo > 0 else idx]
+
+        tl = list(_TIMELINE_HEADER_RE.finditer(head))
+        if tl:
+            last = tl[-1]
+            line_start = head.rfind("\n", 0, last.start()) + 1
+            line_end = head.find("\n", last.end())
+            line = head[line_start : line_end if line_end > 0 else None]
+            section = line.strip().lstrip("- ").strip()
+            h, m, s = (int(last.group(i)) for i in (1, 2, 3))
+            ts_ms = _hms_to_ms(h, m, s)
+            timestamp = f"{h:02d}:{m:02d}:{s:02d}"
+        else:
+
+            for line in reversed(head.splitlines()):
+                ls = line.strip()
+                if ls.startswith("#"):
+                    section = ls.lstrip("#").strip()
+                    break
+        matches.append(
+            SearchMatch(
+                source="summary",
+                snippet=_make_snippet(md_text, idx, idx + len(needle_lower)),
+                timestamp=timestamp,
+                ts_ms=ts_ms,
+                section=section,
+            )
+        )
+        cursor = idx + len(needle_lower)
+    return matches
 
 def _iter_vod_records(output_dir: Path, site_dir: Path) -> Iterable[dict]:
     """report 메타 인덱스를 가벼운 dict 형태로 yield."""

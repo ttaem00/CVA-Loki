@@ -50,9 +50,11 @@ class EvidenceWorldService:
                                         unit_policy=unit_policy)
         return cls(root=root, manifest=manifest, run_root=run_root, owner=owner)
 
-    def __init__(self, *, root, manifest, run_root, owner):
+    def __init__(self, *, root, manifest, run_root, owner, sealed_optional_audio=False):
         self.root = native_path(root)
+        self.sealed_optional_audio = sealed_optional_audio
         self.manifest = manifest
+        self._database_sha256 = manifest["database_sha256"]
         self.world_revision = manifest["world_revision"]
         self.source_id = manifest["identity"]["assets"][0]["source_id"]
         self.video_no = manifest["identity"]["assets"][0]["video_no"]
@@ -66,7 +68,8 @@ class EvidenceWorldService:
         self.family_status = {a["family"]: a["availability"] for a in manifest["identity"]["assets"]}
         with self.open() as db:
             self.assets = {r[0]: AssetBinding(**json.loads(r[1])) for r in
-                           db.execute("SELECT asset_id,binding_json FROM assets")}
+                           db.execute("SELECT asset_id,binding_json FROM assets")
+                           if r[0] != db.sealed_absent_audio_id}
         self.state.load()
         self.dense_backend = None
         self.search_mode = "lexical"
@@ -133,7 +136,9 @@ class EvidenceWorldService:
                 "query_encoding": self.dense_backend.strategy} if self.dense_backend else {}))
 
     def open(self):
-        return open_snapshot(self.root, world_revision=self.world_revision, source_id=self.source_id)
+        return open_snapshot(self.root, world_revision=self.world_revision, source_id=self.source_id,
+                             sealed_optional_audio=self.sealed_optional_audio,
+                             expected_database_sha256=self._database_sha256)
 
     def admission(self):
         return dict(status="ready", scope=("preserved_text_and_derived_metadata_candidate"
@@ -165,7 +170,8 @@ class EvidenceWorldService:
             query = dict(query, mode=self.search_mode)
         result = search(self.root, world_revision=self.world_revision, query=query, page=page,
                         per_query_ms=per_query_ms, run_root=self.run_root,
-                        dense_backend=self.dense_backend, scope_id=question_id)
+                        dense_backend=self.dense_backend, scope_id=question_id,
+                        open_world=self.open, world_identity=self.manifest["identity"])
         metrics = {key: result.pop(key) for key in ("elapsed_sec", "cache_hit", "output_bytes")}
         self.state.event("search_returned", question_id=question_id,
                          payload=dict(query_id=result["query_id"],

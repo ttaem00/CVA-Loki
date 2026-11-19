@@ -290,7 +290,7 @@
     async function loadReport() {
       if (!base) throw new Error('base 파라미터가 없습니다.');
       const loadSequence = ++reportLoadSequence;
-      const previewReady = loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(base)}&t=${Date.now()}`);
+      const previewReady = loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(base)}&format=latest&t=${Date.now()}`);
       const slowTimer = setTimeout(() => {
         setStatus('서버 응답 대기 중… (리포트 수가 많으면 첫 로드는 느릴 수 있어요)', 'info');
       }, 5000);
@@ -942,7 +942,7 @@
         }
         committed = validReportSaveAck(data, attempt);
         if (!committed) throw Error('save_revision_ack_missing');
-        previewFrame.srcdoc = data.html;
+        await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(base)}&format=latest&t=${Date.now()}`);
         previewTitleEl.textContent = data.title || titleTextEl.textContent;
         if (typeof data.md === 'string') {
           if (typeof markdownOverride === 'string') normalReportMarkdown = data.md;

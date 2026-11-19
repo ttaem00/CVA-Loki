@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import json
 import re
 
 
@@ -37,6 +39,41 @@ UI_ASSETS = (
     "scripts/admin/static/vendor/hls.LICENSE.txt",
     "pipeline/summary/viewer.css",
     "pipeline/summary/viewer.js",
+)
+
+
+
+TEMPLATE_ASSETS = (
+    "vendor/loki-page-template/provenance.json",
+    "vendor/loki-page-template/v1/index.html",
+    "vendor/loki-page-template/v1/shared/loki/v1/adapter.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/app.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/assets/PRETENDARD-LICENSE.md",
+    "vendor/loki-page-template/v1/shared/loki/v1/assets/PretendardVariable.woff2",
+    "vendor/loki-page-template/v1/shared/loki/v1/assets/cva-color.svg",
+    "vendor/loki-page-template/v1/shared/loki/v1/assets/loki-color.svg",
+    "vendor/loki-page-template/v1/shared/loki/v1/bootstrap.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/collaboration-view.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/collaboration-view.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/hierarchy.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/assets/report-document.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/assets/report-document.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/assets/vendor/chart.umd.min.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/assets/viewer-editor-tools.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/assets/viewer-editor-tools.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/brand/assets/fonts/PRETENDARD-LICENSE.md",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/brand/assets/fonts/PretendardVariable.woff2",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/native-editor-bridge.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/native-editor-data.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor/native-editor-shell.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/native-editor.html",
+    "vendor/loki-page-template/v1/shared/loki/v1/refinements.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/report-source.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/scene-polish.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/styles.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/template.css",
+    "vendor/loki-page-template/v1/shared/loki/v1/timeline-controller.js",
+    "vendor/loki-page-template/v1/shared/loki/v1/timeline-navigation.css",
 )
 
 PAGES = {"/": "home", "/reports": "home", "/report-workspace": "report_workspace", "/report": "report"}
@@ -88,6 +125,22 @@ def response(runtime, path):
     if path in PAGES:
         return render_page(runtime, PAGES[path]).encode("utf-8"), "text/html; charset=utf-8"
     relative = STATIC.get(path)
+    if relative is None and path.startswith("/loki/"):
+        provenance = json.loads(_file(runtime, "vendor/loki-page-template/provenance.json").read_text(encoding="utf-8"))
+        prefix = f"/loki/{provenance['runtime_version']}/shared/loki/v1/"
+        if not path.startswith(prefix):
+            return None
+        name = "shared/loki/v1/" + path.removeprefix(prefix)
+        relative = "vendor/loki-page-template/v1/" + name
+        if relative not in TEMPLATE_ASSETS:
+            return None
+        raw = _file(runtime, relative).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != provenance["files"][name]["sha256"]:
+            raise ValueError("loki_template_source_changed")
+        kind = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+                ".html": "text/html; charset=utf-8", ".md": "text/plain; charset=utf-8",
+                ".svg": "image/svg+xml", ".woff2": "font/woff2"}[Path(relative).suffix]
+        return raw, kind
     if relative is None:
         return None
     suffix = Path(relative).suffix

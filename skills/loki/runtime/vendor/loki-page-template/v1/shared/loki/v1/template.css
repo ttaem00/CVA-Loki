@@ -1,0 +1,19 @@
+/* Shared loading, missing-data and error states. Report content owns no CSS. */
+html[data-loki-status="loading"] .page-shell,
+html[data-loki-status="error"] .page-shell { display:none; }
+html[data-loki-status="loading"] .header-utilities,
+html[data-loki-status="error"] .header-utilities { visibility:hidden; }
+.report-status { min-height:65vh; display:grid; place-items:center; padding:48px 24px; text-align:center; }
+.report-status > div { max-width:560px; }
+.report-status h1 { margin:24px 0 12px; font-size:clamp(21px,3vw,28px); font-weight:650; letter-spacing:-.04em; word-break:keep-all; }
+.report-status p { line-height:1.7; color:var(--text-muted,#6a716e); word-break:keep-all; }
+.report-status .status-brand { color:#815217; font-weight:750; font-size:34px; letter-spacing:-.06em; }
+.report-status .button { margin-top:20px; }
+.report-status[hidden], .focus-layout[hidden], .broadcast-overview[hidden], #watchButton[hidden], #originalBroadcast[hidden] { display:none!important; }
+a[aria-disabled="true"] { cursor:default; }
+a.row-time[aria-disabled="true"] { color:var(--text-muted,#6a716e); }
+button:disabled { cursor:default; opacity:.5; }
+@media(prefers-reduced-motion:no-preference) {
+  html[data-loki-status="loading"] .status-brand { animation:loki-loading 1.8s ease-in-out infinite alternate; }
+  @keyframes loki-loading { from { opacity:.45; } to { opacity:1; } }
+}

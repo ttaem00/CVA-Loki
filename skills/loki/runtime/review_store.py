@@ -214,6 +214,13 @@ class ReviewStore:
     def report_html(self, report_id):
         return self._context(self._job(report_id))["html"]
 
+    def report_presentation(self, report_id, *, expected_pin=None):
+        try:
+            from .report_ui import project_report
+        except ImportError:
+            from report_ui import project_report
+        return project_report(self._context(self._job(report_id)), report_id, expected_pin=expected_pin)
+
     def _expect(self, report_id, context, expected):
         if expected != self._view(report_id, context)["manager_edit_revision"]:
             raise ReviewConflict("다른 수정본이 먼저 저장되었습니다. 입력을 유지하고 최신 저장본을 다시 열어 주세요.")

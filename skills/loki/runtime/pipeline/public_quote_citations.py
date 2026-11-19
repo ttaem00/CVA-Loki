@@ -69,6 +69,9 @@ def parse_subtitle_cues(path: Path) -> list[QuoteCue]:
         raw = path.read_text(encoding="utf-8-sig", errors="ignore")
     except OSError:
         return []
+    return parse_subtitle_text(raw)
+
+def parse_subtitle_text(raw: str) -> list[QuoteCue]:
     cues: list[QuoteCue] = []
     blocks = re.split(r"\n\s*\n", raw.replace("\r\n", "\n").replace("\r", "\n"))
     for block in blocks:
@@ -289,8 +292,10 @@ def build_public_quote_citation_payload(
     video_no: str,
     chat_records: Iterable[dict[str, Any]] | None = None,
     window_sec: float = 90.0,
+    subtitle_cues: list[QuoteCue] | None = None,
 ) -> dict[str, Any]:
-    subtitle_cues = load_quote_source_cues(work_dir, video_no)
+    if subtitle_cues is None:
+        subtitle_cues = load_quote_source_cues(work_dir, video_no)
     chat_cues = load_chat_quote_cues(chat_records)
     cues = sorted([*subtitle_cues, *chat_cues], key=lambda cue: cue.start_sec)
     items: list[dict[str, Any]] = []

@@ -162,7 +162,8 @@ def _hydrate(db, hit, query):
                 next_action=original_read_action(families=[hit["family"]],
                     record_ids=list(dict.fromkeys(m["record_id"] for m in hit["evidence_members"]))))
 
-def search(root, *, world_revision, query, page=None, per_query_ms, run_root, dense_backend=None, scope_id=None):
+def search(root, *, world_revision, query, page=None, per_query_ms, run_root, dense_backend=None, scope_id=None,
+           open_world=None, world_identity=None):
     """Persist a complete ranking per run. A timeout publishes no partial ranking."""
     mode = query.get("mode", "lexical")
     if mode not in {"exact", "lexical", *HYBRID_MODES}:
@@ -195,10 +196,13 @@ def search(root, *, world_revision, query, page=None, per_query_ms, run_root, de
     started = time.monotonic()
     ranking_started=started
 
-    with open_snapshot(root, world_revision=world_revision) as db:
-        manifest = json.loads((native_path(root) / "manifest.json").read_text(encoding="utf-8"))
-        allowed = manifest["identity"]["policy"]["allowed"]
-        family_status = {a["family"]: a["availability"] for a in manifest["identity"]["assets"]}
+    connection = open_snapshot(root, world_revision=world_revision) if open_world is None else open_world()
+    with connection as db:
+        if world_identity is None:
+            manifest = json.loads((native_path(root) / "manifest.json").read_text(encoding="utf-8"))
+            world_identity = manifest["identity"]
+        allowed = world_identity["policy"]["allowed"]
+        family_status = {a["family"]: a["availability"] for a in world_identity["assets"]}
         for family in query["families"]:
             if family not in FAMILIES:
                 raise EvidenceError("unsupported_family")
@@ -244,7 +248,7 @@ def search(root, *, world_revision, query, page=None, per_query_ms, run_root, de
             else:
                 try:
                     hits = _calculate(db, query, deadline=ranking_started + per_query_ms / 1000,
-                                      representation=manifest["identity"]["representation"])
+                                      representation=world_identity["representation"])
                     if mode in HYBRID_MODES:
                         hits = dense_backend.calculate(db, query, hits, deadline=ranking_started + per_query_ms / 1000)
                 except sqlite3.OperationalError as exc:

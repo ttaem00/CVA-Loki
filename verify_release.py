@@ -58,6 +58,30 @@ def _version_contract(root, manifest, plugin):
             raise ValueError("release_version_documentation_mismatch: " + name)
 
 
+def _template_contract(runtime, ui, canonical_paths):
+    assignment = next((node for node in ui.body if isinstance(node, ast.Assign)
+                       and any(isinstance(target, ast.Name) and target.id == "TEMPLATE_ASSETS"
+                               for target in node.targets)), None)
+    names = ast.literal_eval(assignment.value) if assignment else ()
+    provenance_path = "vendor/loki-page-template/provenance.json"
+    if not isinstance(names, tuple) or not names or provenance_path not in names:
+        raise ValueError("release_template_runtime_incomplete")
+    if any(not isinstance(name, str) or name not in canonical_paths for name in names):
+        raise ValueError("release_template_runtime_incomplete")
+    provenance = json.loads((runtime / provenance_path).read_text(encoding="utf-8"))
+    selected = {"index.html", *(name for name in provenance["files"] if name.startswith("shared/loki/v1/"))}
+    expected = {provenance_path, *("vendor/loki-page-template/v1/" + name for name in selected)}
+    present = {name for name in canonical_paths if name.startswith("vendor/loki-page-template/")}
+    if (set(names) != expected or len(names) != len(expected) or present != expected
+            or not re.fullmatch(r"[a-f0-9]{16}", provenance.get("runtime_version", ""))):
+        raise ValueError("release_template_runtime_closure_changed")
+    for name in selected:
+        raw = (runtime / "vendor/loki-page-template/v1" / name).read_bytes()
+        identity = provenance["files"][name]
+        if hashlib.sha256(raw).hexdigest() != identity["sha256"] or len(raw) != identity["bytes"]:
+            raise ValueError("release_template_source_changed: " + name)
+
+
 def validate(root):
     root = Path(root).resolve(strict=True)
     manifest = json.loads((root / "release-manifest.json").read_text(encoding="utf-8"))
@@ -125,7 +149,9 @@ def validate(root):
                      "runtime/selftest.py", "runtime/requirements.txt", "runtime/local_tools.py", "runtime/node_runtime.py",
                      "runtime/device_setup.py", "runtime/multimodal_setup.py", "runtime/multimodal_worker.py",
                      "runtime/media_selftest.py", "runtime/review.py", "runtime/review_store.py",
-                     "runtime/public_ui.py", "runtime/speech_setup.py", "runtime/transcribe_source.py", "runtime/source_acquire.py",
+                     "runtime/public_ui.py", "runtime/report_ui.py", "runtime/speech_setup.py", "runtime/transcribe_source.py", "runtime/source_acquire.py",
+                     "runtime/publish/builder/loki_template.py", "runtime/publish/builder/loki_runtime.py",
+                     "runtime/publish/builder/report_sanitizers.py",
                      "runtime/scripts/admin/static/report_workspace_state.js", "runtime/scripts/admin/static/report_workspace_history.js",
                      "runtime/requirements-multimodal.txt", "runtime/requirements-speech.txt", "runtime/requirements-source.txt", "LICENSE"):
         if not (skill / required).is_file():
@@ -152,6 +178,7 @@ def validate(root):
             for path in sorted(references.paths):
                 if routes.get(path) not in names:
                     raise ValueError("release_canonical_ui_asset_missing: " + path)
+    _template_contract(skill / "runtime", ui, canonical_paths)
     _version_contract(root, manifest, plugin)
     return manifest
 

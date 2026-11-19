@@ -1,0 +1,962 @@
+/* Source-aware viewer styles. Scene previews stay quiet until approached. */
+html { scrollbar-gutter: stable; }
+/* Progressive typography: unsupported values keep the existing line wrapping. */
+#broadcastTitle,
+#selectedTitle,
+.scope-context h2 { text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+#selectedStory { text-wrap: pretty; }
+/* Artwork stays optional; the shared row layout is defined below. */
+.focus-layout.without-artwork { display: block; }
+.focus-layout.without-artwork .scene-stage { display: block; width: 100%; border: 0; }
+.focus-layout.without-artwork .scene-bottom-bar { border-bottom: 1px solid var(--line-soft); padding: 0 24px; height: 44px; background: var(--surface); }
+.focus-layout.without-artwork .scene-context,
+.focus-layout.without-artwork .scene-stepper .icon-button { color: var(--muted); }
+.focus-layout.without-artwork .scene-stepper .icon-button:hover:not(:disabled) { color: var(--accent); background: var(--soft); }
+.focus-layout.without-artwork .moment-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 300px); column-gap: 48px; padding: 26px 0; margin: 0; }
+.focus-layout.without-artwork .detail-top { grid-column: 1 / -1; margin-bottom: 15px; }
+.focus-layout.without-artwork .detail-top .glass-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; margin-left: 8px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.focus-layout.without-artwork .detail-top .glass-button[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.focus-layout.without-artwork #selectedTitle,
+.focus-layout.without-artwork .selection-meta,
+.focus-layout.without-artwork .story { grid-column: 1; }
+.focus-layout.without-artwork .story { font-size: 16px; line-height: 1.85; max-width: 70ch; }
+.focus-layout.without-artwork .watch-button { grid-column: 2; grid-row: 2 / span 3; align-self: center; margin: 0; }
+.focus-layout.without-artwork .scene-context-disclosure { grid-column: 1 / -1; margin-top: 22px; }
+.broadcast-header .header-actions { display: flex; align-items: center; }
+.header-actions .broadcast-summary-button { min-height: 40px; padding: 8px 12px; gap: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 12px; white-space: nowrap; text-decoration: none; }
+.header-actions .broadcast-summary-button:hover { border-color: var(--accent); color: var(--accent); }
+.clip-rows { margin: 0 0 8px; }
+.clip-track { position: relative; min-width: 0; height: 36px; }
+.clip-track .map-marker { top: 2px !important; width: 32px; height: 32px; }
+
+/* One media preview and one reading column, without a surrounding dashboard box. */
+.focus-layout { grid-template-columns: minmax(0, .85fr) minmax(360px, 1.15fr); gap: 40px; align-items: start; border: 0; border-radius: 0; background: transparent; overflow: visible; }
+.focus-layout .scene-stage { align-self: start; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.focus-layout:not(.without-artwork) .scene-stage { box-shadow: var(--shadow-panel); }
+.focus-layout .scene.hero-image { aspect-ratio: 16 / 9; height: auto; min-height: 0; max-height: none; flex: none; }
+.hero-play > .icon { margin-left: 0; }
+.focus-layout:not(.without-artwork) .moment-detail { align-self: start; padding: 7px 0 0; background: transparent; }
+.focus-layout .scene-stage .collaboration-card { width: 100%; background: var(--surface); border-radius: 0; }
+.loki-collaboration .collab-strip-main:has(.collab-more-names) > .collab-count { display: none; }
+.moment-detail .detail-top { margin: 0 0 15px; flex-wrap: nowrap; }
+.moment-detail .selection-index { margin-left: auto; }
+.detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; margin-bottom: 10px; }
+.detail-meta .time-copy { order: 0; flex: 0 0 auto; min-height: 24px; margin: 0; padding: 0; font-size: 18px; line-height: 1.5; color: var(--accent); }
+.detail-meta .time-copy:hover { text-decoration: underline; text-underline-offset: 4px; }
+.detail-meta .selection-meta { margin: 0; padding-left: 12px; border-left: 1px solid var(--line); font-size: 11px; line-height: 18px; }
+.moment-detail .story { font-size: 15px; line-height: 1.85; margin-top: 13px; }
+.moment-detail .watch-button { margin-top: 22px; min-height: 44px; box-shadow: var(--shadow-control); transition: background-color 140ms ease, box-shadow 140ms ease; }
+@media (min-width: 761px) {
+  #watchButton { width: fit-content; min-width: 208px; max-width: 100%; padding-inline: 20px; }
+}
+.scene-context-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 44px; margin-top: 13px; padding: 9px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--muted); background: transparent; font-size: 12px; text-align: left; }
+.scene-context-toggle:hover { color: var(--accent); }
+.scene-context-toggle[aria-expanded='true'] { color: var(--text); }
+.scene-context-toggle[aria-expanded='true'] > svg { transform: rotate(90deg); }
+.scene-context-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.focus-layout .scene-context-panel { grid-column: 1 / -1; display: block; padding: 18px 0 0; border: 0; background: transparent; }
+.scene-context-panel .detail-spans { min-width: 0; margin: 0; padding: 0; border: 0; }
+.scene-context-panel .detail-label-row { margin-bottom: 12px; }
+.scene-context-panel h3 { font-size: 12px; line-height: 1.5; font-weight: 650; color: var(--muted); }
+.scene-context-panel .detail-points { min-width: 0; margin: 18px 0 0; padding: 18px 0 0; border: 0; border-top: 1px solid var(--line-soft); }
+.scene-context-panel.single-context .detail-points { margin: 0; padding: 0; border: 0; }
+.scene-context-panel .source-spans .source-span { display: flex; min-height: 44px; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px; }
+.scene-context-panel .source-spans .source-span.is-active { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
+.scene-context-panel .source-spans .source-span:hover { background: var(--accent-soft); }
+.scene-context-panel .source-span > svg { margin-left: auto; flex: 0 0 16px; width: 16px; height: 16px; }
+.scene-context-panel .source-spans .span-reason { margin: 8px 0 12px; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.scene-context-panel .highlight-reason { margin-top: 14px; }
+.highlight-reason h4 { margin: 0 0 5px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.highlight-reason p { margin: 0; font-size: 13px; line-height: 1.8; color: var(--muted); word-break: keep-all; overflow-wrap: anywhere; }
+.scene-context-panel.single-context .priority-explanation { max-width: 80ch; margin: 0; padding: 0; border: 0; }
+.focus-layout.without-artwork .detail-meta { grid-column: 1; }
+.focus-layout.without-artwork .watch-button { grid-column: 2; grid-row: 3 / span 2; margin: 0; }
+.focus-layout.without-artwork .scene-context-toggle { grid-column: 2; grid-row: 5; align-self: start; margin-top: 8px; }
+.focus-layout.without-artwork .scene-context-panel { max-width: 80ch; }
+.source-notes { margin-top: 8px; }
+.source-notes > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--muted); font-size: 12px; list-style: none; cursor: pointer; }
+.source-notes > summary::-webkit-details-marker { display: none; }
+.source-notes > summary:hover { color: var(--accent); }
+.source-notes[open] > summary > svg { transform: rotate(90deg); }
+.source-notes .span-reason { margin: 6px 0 0; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.source-label-note + .source-label-note { margin-top: 14px; }
+.source-label-note h4 { margin-bottom: 5px; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+@media (max-width: 760px) {
+  .focus-layout { display: block; }
+  .focus-layout.without-artwork .moment-detail { display: block; padding: 21px 0; }
+  .focus-layout.without-artwork .scene-bottom-bar { padding: 0 14px; }
+  .focus-layout.without-artwork .watch-button { margin-top: 20px; width: 100%; }
+  .focus-layout.without-artwork .story { font-size: 15px; }
+  .header-actions .broadcast-summary-button { min-height: 40px; font-size: 12px; }
+  .focus-layout:not(.without-artwork) .moment-detail { padding: 24px 0 0; }
+  .focus-layout .scene-context-panel { padding: 18px 0 0; }
+  .scene-context-panel .detail-points { padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--line-soft); }
+  .detail-meta { gap: 6px 10px; }
+  .detail-meta .selection-meta { padding-left: 10px; }
+  .moment-detail .story { font-size: 15px; }
+  .focus-layout.without-artwork .scene-context-toggle { margin-top: 13px; }
+}
+
+:root {
+  --point-normal: #2f6e68;
+  --point-normal-soft: #eaf2ef;
+}
+:root[data-theme='dark'] {
+  --point-normal: #8dc9bd;
+  --point-normal-soft: #253e39;
+}
+
+/* One selected chapter, with its title, original text and a clear way out. */
+.exploration-results > .scope-context {
+  margin: 24px 0 28px;
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.scope-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.scope-heading-copy { min-width: 0; }
+.scope-context .map-activity-nav { gap: 2px 8px; margin: -6px 0 6px; font-size: 12px; }
+.scope-context .map-activity-nav > button { min-height: 32px; padding: 3px 0; }
+.scope-context .map-activity-nav > button:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
+.scope-context h2 { margin: 0; font-size: 23px; line-height: 1.45; font-weight: 650; letter-spacing: -.03em; }
+.scope-clear {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; gap: 8px;
+  min-height: 44px; padding: 9px 13px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--surface);
+  color: var(--text); font-size: 13px; line-height: 1.5; font-weight: 500;
+}
+.scope-clear:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.scope-clear > .icon { width: 15px; height: 15px; }
+.scope-body { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; margin-top: 14px; }
+.scope-reading { flex: 1 1 auto; min-width: 0; max-width: 960px; }
+.scope-context .scope-description { max-width: 100%; margin: 0; color: var(--text); font-size: 16px; font-weight: 400; line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
+.scope-context .scope-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; margin-top: 14px; }
+.scope-clock { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.6; }
+.scope-context .scope-actions .text-button { min-height: 40px; padding: 4px 0; font-size: 13px; font-weight: 550; color: var(--accent); }
+.scope-context .scope-actions .text-button:hover { text-decoration: underline; text-underline-offset: 4px; }
+.scope-preview { flex: 0 0 176px; width: 176px; margin: 0; }
+.scope-preview img { display: block; width: 176px; height: 99px; object-fit: cover; border-radius: 6px; }
+.scope-preview figcaption { margin-top: 7px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.moments-heading-row h2 > #momentsTitle { margin: 0; color: var(--text); font: inherit; vertical-align: baseline; }
+.moments-heading-row h2 > #resultCount { margin-left: 6px; font-size: 14px; }
+.exploration-results > .broadcast-overview { padding-bottom: 24px; }
+.exploration-results > .scope-context:not([hidden]) { margin-top: 0; }
+.timeline-zoom { display: inline-flex; align-items: center; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.timeline-zoom button { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 4px 8px; border-radius: 4px; color: var(--text); font-size: 12px; line-height: 1.4; }
+.timeline-zoom button:hover:not(:disabled) { background: var(--soft); }
+.timeline-zoom #zoomReset { min-width: 44px; color: var(--muted); }
+.timeline-controls #outlineToggle { min-height: 38px; margin-left: 8px; font-size: 12px; }
+.priority-explanation { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.priority-explanation > span { color: var(--muted); font-size: 11px; font-weight: 500; }
+.priority-explanation p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
+#pointList { gap: 8px; padding: 0; margin-top: 12px; }
+#pointList > .linked-point { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+#pointList > .linked-point.is-selected { background: var(--bg); }
+#pointList .point-item {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr) 16px;
+  align-items: start; column-gap: 12px;
+  width: 100%; height: auto; min-height: 64px; padding: 13px 14px;
+  border: 0; border-radius: 7px; background: transparent; text-align: left;
+}
+#pointList .point-item > time { padding-top: 1px; font-size: 12px; line-height: 21px; white-space: nowrap; }
+#pointList .point-item > span { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+#pointList .point-item > span > strong { display: block; color: var(--text); font-size: 14px; font-weight: 550; line-height: 21px; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+#pointList .point-item > span > .priority-label { margin: 0; }
+#pointList .point-item > svg { width: 14px; height: 14px; margin-top: 4px; color: var(--muted); }
+#pointList .point-item[aria-expanded='true'] > svg { transform: rotate(90deg); }
+#pointList .point-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#pointList .point-context { margin: 0; padding: 0 14px 16px; border: 0; border-radius: 0; background: transparent; }
+#pointList .point-context > p { margin: 0; color: var(--text); font-size: 14px; line-height: 1.85; word-break: keep-all; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .exploration-results > .scope-context { padding: 18px; margin-bottom: 24px; border-radius: 10px; }
+  .scope-heading-row { gap: 12px; flex-wrap: wrap; }
+  .scope-heading-copy { flex: 1 1 170px; }
+  .scope-context h2 { font-size: 20px; line-height: 1.5; }
+  .scope-context .map-activity-nav { font-size: 11px; gap: 0 6px; margin-bottom: 5px; }
+  .scope-context .map-activity-nav > button { max-width: 100%; text-align: left; }
+  .scope-clear { padding: 8px 10px; min-height: 44px; font-size: 12px; gap: 5px; }
+  .scope-body { flex-wrap: wrap; gap: 16px; margin-top: 14px; }
+  .scope-context .scope-description { font-size: 16px; line-height: 1.8; }
+  .scope-context .scope-actions { gap: 3px 16px; margin-top: 10px; }
+  .scope-clock { font-size: 11px; }
+  .scope-preview { flex-basis: 128px; width: 128px; }
+  .scope-preview img { width: 128px; height: 72px; }
+  .scope-preview figcaption { font-size: 10px; }
+}
+
+/* Quiet image overview. JS owns cluster membership and source coordinates. */
+.map-canvas .time-map {
+  height: var(--hint-zone-height, 86px);
+}
+.map-canvas .map-thumbnails {
+  height: var(--hint-zone-height, 86px);
+  z-index: 5;
+  pointer-events: none;
+}
+.map-hint-card,
+.map-hint-card.is-selected,
+.map-hint-card:focus-within {
+  top: auto;
+  bottom: 0;
+  display: block;
+  width: var(--hint-width, 108px);
+  height: var(--hint-height, 61px);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+.map-hint-card .hint-entry {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+}
+.map-hint-card .hint-picture {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--soft);
+}
+.map-hint-card .hint-picture > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+.map-hint-card .hint-entry.is-selected .hint-picture { border-color: var(--accent); }
+.map-hint-card .hint-picture:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.map-hint-card .image-source-note {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: #141d2bd9;
+  color: #faf5eb;
+  font-size: 8px;
+  line-height: 12px;
+  pointer-events: none;
+}
+.map-hint-card .hint-count {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 1px solid #faf5eb80;
+  border-radius: 3px;
+  background: #141d2be6;
+  color: #faf5eb;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.map-hint-card .hint-copy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 3px 4px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #141d2be0;
+  color: #faf5eb;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.map-hint-card .hint-title {
+  display: -webkit-box;
+  max-height: 30px;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 15px;
+  letter-spacing: -.015em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.map-hint-card:has(.hint-count) .hint-title { padding-right: 16px; }
+.map-hint-card .hint-footer {
+  display: flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #faf5eb;
+}
+.map-hint-card .hint-watch {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 0;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+.map-hint-card .hint-watch time {
+  text-decoration: underline;
+  text-decoration-color: #faf5eb80;
+  text-underline-offset: 3px;
+}
+.map-hint-card .hint-watch:hover time { text-decoration-color: currentColor; }
+.map-hint-card .hint-watch:focus-visible { outline: 1px solid #faf5eb; outline-offset: 1px; }
+.map-hint-card .hint-duration,
+.map-hint-card .hint-cluster-time {
+  color: #e1e6e9;
+  font-size: 10px;
+  font-weight: 450;
+  line-height: 24px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.map-hint-card:hover .hint-copy,
+.map-hint-card:focus-within .hint-copy { opacity: 1; visibility: visible; }
+.map-hint-card .hint-connector {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  height: 8px;
+  max-width: none;
+  overflow: visible;
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.map-hint-card:hover .hint-connector,
+.map-hint-card:focus-within .hint-connector,
+.map-hint-card.has-selection .hint-connector { opacity: 1; visibility: visible; }
+.map-hint-card.is-cluster .hint-connector { display: none; }
+.map-canvas .point-track .map-spine { top: 22px; }
+.map-canvas .map-spine::before,
+.map-canvas .map-spine::after { display: none; }
+.point-rows { margin: 0 0 8px; }
+.point-track { position: relative; min-width: 0; height: 44px; }
+.map-canvas .point-track .map-markers { top: 0; height: 44px; }
+
+/* Priority is source metadata; selection and keyboard focus are separate marks. */
+.priority-label {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 450;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.priority-label[data-priority='focus'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+}
+.priority-label[data-priority='normal'] {
+  background: var(--point-normal-soft);
+  color: var(--point-normal);
+  font-weight: 550;
+}
+.priority-label[data-priority='later'] { background: var(--soft); }
+.priority-label[data-priority='unspecified'] { border-color: var(--line); background: transparent; }
+/* Small source-priority marks; selection never replaces their fill. */
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.point, .point-cluster, .clip-cluster, [data-map-cluster='clip']) { width: 32px; height: 32px; }
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.point, .point-cluster, .clip-cluster, [data-map-cluster='clip']) > span:first-child {
+  width: var(--point-size, 6px);
+  height: var(--point-size, 6px);
+  border: 1px solid var(--point-color, var(--muted));
+  border-radius: 50%;
+  background: var(--point-fill, transparent);
+  box-shadow: none;
+  transform: translateX(var(--point-edge-shift, 0px));
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker.point[data-priority='focus'] {
+  --point-size: 11px; --point-color: var(--accent); --point-fill: var(--amber);
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker.point[data-priority='normal'] {
+  --point-size: 7px; --point-color: var(--point-normal); --point-fill: var(--bg);
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker.point[data-priority='later'] {
+  --point-size: 5px; --point-color: var(--muted); --point-fill: var(--muted);
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.point, .point-cluster, .clip-cluster, [data-map-cluster='clip']).is-selected > span:first-child {
+  outline: 1px solid var(--text); outline-offset: 3px;
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.point, .point-cluster, .clip-cluster, [data-map-cluster='clip']).is-related:not(.is-selected) > span:first-child {
+  outline: 1px solid var(--line); outline-offset: 3px;
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.point, .point-cluster, .clip-cluster, [data-map-cluster='clip']):focus-visible {
+  border-radius: 4px; outline: 2px dashed var(--focus); outline-offset: -4px;
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(:hover, :focus-visible) { z-index: 9; }
+
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.point-cluster, .clip-cluster, [data-map-cluster='clip']) > span:first-child {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker.point-cluster[data-focus-count]:not([data-focus-count='0']) > span:first-child::after {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  outline: 1px solid var(--surface);
+  content: '';
+}
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(.clip-cluster, [data-map-cluster='clip']) > span:first-child { border-radius: 3px; }
+#overviewMarkers .map-marker.point > span:first-child {
+  border-radius: 1px;
+  transform: translateX(var(--point-edge-shift, 0px)) rotate(45deg);
+}
+#overviewMarkers .map-marker.point[data-priority='focus'] { --point-size: 9px; }
+#overviewMarkers .map-marker.point[data-priority='unspecified'] > span:first-child { border-style: dashed; }
+#overviewMarkers .map-marker.point-cluster > span:first-child { width: 20px; height: 20px; border-radius: 3px; transform: rotate(45deg); }
+#overviewMarkers .point-cluster .cluster-number { display: grid; place-items: center; width: 100%; height: 100%; transform: rotate(-45deg) translateY(-.5px); font-size: 10px; font-weight: 650; line-height: 1; letter-spacing: 0; }
+#clipMarkers .cluster-number { font-weight: 650; }
+#overviewMarkers .map-marker.point-cluster[data-focus-count]:not([data-focus-count='0']) > span:first-child { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); color: var(--accent); }
+#overviewMarkers .map-marker.point-cluster > span:first-child::after { display: none; }
+
+/* Compact ribbons retain interval identity; exact coordinates stay on the button. */
+.highlight-rows {
+  --range-color: color-mix(in srgb, var(--accent) 76%, var(--surface));
+  --range-hover-color: var(--accent);
+  margin: 0 0 4px;
+}
+.highlight-rows .hierarchy-row { align-items: start; }
+.highlight-rows .hierarchy-row-label { min-height: 24px; align-items: center; }
+.highlight-track { position: relative; min-width: 0; min-height: 24px; overflow: visible; }
+.highlight-track .range-hit {
+  position: absolute;
+  z-index: var(--range-layer, 1);
+  top: 0;
+  display: block;
+  height: 24px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transform: none;
+}
+.highlight-track .range-hit::before {
+  position: absolute;
+  top: 0;
+  left: var(--range-display-left, 0px);
+  width: var(--range-display-width, 100%);
+  min-width: 24px;
+  height: 24px;
+  content: '';
+}
+.highlight-track .range-fill {
+  position: absolute;
+  top: 8px;
+  left: var(--range-display-left, 0px);
+  display: block;
+  width: var(--range-display-width, 100%);
+  min-width: 24px;
+  height: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--range-color);
+  color: var(--accent);
+  pointer-events: none;
+}
+.highlight-track .range-fill::before,
+.highlight-track .range-fill::after { content: none; }
+.highlight-track .range-caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.highlight-track .range-hit:hover .range-fill { background: var(--range-hover-color); }
+.highlight-track .range-hit.is-selected .range-fill { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: 0; }
+.highlight-track .range-hit:focus-visible { outline: 0; }
+.highlight-track .range-hit:focus-visible .range-fill { outline: 2px dashed var(--focus); outline-offset: 2px; }
+.highlight-track .range-hit:is(:hover, :focus-visible) { z-index: 9; }
+.highlight-track .range-hit.is-muted .range-fill { border-color: var(--line); background: var(--soft); color: var(--muted); }
+
+.highlight-track .range-cluster {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 22px;
+  min-height: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  transform: translateX(-50%);
+}
+.range-cluster-symbol {
+  position: relative;
+  display: block;
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.range-cluster-symbol::before,
+.range-cluster-symbol::after {
+  position: absolute;
+  left: 0;
+  width: 12px;
+  height: 3px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--range-color);
+  content: '';
+}
+.range-cluster-symbol::before { top: 2px; }
+.range-cluster-symbol::after { bottom: 2px; }
+.range-cluster-count { font-size: 11px; font-weight: 650; line-height: 20px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.highlight-track .range-cluster:is(.is-selected, .has-selection) { background: color-mix(in srgb, var(--amber) 30%, var(--surface)); outline: 0; }
+.highlight-track .range-cluster:hover { background: color-mix(in srgb, var(--amber) 38%, var(--surface)); }
+.highlight-track .range-cluster:hover .range-cluster-symbol::before,
+.highlight-track .range-cluster:hover .range-cluster-symbol::after { background: var(--range-hover-color); }
+.highlight-track .range-cluster:focus-visible { outline: 2px dashed var(--focus); outline-offset: 2px; }
+.highlight-track .range-cluster:is(:hover, :focus-visible) { z-index: 9; }
+
+/* Details appear at the active object; edge alignment keeps them on the map. */
+:is(#overviewMarkers, #clipMarkers) .marker-tooltip,
+.highlight-track .marker-tooltip {
+  position: absolute;
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  z-index: 12;
+  display: block;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 128px));
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #141d2bf2;
+  color: #faf5eb;
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  transform: translateX(-50%);
+  box-shadow: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.highlight-track .marker-tooltip { left: calc(var(--range-display-left, 0px) + var(--range-display-width, 100%) / 2); }
+:is(#overviewMarkers, #clipMarkers) .map-marker:is(:hover, :focus-visible) .marker-tooltip,
+.highlight-track :is(.range-hit, .range-cluster):is(:hover, :focus-visible) .marker-tooltip { opacity: 1; visibility: visible; }
+:is(#overviewMarkers, #clipMarkers) .map-marker[data-tip-align='start'] .marker-tooltip,
+.highlight-track :is(.range-hit, .range-cluster)[data-tip-align='start'] .marker-tooltip { left: 0; transform: none; }
+:is(#overviewMarkers, #clipMarkers) .map-marker[data-tip-align='end'] .marker-tooltip,
+.highlight-track :is(.range-hit, .range-cluster)[data-tip-align='end'] .marker-tooltip { left: auto; right: 0; transform: none; }
+.time-map:has(#mapThumbnails[hidden]) .map-marker .marker-tooltip { top: 30px; bottom: auto; }
+.map-interaction-hint { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+#rangeScaleNote { color: var(--muted); }
+
+/* Only exact overlaps at maximum zoom need the horizontal fallback chooser. */
+.cluster-options {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 4px 2px 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.cluster-options .cluster-scene,
+.cluster-options .cluster-scene:last-child {
+  flex: 0 0 min(280px, calc(100vw - 88px));
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  scroll-snap-align: start;
+}
+
+/* A shared reading list: time and optional artwork on the left, content on the right. */
+#momentGrid,
+#momentGrid[data-density='compact'] { display: flex; flex-direction: column; gap: 0; width: 100%; }
+#momentGrid .moment-card,
+#momentGrid :where(.moment-card.no-artwork) { position: relative; display: grid; grid-template-columns: 144px minmax(0,1fr); align-items: start; gap: 24px; min-width: 0; width: 100%; padding: 20px 48px 20px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; transform: none; overflow: visible; }
+#momentGrid .moment-card:hover,
+#momentGrid .moment-card.is-selected { background: transparent; border-color: var(--line); box-shadow: none; transform: none; }
+#momentGrid .moment-card.is-selected { background: linear-gradient(90deg, color-mix(in srgb, var(--accent-soft) 40%, transparent), transparent 88%); }
+#momentGrid .moment-card.is-selected::before { position: absolute; top: 20px; bottom: 20px; left: -12px; width: 3px; border-radius: 2px; background: var(--accent); content: ''; }
+#momentGrid .moment-select,
+#momentGrid :where(.moment-card.no-artwork) .moment-select { display: block; min-width: 0; width: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: left; overflow: visible; }
+#momentGrid .moment-select:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+#momentGrid .moment-leading { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-width: 0; }
+#momentGrid .row-time { display: inline-flex; align-items: center; align-self: flex-start; gap: 8px; min-height: 28px; color: var(--accent); font-size: 13px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; }
+#momentGrid .row-point-mark { display: inline-block; flex: 0 0 7px; width: 7px; height: 7px; border: 1px solid var(--point-normal); border-radius: 1px; background: transparent; transform: rotate(45deg); }
+#momentGrid .row-point-mark[data-priority='focus'] { width: 9px; height: 9px; flex-basis: 9px; border-color: var(--accent); background: var(--amber); }
+#momentGrid .row-point-mark[data-priority='later'] { width: 5px; height: 5px; flex-basis: 5px; border-color: var(--muted); background: var(--muted); }
+#momentGrid .row-point-mark[data-priority='unspecified'] { border-color: var(--muted); border-style: dashed; }
+#momentGrid .moment-image { display: block; position: relative; width: 100%; height: auto; min-height: 0; padding: 0; border: 1px solid color-mix(in srgb, var(--line) 70%, var(--muted)); aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; outline: 0; background: var(--soft); box-shadow: var(--shadow-media); }
+#momentGrid .moment-image > img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+#momentGrid .moment-image::after { display: none; }
+#momentGrid .moment-image .image-source-note { position: absolute; top: 5px; left: 5px; z-index: 2; padding: 1px 4px; border-radius: 3px; background: #141d2bd9; color: #faf5eb; font-size: 9px; font-weight: 450; line-height: 15px; white-space: nowrap; pointer-events: none; }
+#momentGrid .moment-copy,
+#momentGrid :where(.moment-card.no-artwork) .moment-copy { display: block; min-width: 0; padding: 0; }
+#momentGrid .moment-meta,
+#momentGrid :where(.moment-card.no-artwork) .moment-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 5px 9px; min-height: 20px; margin: 0 0 5px; padding: 0; color: var(--muted); font-size: 11px; line-height: 20px; }
+#momentGrid .moment-meta > span + span::before { content: none; }
+#momentGrid .moment-title,
+#momentGrid :where(.moment-card.no-artwork) .moment-title { display: -webkit-box; min-height: 0; max-height: none; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--text); font-size: 18px; font-weight: 600; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
+#momentGrid .moment-title::before { display: none; }
+#momentGrid .moment-card.is-selected .moment-title { color: var(--accent); }
+#momentGrid .moment-excerpt,
+#momentGrid :where(.moment-card.no-artwork) .moment-excerpt { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 7px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+#momentGrid .card-context,
+#momentGrid :where(.moment-card.no-artwork) .card-context { display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 10px; padding: 0; border: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+#momentGrid .card-context > svg { display: none; }
+#momentGrid .moment-bookmark,
+#momentGrid :where(.moment-card.no-artwork) .moment-bookmark { top: 19px; right: 0; width: 36px; height: 36px; min-width: 36px; min-height: 36px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); box-shadow: none; }
+#momentGrid .moment-bookmark:hover { background: var(--soft); color: var(--accent); }
+#momentGrid .moment-bookmark[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+#momentGrid .moment-card.no-artwork .card-context { display: none; }
+#momentGrid .moment-card.no-artwork .moment-leading { align-self: center; }
+#momentGrid .moment-card.no-artwork .row-time { align-self: stretch; justify-content: center; width: 100%; aspect-ratio: 16 / 9; min-height: 40px; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); box-shadow: inset 0 1px 0 var(--surface); }
+#momentGrid .moment-card.no-artwork .row-time:hover { border-color: var(--accent); background: var(--accent-soft); }
+#momentGrid .moment-card.no-artwork .row-point-mark { display: none; }
+#momentGrid .row-time time { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+#momentGrid .row-time > svg { width: 11px; height: 11px; opacity: .6; }
+#momentGrid .row-time:hover time { text-decoration-color: currentColor; }
+#momentGrid .row-time:hover > svg { opacity: 1; }
+#momentGrid .row-time:focus-visible,
+#momentGrid .moment-image:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 3px; }
+#momentGrid .moment-select:is(:hover,:focus-visible) .moment-title { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; text-decoration-skip-ink: auto; }
+
+/* Compact is a text scan: no media reserve and no second summary to read. */
+#momentGrid[data-density='compact'] .moment-card { grid-template-columns: 100px minmax(0, 1fr); gap: 20px; padding-top: 14px; padding-bottom: 14px; }
+#momentGrid[data-density='compact'] .moment-card .moment-leading { align-self: center; gap: 0; }
+#momentGrid[data-density='compact'] .moment-card .row-time { align-self: stretch; justify-content: center; width: 100%; height: 36px; min-height: 36px; aspect-ratio: auto; gap: 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); box-shadow: none; }
+#momentGrid[data-density='compact'] .moment-card .row-time:hover { border-color: var(--accent); background: var(--accent-soft); }
+#momentGrid[data-density='compact'] .moment-title { font-size: 17px; }
+#momentGrid[data-density='compact'] :is(.moment-image, .moment-excerpt, .card-context) { display: none; }
+.density-switch button[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); box-shadow: var(--shadow-control); }
+@media (max-width: 760px) {
+  #moments .filter-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; margin-bottom: 8px; }
+  #densityBar { display: flex; margin-left: 0; }
+  #momentGrid .moment-card { grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 18px 29px 18px 0; }
+  #momentGrid[data-density='compact'] .moment-card { grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 12px 29px 12px 0; }
+  #momentGrid[data-density='compact'] .moment-card .row-time { height: 40px; min-height: 40px; }
+  #momentGrid .row-time { font-size: 11px; gap: 6px; }
+  #momentGrid .moment-title,
+  #momentGrid[data-density='compact'] .moment-title,
+  #momentGrid :where(.moment-card.no-artwork) .moment-title { font-size: 16px; line-height: 1.5; }
+  #momentGrid .moment-meta { gap: 4px 7px; font-size: 10px; }
+  #momentGrid .moment-excerpt,
+  #momentGrid[data-density='compact'] .moment-excerpt,
+  #momentGrid :where(.moment-card.no-artwork) .moment-excerpt { font-size: 14px; line-height: 1.75; }
+  #momentGrid .card-context,
+  #momentGrid :where(.moment-card.no-artwork) .card-context { display: none; }
+  #momentGrid .moment-bookmark,
+  #momentGrid :where(.moment-card.no-artwork) .moment-bookmark { top: 15px; right: -5px; width: 30px; min-width: 30px; height: 34px; min-height: 34px; }
+  #momentGrid .moment-bookmark svg { width: 16px; height: 16px; }
+  #momentGrid .moment-card.is-selected::before { left: -8px; width: 2px; }
+  #momentGrid .moment-image .image-source-note { top: 3px; left: 3px; font-size: 8px; line-height: 13px; padding: 0 3px; }
+}
+
+@media (hover: none) {
+  .map-hint-card:has(.hint-entry.is-selected) .hint-copy { opacity: 1; visibility: visible; }
+  #mapThumbnails:has(.map-hint-card:focus-within) .map-hint-card:not(:focus-within) .hint-copy {
+    opacity: 0; visibility: hidden;
+  }
+}
+/* Hover takes precedence over another object's retained keyboard/selection state. */
+.map-canvas:has(.map-hint-card:hover, .range-hit:hover, .range-cluster:hover, .map-marker:hover) .map-hint-card:not(:hover) .hint-copy,
+.map-canvas:has(.map-hint-card:hover, .range-hit:hover, .range-cluster:hover, .map-marker:hover) :is(.range-hit, .range-cluster):not(:hover) .marker-tooltip,
+.map-canvas:has(.map-hint-card:hover, .range-hit:hover, .range-cluster:hover, .map-marker:hover) .map-marker:not(:hover) .marker-tooltip {
+  opacity: 0;
+  visibility: hidden;
+}
+#mapThumbnails[data-hints-dismissed] .hint-copy {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-hint-card .hint-copy { transition: none; }
+}
+@media (max-width: 640px) {
+  .broadcast-overview .timeline-legend { gap: 5px 10px; }
+  .map-interaction-hint { font-size: 10px; line-height: 1.7; }
+}
+
+/* Scene Atlas keeps the editing workspace navy inside either page theme. */
+#nativeEditorFrame {
+  border-color: #344155;
+  background: #111a28;
+  color-scheme: dark;
+}
+
+/* One shared scene axis: artwork stems and Point diamonds use the same baseline. */
+#pointRows .point-track { isolation: isolate; height: 62px; }
+#pointRows .hierarchy-row-label { height: 44px; align-self: start; }
+#pointRows .map-spine { z-index: 0; }
+#pointRows #overviewMarkers { z-index: 4; pointer-events: none; }
+#pointRows #overviewMarkers .map-marker { pointer-events: auto; }
+#pointRows .highlight-rows {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  pointer-events: none;
+}
+#pointRows .highlight-track { height: 62px; }
+#pointRows .range-hit { top: 38px; height: 24px; min-height: 24px; pointer-events: auto; }
+#pointRows .range-hit[hidden] { display: none; }
+#pointRows .range-hit::before { height: 24px; }
+#pointRows .range-fill {
+  top: 20px;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: none;
+}
+#pointRows .range-fill::before,
+#pointRows .range-fill::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  background: currentColor;
+}
+#pointRows .range-fill::before { left: 0; }
+#pointRows .range-fill::after { right: 0; }
+#pointRows .range-hit.is-selected .range-fill { box-shadow: none; }
+#pointRows .range-hit .marker-tooltip { bottom: 30px; }
+.map-canvas .map-hint-card .hint-connector {
+  display: block;
+  height: 22px;
+  stroke: var(--line);
+  opacity: 1;
+  visibility: visible;
+}
+.map-canvas .map-hint-card:is(:hover,:focus-within,.is-previewed) .hint-connector { stroke: var(--accent); }
+.map-canvas .map-hint-card.is-previewed .hint-picture { border-color: var(--accent); }
+.highlight-anchors { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.highlight-anchor {
+  position: absolute;
+  top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.highlight-anchor-symbol { width: 14px; height: 6px; border: 1px solid currentColor; border-radius: 1px; background: var(--bg); }
+.highlight-anchor.is-cluster { width: 36px; border-radius: 4px; background: var(--accent-soft); }
+.highlight-anchor.is-cluster .highlight-anchor-symbol { width: 10px; }
+.highlight-anchor b { font-size: 10px; font-weight: 650; }
+.highlight-anchor .marker-tooltip { display: none; }
+.highlight-anchor:is(:hover,:focus-visible) .marker-tooltip {
+  position: absolute;
+  bottom: 32px;
+  display: block;
+  width: max-content;
+  max-width: min(240px,calc(100vw - 100px));
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #141d2bf2;
+  color: #faf5eb;
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: none;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Depth follows interaction: controls sit close, media lifts, the map floats. */
+:root {
+  --atlas-soft: #F5E7CE; --atlas-border: #C7CCC9; --atlas-ink: #fff;
+  --shadow-control: 0 1px 2px #141d2b0d, inset 0 1px 0 #ffffffb3;
+  --shadow-media: 0 2px 4px #141d2b1a, 0 8px 16px -5px #141d2b40;
+  --shadow-panel: 0 3px 8px #141d2b0d, 0 18px 34px -18px #141d2b47;
+  --shadow-map: 0 2px 4px #141d2b29, 0 9px 18px -3px #141d2b4d;
+  --shadow-map-active: 0 3px 7px #141d2b33, 0 12px 24px -4px #141d2b57;
+}
+html[data-theme='dark'] {
+  --atlas-soft: #342F2B; --atlas-border: #647183; --atlas-ink: #182635;
+  --shadow-control: 0 1px 3px #0003, inset 0 1px 0 #ffffff0a;
+  --shadow-media: 0 2px 5px #0005, 0 9px 18px -5px #0009;
+  --shadow-panel: 0 3px 8px #0003, 0 18px 34px -18px #0009;
+  --shadow-map: 0 2px 5px #0006, 0 10px 20px -3px #0009;
+  --shadow-map-active: 0 3px 7px #0007, 0 12px 24px -4px #000b;
+}
+#moments .search-field,
+.header-utilities .button-outline,
+.header-actions .broadcast-summary-button,
+#shareButton,
+.timeline-zoom,
+.density-switch { box-shadow: var(--shadow-control); }
+#moments .search-field { border-color: color-mix(in srgb, var(--line) 80%, var(--muted)); }
+#moments .search-field .clear-search { flex: 0 0 36px; width: 36px; height: 36px; justify-content: center; padding: 0; border-radius: 5px; }
+#moments .search-field .clear-search:hover { color: var(--accent); background: var(--soft); }
+@media (max-width: 760px) {
+  #moments .search-field { padding-inline: 12px 5px; }
+  #moments .search-field .clear-search { flex-basis: 44px; width: 44px; height: 44px; }
+  #moments .search-field > kbd { display: none; }
+}
+/* Scene Atlas: outlined diamonds and warm selection glow. */
+#broadcastMeta .report-version { margin-left: 0; white-space: nowrap; }
+#shareButton { width: 40px; height: 40px; min-width: 40px; min-height: 40px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); }
+#shareButton:hover { border-color: var(--accent); background: var(--soft); }
+#shareButton .icon { width: 18px; height: 18px; }
+.map-hint-card .hint-picture {
+  border-color: var(--atlas-border);
+  border-radius: 6px;
+  box-shadow: none;
+  transition: border-color 140ms ease;
+}
+.map-hint-card .hint-entry { border-radius: 6px; box-shadow: var(--shadow-map); transition: box-shadow 140ms ease; }
+.map-hint-card:is(:hover,:focus-within) .hint-picture {
+  border-color: var(--accent);
+}
+.map-hint-card:is(:hover,:focus-within) .hint-entry { box-shadow: var(--shadow-map-active); }
+/* An inspected interval sits just beneath the shared axis so Point diamonds remain legible. */
+#pointRows .range-fill { top: 10px; height: 3px; }
+#pointRows .range-fill::before,
+#pointRows .range-fill::after { top: -2px; height: 7px; }
+#overviewMarkers .map-marker.point[data-priority='focus'] { --point-size: 9px; --point-fill: var(--accent); }
+#overviewMarkers .map-marker.point[data-priority='normal'] { --point-size: 8px; }
+#overviewMarkers .map-marker.point > span:first-child {
+  border: 2px solid var(--bg);
+  border-radius: 0;
+  outline: 0;
+  box-shadow: 0 0 0 1px var(--point-color, var(--muted));
+  transition: width 120ms ease, height 120ms ease, box-shadow 120ms ease;
+}
+#overviewMarkers .map-marker.point[data-priority='normal'] > span:first-child {
+  border: 1px solid var(--point-color);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+#overviewMarkers .map-marker.point:is(:hover,:focus-visible,.is-selected,.is-related) > span:first-child {
+  width: calc(var(--point-size, 6px) + 4px);
+  height: calc(var(--point-size, 6px) + 4px);
+  outline: 0;
+  box-shadow: 0 0 0 4px var(--atlas-soft);
+}
+#overviewMarkers .map-marker.point[data-priority='normal']:is(:hover,:focus-visible,.is-selected,.is-related) > span:first-child {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px var(--atlas-soft);
+}
+#overviewMarkers .map-marker.point.is-related:not(.is-selected) > span:first-child { outline: 0; }
+#overviewMarkers .map-marker.point-cluster > span:first-child {
+  border-radius: 0;
+  box-shadow: 3px -3px 0 -1px var(--bg), 3px -3px 0 0 var(--line);
+}
+#overviewMarkers .map-marker.point-cluster:is(:hover,:focus-visible) > span:first-child {
+  border-color: var(--accent);
+  box-shadow: 3px -3px 0 -1px var(--bg), 3px -3px 0 0 var(--line), 0 0 0 4px var(--atlas-soft);
+}
+/* Put transient labels below both the thumbnail and the revealed interval.
+   This row owns the overlay, so later D1/D2 rows cannot paint over the text. */
+#pointRows { position: relative; z-index: 6; }
+#pointRows .marker-tooltip {
+  top: 56px;
+  bottom: auto;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: var(--atlas-ink);
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  box-shadow: 0 3px 12px #0003;
+}
+#pointRows #overviewMarkers .marker-tooltip { top: 56px; bottom: auto; }
+#pointRows .range-hit .marker-tooltip { top: 26px; bottom: auto; }
+#pointRows .highlight-anchor .marker-tooltip { top: 56px; bottom: auto; }
+#pointRows .marker-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: calc(50% - 4px);
+  border-bottom: 5px solid var(--accent);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+#pointRows [data-tip-align='start'] .marker-tooltip::before { left: 12px; }
+#pointRows [data-tip-align='end'] .marker-tooltip::before { left: auto; right: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .map-hint-card .hint-picture,
+  .map-hint-card .hint-entry,
+  #overviewMarkers .map-marker.point > span:first-child { transition: none; }
+}

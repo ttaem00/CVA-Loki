@@ -123,9 +123,14 @@ def _service(root, prepared):
     manifest, sha = _json(prepared["world_manifest_path"])
     if sha != prepared["world_manifest_sha256"] or manifest["world_revision"] != prepared["world_revision"]:
         raise ValueError("current_conversation_world_changed")
+    frozen_assets = prepared["identity"].get("source_assets", []) + prepared.get(
+        "source_bundle", {}).get("frozen_assets", [])
+    has_frozen_audio = any(asset["family"] in {"audio_features", "audio_events"}
+                           for asset in frozen_assets)
     service = EvidenceWorldService(root=native_path(prepared["world_manifest_path"]).parent,
         manifest=manifest, run_root=root / "source-reads",
-        owner=current_conversation_author_owner(prepared["identity"]["author"]))
+        owner=current_conversation_author_owner(prepared["identity"]["author"]),
+        sealed_optional_audio=not has_frozen_audio)
 
 
     service.configure_read(prepared.get('read_page_policy', 'family_serial_v1'))
@@ -304,9 +309,22 @@ def prepare(spec):
         media_path = prepared_media_path
         if media_path:
             media_path = native_path(media_path).resolve()
-            if not media_path.is_relative_to(source_dir) or not media_path.is_file():
+            if not media_path.is_relative_to(source_dir):
                 raise ValueError('current_conversation_media_outside_source')
-            media = dict(path=str(media_path), sha256=file_hash(media_path))
+            media_sha = None
+            if snapshot is not None:
+                frozen_media = snapshot.get('media_source')
+                if not frozen_media or native_path(frozen_media['path']).resolve() != media_path:
+                    raise ValueError('current_conversation_snapshot_media_changed')
+                from .live_original_vod_archive import resolve_saved_original
+                if resolve_saved_original(media_path, video_no=video, work_dir=work,
+                        expected_sha256=frozen_media['sha256']) is not None:
+                    media_sha = frozen_media['sha256']
+            if media_sha is None:
+                if not media_path.is_file():
+                    raise ValueError('current_conversation_media_outside_source')
+                media_sha = file_hash(media_path)
+            media = dict(path=str(media_path), sha256=media_sha)
             bundle['frozen_assets'].append(dict(family='media', **media))
         if snapshot is not None:
             from .editorial_current_sources import assert_snapshot_sources
@@ -672,14 +690,21 @@ def remember(job_root, note, *, expected_revision):
         return retain(_service(root, prepared), **note)
 
 def memory(job_root, *, expected_revision, query=None):
-    root, prepared, _ = _load(job_root)
-    if expected_revision != prepared['prepared_revision']:
-        raise ValueError('current_conversation_memory_conflict')
-    from .evidence_world.context_session import memory as recall
-    return recall(_service(root, prepared), query=query)
+    from .editorial_native_retained import native_retained_saved_read
+    with native_retained_saved_read(job_root):
+        root, prepared, _ = _load(job_root)
+        if expected_revision != prepared['prepared_revision']:
+            raise ValueError('current_conversation_memory_conflict')
+        from .evidence_world.context_session import memory as recall
+        return recall(_service(root, prepared), query=query)
 
 def continuation(job_root, *, read_id, expected_revision):
     """Recover an exact delivered query without enlarging or mutating read pages."""
+    from .editorial_native_retained import native_retained_saved_read
+    with native_retained_saved_read(job_root):
+        return _continuation(job_root, read_id=read_id, expected_revision=expected_revision)
+
+def _continuation(job_root, *, read_id, expected_revision):
     root, prepared, _ = _load(job_root)
     if expected_revision != prepared['prepared_revision']:
         raise ValueError('current_conversation_prepare_conflict')
@@ -740,8 +765,12 @@ def _navigation_media_hashes(prepared):
     media = prepared.get('media_source')
     if media is None:
         return None
+    from .live_original_vod_archive import resolve_saved_original
+    identity = prepared['identity']
     path = native_path(media['path'])
-    if not path.is_file() or file_hash(path) != media['sha256']:
+    retained = resolve_saved_original(path, video_no=identity['video_no'], work_dir=identity['work_root'],
+        expected_sha256=media['sha256'])
+    if retained is None and (not path.is_file() or file_hash(path) != media['sha256']):
         raise ValueError('current_conversation_support_source_changed')
     return {media['sha256']}
 

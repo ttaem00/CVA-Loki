@@ -223,7 +223,7 @@ def render_replay_links(replays):
     content = ('<nav class="collaboration-chips" aria-label="합방 다시보기"><span class="collaboration-chips-label">합방 영상</span>' + ''.join(rows) + '</nav>') if rows else ""
     return START_MARKER + content + END_MARKER
 
-def project_report_references(output_dir, video_no, *, root=None):
+def project_report_references(output_dir, video_no, *, root=None, cfg=None):
     """Refresh the reference lane through the existing report family transaction.
 
     Only reports created with our explicit lane markers and exact embedded VOD
@@ -235,13 +235,42 @@ def project_report_references(output_dir, video_no, *, root=None):
     output = Path(output_dir).resolve()
     from .report_artifact_family import _report_family_lock
     with _report_family_lock(output, video_no=video):
-        return _project_locked_report_references(output, video, root=root)
+        return _project_locked_report_references(output, video, root=root, cfg=cfg)
 
-def _project_locked_report_references(output, video, *, root):
+def _project_locked_report_references(output, video, *, root, cfg):
     from .report_artifact_family import (ReportArtifactFamilyError,
-        validate_report_artifact_family, next_generation_lineage, commit_report_artifact_family)
+        validate_report_artifact_family, next_generation_lineage, commit_report_artifact_family,
+        retained_editor_paths, retained_editor_family)
+    originals = {p.name.removesuffix("_metadata.json"): p
+                 for p in sorted(output.glob(f"*{video}*_metadata.json"))[:16]}
+    routes = {}
+    if cfg and cfg.get("work_dir"):
+        from .live_family_retention import published_report_routes
+
+        work = Path(cfg["work_dir"]).resolve()
+        site = Path(cfg.get("publish_site_dir") or output.parent / "site").resolve()
+        routes = published_report_routes(work_dir=work, hot_roots=dict(work=work, output=output, site=site),
+            cold_roots=cfg.get("vod_search_cold_roots"), cold_database=cfg.get("vod_search_cold_database"),
+            known_reports=[(base, video) for base in originals], video_no=video)
+    if any(not route.get("available") for route in routes.values()):
+        raise ValueError("collaboration_retained_report_unavailable")
+
     changed = 0
-    for meta_path in sorted(output.glob(f"*{video}*_metadata.json"))[:16]:
+    for base in sorted(set(originals) | set(routes)):
+        route = routes.get(base)
+        if route:
+            destination = retained_editor_paths(output, base, route["report_key"])
+            overlay = retained_editor_family(destination, video_no=video, report_key=route["report_key"])
+            if overlay is not None:
+                markdown, page, meta_path = destination
+            else:
+                markdown, page, meta_path = (Path(route[name]) for name in
+                                              ("markdown_path", "html_path", "metadata_path"))
+        else:
+            meta_path = originals[base]
+            page = meta_path.with_name(base + ".html")
+            markdown = page.with_suffix(".md")
+            destination = (markdown, page, meta_path)
         meta = _read(meta_path, 12 * 1024 * 1024)
         if not meta or str(meta.get("video_no")) != video:
             continue
@@ -251,8 +280,6 @@ def _project_locked_report_references(output, video, *, root):
         replays = load_replays(video, duration_sec=meta.get("duration"), channel_id=meta.get("channel_id"), root=root)
         if not replays:
             continue
-        page = meta_path.with_name(meta_path.name.removesuffix("_metadata.json") + ".html")
-        markdown = page.with_suffix(".md")
         if page.is_symlink() or not page.is_file() or page.stat().st_size > 32 * 1024 * 1024:
             continue
         if markdown.is_symlink() or not markdown.is_file() or markdown.stat().st_size > 16 * 1024 * 1024:
@@ -296,9 +323,15 @@ def _project_locked_report_references(output, video, *, root):
             continue
         alias = meta["report_artifact_family"]["artifacts"].get("candidate_alias", {}).get("name")
         meta["collaboration_replays"] = replays
-        sequence, parent = next_generation_lineage(output, video_no=video)
-        commit_report_artifact_family(markdown_path=markdown, html_path=page, metadata_path=meta_path,
-            candidate_alias_path=meta_path.with_name(alias) if alias else None,
+        write_markdown, write_page, write_meta = destination
+        sequence, parent = next_generation_lineage(write_meta.parent, video_no=video)
+        if route:
+            sealed = family["metadata"]["report_artifact_family"]
+            if sequence == 1:
+                sequence, parent = sealed["generation_sequence"] + 1, sealed["generation_id"]
+            meta["retained_report_key"] = route["report_key"]
+        commit_report_artifact_family(markdown_path=write_markdown, html_path=write_page, metadata_path=write_meta,
+            candidate_alias_path=write_meta.with_name(alias) if alias else None,
             markdown_text=markdown.read_text(encoding="utf-8"), html_text=rendered, metadata=meta,
             generation_sequence=sequence, parent_generation_id=parent,
             authority_revision_id=family["authority_revision_id"])
@@ -311,7 +344,7 @@ def main():
         raise ValueError("collaboration_projection_request_invalid")
     from .config import load_config
     cfg = load_config()
-    result = project_report_references(cfg["output_dir"], request["video_no"])
+    result = project_report_references(cfg["output_dir"], request["video_no"], cfg=cfg)
     sys.stdout.write(json.dumps(result))
 
 if __name__ == "__main__":

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko" data-theme="light" data-loki-status="loading" data-default-report="reports/default.json">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#FAF5EB">
+  <meta name="description" content="방송의 흐름에서 보고 싶은 순간으로. 시청자와 편집자를 위한 Loki 방송 결과 페이지.">
+  <title>Loki — 방송의 순간들</title>
+  <link rel="icon" href="shared/loki/v1/assets/loki-color.svg">
+  <link rel="preload" href="shared/loki/v1/assets/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="shared/loki/v1/styles.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="shared/loki/v1/refinements.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="shared/loki/v1/hierarchy.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="shared/loki/v1/timeline-navigation.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="shared/loki/v1/scene-polish.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="shared/loki/v1/collaboration-view.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="shared/loki/v1/template.css?v=c8b0660bde05428e">
+  <script src="shared/loki/v1/report-source.js?v=c8b0660bde05428e" defer></script>
+  <script src="shared/loki/v1/adapter.js?v=c8b0660bde05428e" defer></script>
+  <script src="shared/loki/v1/timeline-controller.js?v=c8b0660bde05428e" defer></script>
+  <script src="shared/loki/v1/collaboration-view.js?v=c8b0660bde05428e" defer></script>
+  <script src="shared/loki/v1/app.js?v=c8b0660bde05428e" defer></script>
+  <script src="shared/loki/v1/bootstrap.js?v=c8b0660bde05428e" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#moments">장면 목록으로 건너뛰기</a>
+  <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5 19 12 8 18.5Z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 20V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v15l-6-4Z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6L9 15M10 4H4v16h16v-6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.8 8.8 0 0 1 9.8 4 8.8 8.8 0 1 0 20 14.2Z"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-7 0v6"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></symbol>
+    <symbol id="i-picture" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-4 4 3 4-6 4 6"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="m9 15 6-6M8.5 8.5l2-2a5 5 0 0 1 7 7l-2 2m-7-1-2 2a5 5 0 0 1-7-7l2-2" transform="translate(3 1)"/></symbol>
+  </defs></svg>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="loki-brand" href="#top" aria-label="Loki 페이지 맨 위"><img src="shared/loki/v1/assets/loki-color.svg" alt="" width="34" height="34"><span>loki<span class="brand-period">.</span></span><small>CVA</small></a>
+      <nav class="header-breadcrumb" aria-label="현재 위치"><a href="https://ttaem.com/" target="_blank" rel="noopener">방송 기록</a><span aria-hidden="true">/</span><span id="headerStreamer"></span></nav>
+      <div class="header-utilities"><button id="demoButton" class="demo-badge" type="button">보고서 정보<svg class="icon tiny"><use href="#i-info"/></svg></button><button id="themeButton" class="icon-button" type="button" aria-label="어두운 화면으로 바꾸기"><svg class="icon"><use href="#i-moon"/></svg></button><a id="originalBroadcast" class="button button-outline" aria-disabled="true" target="_blank" rel="noopener">원본 방송<svg class="icon tiny"><use href="#i-out"/></svg></a></div>
+    </div>
+  </header>
+
+  <section id="reportStatus" class="report-status" role="status" aria-live="polite"><div><span class="status-brand">loki.</span><h1 id="reportStatusTitle">방송 기록을 불러오고 있습니다.</h1><p id="reportStatusMessage"></p><button id="reportRetry" type="button" class="button button-outline" hidden>다시 불러오기</button></div></section>
+  <main id="top" class="page-shell" aria-busy="true">
+    <section class="broadcast-header" aria-labelledby="broadcastTitle">
+      <div class="broadcast-heading"><div id="broadcastMeta" class="broadcast-meta"></div><h1 id="broadcastTitle">방송 기록을 불러오고 있습니다.</h1></div>
+      <div class="header-actions"><button id="summaryToggle" class="text-button broadcast-summary-button" type="button" aria-controls="modal" aria-haspopup="dialog"><svg class="icon tiny" aria-hidden="true"><use href="#i-list"/></svg>방송 전체 요약<svg class="icon tiny" aria-hidden="true"><use href="#i-chev"/></svg></button><button id="shareButton" class="icon-button" type="button" aria-label="선택한 장면 링크 복사" title="선택한 장면 링크 복사"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg></button></div>
+    </section>
+
+    <section class="focus-layout" aria-label="선택한 장면">
+      <div class="scene-stage">
+        <div id="sceneHero" class="scene hero-image" role="group" aria-label="선택한 장면 이미지">
+          <img id="heroArtwork" alt="" width="1280" height="720">
+          <div class="scene-topline"><button id="imageProvenance" class="image-label" type="button"><span id="heroImageKind">대표 장면</span><svg class="icon tiny"><use href="#i-info"/></svg></button><button id="bookmarkButton" type="button" class="glass-button" aria-label="선택한 장면 북마크" aria-pressed="false"><svg class="icon"><use href="#i-bookmark"/></svg></button></div>
+          <a id="heroWatch" class="hero-play" aria-disabled="true" target="_blank" rel="noopener" aria-label="선택한 시각부터 원본 방송 보기"><svg class="icon solid"><use href="#i-play"/></svg></a>
+          <div class="scene-caption"><span id="heroImageStatus" class="image-note"></span></div>
+        </div>
+        <div class="scene-bottom-bar"><div class="scene-context"><span class="selection-indicator" aria-hidden="true"></span><span id="selectedChapter"></span><svg class="icon tiny"><use href="#i-chev"/></svg><span id="selectedTopic"></span></div><div class="scene-stepper"><button id="prevMoment" type="button" class="icon-button" aria-label="이전 장면"><svg class="icon flip"><use href="#i-chev"/></svg></button><button id="nextMoment" type="button" class="icon-button" aria-label="다음 장면"><svg class="icon"><use href="#i-chev"/></svg></button></div></div>
+      </div>
+      <article class="moment-detail" aria-labelledby="selectedTitle">
+        <div class="detail-top"><span id="selectedKind" class="kind-label">하이라이트</span><span id="selectedIndex" class="selection-index"></span></div>
+        <div class="detail-meta"><a id="selectedTimeLink" class="time-copy" aria-disabled="true" target="_blank" rel="noopener"><span id="selectedTime"></span></a><p id="selectionMeta" class="selection-meta"></p></div>
+        <h2 id="selectedTitle" tabindex="-1"></h2>
+        <p id="selectedStory" class="story"></p>
+        <a id="watchButton" class="button button-primary watch-button" aria-disabled="true" target="_blank" rel="noopener"><svg class="icon solid"><use href="#i-play"/></svg><span id="watchLabel">이 시각부터 보기</span><svg class="icon watch-arrow"><use href="#i-out"/></svg></a>
+        <button id="contextToggle" class="scene-context-toggle" type="button" aria-expanded="false" aria-controls="sceneContext"><span id="contextLabel">주요 내용들</span><svg class="icon tiny" aria-hidden="true"><use href="#i-chev"/></svg></button>
+      <section id="sceneContext" class="scene-context-panel" aria-label="선택한 장면의 주요 내용들" hidden>
+        <div id="sourceGroup" class="detail-spans"><div class="detail-label-row"><h3 id="sourceHeading">하이라이트 구간</h3></div><div id="sourceSpans" class="source-spans"></div><details id="sourceNotes" class="source-notes"><summary>구간 설명<svg class="icon tiny" aria-hidden="true"><use href="#i-chev"/></svg></summary><div id="sourceLabels"></div><div id="highlightReason" class="highlight-reason" hidden></div></details></div>
+        <div id="detailPoints" class="detail-points"><h3>연결된 핵심 지점</h3><div id="pointList" class="point-list"></div></div>
+      </section>
+      </article>
+<section id="collaborationCard" class="collaboration-card" aria-labelledby="collaborationHeading"></section>
+    </section>
+
+    <div class="page-mode-row"><div class="mode-switch" aria-label="보기 방식"><button id="viewWatch" type="button" aria-pressed="true"><svg class="icon"><use href="#i-play"/></svg>장면 탐색</button><button id="viewEditor" type="button" aria-pressed="false"><svg class="icon"><use href="#i-tools"/></svg>편집 도구</button></div><p id="reportOutline" class="mode-note"></p></div>
+
+    <div id="viewerWorkspace" class="viewer-workspace">
+      <div class="exploration-results">
+
+    <section class="broadcast-overview" aria-labelledby="overviewHeading">
+      <div class="section-topline"><div class="timeline-title"><h2 id="overviewHeading">방송의 시간 지도</h2><span id="mapDuration"></span></div><div class="timeline-legend"><div id="pointPriorityLegend" class="point-priority-legend"><span class="point-priority-key"><i data-priority="focus"></i>먼저 검토</span><span class="point-priority-key"><i data-priority="normal"></i>함께 검토</span></div><span id="clipMapLegend" hidden><i class="legend-square"></i>클립</span><div class="timeline-controls"><div class="timeline-zoom"><button id="zoomOut" type="button" aria-label="시간 지도 축소" title="축소 · Ctrl 또는 Alt + 휠">−</button><button id="zoomReset" type="button" aria-label="방송 전체 너비에 맞추기" title="방송 전체 너비에 맞추기">맞춤</button><button id="zoomIn" type="button" aria-label="시간 지도 확대" title="확대 · Ctrl 또는 Alt + 휠">+</button></div><button id="outlineToggle" type="button" class="text-button" aria-controls="modal" aria-haspopup="dialog">목차<svg class="icon tiny"><use href="#i-list"/></svg></button></div></div></div>
+      <div id="mapScroll" class="map-scroll" tabindex="0" role="region" aria-label="시간 지도. Ctrl 또는 Alt와 휠로 확대, Shift와 휠 또는 가로 스크롤로 이동할 수 있습니다"><div id="mapCanvas" class="map-canvas">
+      <div id="timeMap" class="time-map" aria-label="하이라이트 대표 이미지">
+        <div id="mapThumbnails" class="map-thumbnails"></div>
+        <div id="mapSelection" class="map-selection"></div>
+      </div>
+      <div id="pointRows" class="point-rows" aria-label="하이라이트와 핵심 지점의 시간선"><div class="hierarchy-row"><span id="pointLaneLabel" class="hierarchy-row-label">장면</span><div class="point-track"><div class="map-spine" aria-hidden="true"></div><div id="highlightRows" class="highlight-rows" aria-label="관심을 둔 하이라이트의 원본 구간"></div><div id="highlightAnchors" class="highlight-anchors" aria-label="이미지 없는 하이라이트"></div><div id="overviewMarkers" class="map-markers"></div></div></div></div>
+      <div id="clipRows" class="clip-rows" aria-label="시청자 클립의 원본 시작 시각" hidden><div class="hierarchy-row"><span class="hierarchy-row-label">클립</span><div id="clipMarkers" class="clip-track"></div></div></div>
+      <div id="hierarchyBands" class="hierarchy-bands" aria-label="D1 큰 활동과 D2 세부 주제 시간 구간"></div>
+      <div class="ruler-row"><span class="ruler-label">시간</span><div id="mapRuler" class="ruler-track"><div id="overviewScale" class="map-scale" aria-hidden="true"></div><a id="mapSeek" class="map-seek" aria-disabled="true" target="_blank" rel="noopener" aria-label="시간 눈금에서 원본 영상 열기. 좌우 화살표로 10초씩 이동할 수 있습니다"></a><span id="seekHint" class="seek-hint" aria-hidden="true"></span></div></div>
+      </div></div>
+      <span id="rangeScaleNote" class="sr-only">짧은 하이라이트는 최소 표시 폭을 사용합니다. 실제 길이는 구간에 초점을 맞추거나 선택해서 확인할 수 있습니다.</span>
+      <div class="map-context" hidden><span id="mapTopic"></span></div>
+
+    </section>
+
+      <section id="scopeContext" class="scope-context" aria-labelledby="scopeTitle" hidden>
+        <div class="scope-heading-row">
+          <div class="scope-heading-copy">
+            <nav id="mapActivityNav" class="map-activity-nav" aria-label="선택한 주제의 상위 활동"></nav>
+            <h2 id="scopeTitle"></h2>
+          </div>
+          <button id="clearScope" type="button" class="scope-clear" aria-label="선택 해제, 방송 전체에서 보기" hidden>선택 해제<svg class="icon tiny" aria-hidden="true"><use href="#i-close"/></svg></button>
+        </div>
+        <div id="scopeBody" class="scope-body"></div>
+      </section>
+      <div id="scopeStatus" class="sr-only" role="status" aria-live="polite"></div>
+      <details id="fullOutline" class="full-outline" hidden><summary>전체 목차와 세부 주제 보기 <svg class="icon tiny"><use href="#i-chev"/></svg></summary>
+      <aside class="chapter-sidebar" aria-labelledby="chapterNavHeading">
+        <div class="chapter-sidebar-heading"><h2 id="chapterNavHeading">방송 목차</h2><span id="chapterNavCount"></span><p>큰 활동에서 세부 주제로</p></div>
+        <button id="allChapters" type="button" data-chapter="all" aria-pressed="true"><svg class="icon tiny"><use href="#i-list"/></svg><span>방송 전체</span><span id="sidebarTotal"></span></button>
+        <nav id="flowContext" class="chapter-tree" aria-label="D1 큰 활동과 D2 세부 주제"></nav>
+        <p class="chapter-sidebar-key"><span class="current-dot" aria-hidden="true"></span>선택한 장면이 속한 주제</p>
+      </aside>
+      </details>
+
+    <section id="moments" class="moments-section" aria-labelledby="momentsHeading">
+      <div class="moments-heading-row"><div><h2 id="momentsHeading" tabindex="-1"><span id="momentsTitle">장면 탐색</span> <span id="resultCount"></span></h2><p id="activeChapterName" class="sr-only">방송 전체 · 시간순</p></div><div class="search-field"><svg class="icon"><use href="#i-search"/></svg><label class="sr-only" for="searchInput">어떤 장면을 찾으세요?</label><input type="search" id="searchInput" placeholder="어떤 장면을 찾으세요?" autocomplete="off"><button type="button" id="clearSearch" class="clear-search" aria-label="검색어 지우기" hidden><svg class="icon tiny"><use href="#i-close"/></svg></button><kbd>/</kbd></div></div>
+      <div class="filter-row"><div id="filterBar" class="filter-bar" aria-label="장면 종류"><button type="button" data-filter="all" aria-pressed="true">장면 모아보기 <span id="countAll"></span></button><button type="button" data-filter="highlight" aria-pressed="false">하이라이트 <span id="countHighlights"></span></button><button type="button" data-filter="point" aria-pressed="false">핵심 지점 <span id="countPoints"></span></button><button type="button" data-filter="clip" aria-pressed="false">시청자 클립 <span id="countClips"></span></button><button type="button" data-filter="saved" aria-pressed="false"><svg class="icon tiny"><use href="#i-bookmark"/></svg>북마크 <span id="bookmarkedCount">0</span></button></div><div id="densityBar" class="density-switch" aria-label="표시 밀도"><button type="button" data-density="comfortable" aria-label="썸네일 목록 보기" aria-pressed="true" title="썸네일 목록 보기"><svg class="icon"><use href="#i-picture"/></svg></button><button type="button" data-density="compact" aria-label="간결한 목록 보기" aria-pressed="false" title="간결한 목록 보기"><svg class="icon"><use href="#i-list"/></svg></button></div></div>
+      <div id="momentGrid" class="moment-grid"></div>
+      <div id="emptyState" class="empty-state" hidden><svg class="icon"><use href="#i-search"/></svg><h3>찾는 순간이 아직 보이지 않아요.</h3><p>다른 단어로 검색하거나 필터를 바꿔보세요.</p><div id="emptyAlternatives" class="empty-alternatives"></div><button type="button" data-action="reset-filters" class="button button-outline">방송 전체에서 다시 찾기</button></div>
+    </section>
+
+      </div>
+    </div>
+
+    <section id="editorPanel" class="native-editor-panel" hidden aria-labelledby="editorHeading">
+      <div class="native-editor-topline"><h2 id="editorHeading" tabindex="-1" class="sr-only">편집자 워크스페이스</h2><button id="editorToggle" class="text-button" type="button" aria-expanded="false" aria-controls="editorPanel"><svg class="icon tiny"><use href="#i-close"/></svg><span data-editor-label>편집 도구 닫기</span></button></div>
+      <iframe id="nativeEditorFrame" title="Loki 원본 편집 도구" loading="lazy" allow="clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </section>
+
+    <footer class="page-footer"><div><img src="shared/loki/v1/assets/loki-color.svg" width="24" height="24" alt=""><span><strong>Loki</strong> <span class="footer-separator">·</span> 긴 방송에서, 당신의 순간으로.</span></div><button id="shortcutsButton" type="button" class="text-button">키보드 단축키 <kbd>?</kbd></button></footer>
+  </main>
+  <dialog id="modal" aria-labelledby="modalTitle"><div class="modal-header"><h2 id="modalTitle"></h2><button id="modalClose" class="icon-button" type="button" aria-label="닫기"><svg class="icon"><use href="#i-close"/></svg></button></div><div id="modalBody" class="modal-body"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="noscript">장면 탐색을 사용하려면 JavaScript를 켜주세요. 보고서 JSON은 HTTP(S) 서버에서 열어 주세요.</p></noscript>
+</body>
+</html>
