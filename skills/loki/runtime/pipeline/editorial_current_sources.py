@@ -344,7 +344,14 @@ def frozen_source_snapshot(spec, *, source_dir, root):
     assets = saved['identity']['source_assets'] + saved['source_bundle']['frozen_assets']
     for asset in assets:
         location = native_path(asset['path']).resolve()
-        if not location.is_relative_to(source_dir) or file_hash(location) != asset['sha256']:
+        if not location.is_relative_to(source_dir):
+            raise ValueError('current_conversation_snapshot_source_bytes_changed')
+        retained = None
+        if asset['family'] == 'media':
+            from .live_original_vod_archive import resolve_saved_original
+            retained = resolve_saved_original(location, video_no=saved['identity']['video_no'],
+                work_dir=source_dir.parent, expected_sha256=asset['sha256'])
+        if retained is None and file_hash(location) != asset['sha256']:
             raise ValueError('current_conversation_snapshot_source_bytes_changed')
         if asset['family'] == 'chat' and is_bound_chat(location):
             descriptor_status(location)

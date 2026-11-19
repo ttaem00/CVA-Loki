@@ -34,7 +34,7 @@ def pipelines_for(*kinds: str) -> frozenset[str]:
 
 def uses_loki_308_profile(value: object) -> bool:
     """Share reviewed execution behavior without changing concrete job identity."""
-    return isinstance(value, str) and value in {"loki_3_0_8", "loki_3_0_8_1"}
+    return isinstance(value, str) and value in {"loki_3_0_8", "loki_3_0_8_1", "loki_3_0_8_2"}
 
 def normalize_pipeline(value: str) -> str:
     policy = load_loki_version_policy()

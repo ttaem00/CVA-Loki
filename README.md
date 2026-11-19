@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.8.1 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.8.2 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.8.1</h1>
-<p align="center">정식 요약 메커니즘 Loki 3.0.8.1</p>
+<h1 align="center">CVA-Loki 3.0.8.2</h1>
+<p align="center">정식 요약 메커니즘 Loki 3.0.8.2</p>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.8.1" src="https://img.shields.io/badge/버전-3.0.8.1-8B5CF6?style=flat-square" /></a>
+  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.8.2" src="https://img.shields.io/badge/버전-3.0.8.2-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
   <a href="#codex-integration"><img alt="코덱스 플러그인과 스킬" src="https://img.shields.io/badge/코덱스-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
   <a href="#docker-install"><img alt="도커 한 명령 설치" src="https://img.shields.io/badge/도커-한%20명령%20설치-2496ED?style=flat-square" /></a>
@@ -91,9 +91,9 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 ### 1. 배포 폴더를 준비하세요
 
-[CVA-Loki-3.0.8.1.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.8.1/CVA-Loki-3.0.8.1.zip) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+[CVA-Loki-3.0.8.2.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.8.2/CVA-Loki-3.0.8.2.zip) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
 
-이 배포본의 배포·플러그인·스킬·요약 메커니즘은 **3.0.8.1**이며, 새 작업의 `latest`도 **Loki 3.0.8.1**을 선택합니다. 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
+이 배포본의 배포·플러그인·스킬·요약 메커니즘은 **3.0.8.2**이며, 새 작업의 `latest`도 **Loki 3.0.8.2**을 선택합니다. 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
 
 ### 2. 설치할 곳을 선택하세요
 
@@ -147,7 +147,7 @@ docker compose run --build --rm loki
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 요약 메커니즘 3.0.8.1 동작 |
+| 기능 | 요약 메커니즘 3.0.8.2 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
@@ -262,7 +262,7 @@ AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지�
 <a id="native-install"></a>
 ## 로컬 설치
 
-3.0.8.1 배포 폴더를 준비해 설치합니다. 공개 배포 파일은 위 빠른 시작의 다운로드 링크에서 확인합니다.
+3.0.8.2 배포 폴더를 준비해 설치합니다. 공개 배포 파일은 위 빠른 시작의 다운로드 링크에서 확인합니다.
 
 ```sh
 python install.py --workspace ../loki-workspace --mode skill
@@ -336,8 +336,8 @@ python install.py --workspace ../loki-plugin-workspace --mode plugin
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.8.1` |
-| 요약 메커니즘 | `3.0.8.1` · `latest`는 `loki_3_0_8_1` 선택 |
+| 배포 버전 | `3.0.8.2` |
+| 요약 메커니즘 | `3.0.8.2` · `latest`는 `loki_3_0_8_2` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
 | skill | `loki` / 명시 호출 `$loki` |
@@ -598,6 +598,8 @@ Loki는 기존 Report Admin의 **목록·영상 작업실·상세 편집 템플�
 
 기본 주소는 [http://127.0.0.1:8787/](http://127.0.0.1:8787/)입니다. 설치 결과의 `review.status=available_not_started`는 명령이 준비됐으며 서버가 아직 실행되지 않았다는 뜻입니다.
 
+보고서를 열면 현재 저장 revision을 최신 결과 화면으로 표시합니다. 로컬 HTTP 서버가 화면의 스크립트·스타일·글꼴·이미지·JSON을 함께 제공합니다. 저장 후 다시 열기도 같은 화면을 사용하며, 원본 Markdown·HTML·metadata와 기존 작성 버전·관리자 수정 이력은 보존합니다. 이 읽기에는 새 요약이나 모델 호출이 필요하지 않습니다.
+
 일반적인 검토 흐름은 다음과 같습니다.
 
 1. 목록에서 보고서를 선택합니다.
@@ -669,7 +671,7 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 <a id="release-version-policy"></a>
 ### 버전 정책
 
-현재 배포본은 **3.0.8.1**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 이 배포본의 버전을 씁니다. 공개 다운로드는 **v3.0.8.1**의 ZIP을 가리킵니다. 공개한 태그·ZIP과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
+현재 배포본은 **3.0.8.2**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 이 배포본의 버전을 씁니다. 공개 다운로드는 **v3.0.8.2**의 ZIP을 가리킵니다. 공개한 태그·ZIP과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
 
 ### 3.0.7.2의 주요 변경
 

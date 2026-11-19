@@ -212,6 +212,7 @@ def _acquire_video_assets(
     access_policy: dict[str, Any] | None = None,
     whole_video_bounds: dict[str, Any] | None = None,
     ffmpeg_location: str | None = None,
+    probe_version: bool = True,
 ) -> dict[str, Any]:
     """Internal shared engine. Only the explicit membership module passes policy."""
 
@@ -494,12 +495,14 @@ def _acquire_video_assets(
                     written.append(target.resolve())
         results["frames"] = asset_result("PASS" if len(written) == len(frame_list) else "FAIL", "PUBLIC_FRAMES_READY" if len(written) == len(frame_list) else "PUBLIC_FRAME_FAILED", written, requested_count=len(frame_list), frame_max_height=frame_max_height, time_budget_seconds=time_budget_seconds, budget_exhausted=budget_exhausted)
 
-    try:
-        yt_dlp_version = _yt_dlp_version(
-            command_prefix, output, runner, timeout=command_timeout(15),
-        )
-    except subprocess.TimeoutExpired:
-        yt_dlp_version = None
+    yt_dlp_version = None
+    if probe_version:
+        try:
+            yt_dlp_version = _yt_dlp_version(
+                command_prefix, output, runner, timeout=command_timeout(15),
+            )
+        except subprocess.TimeoutExpired:
+            pass
     manifest = {
         "schema_version": "youtube_member_assets.v1" if member else ACQUISITION_SCHEMA,
         "source_url": source_url,
@@ -526,12 +529,12 @@ def acquire_public_video_assets(
     sections: Iterable[tuple[float, float]] = (), frames: Iterable[float] = (),
     languages: Iterable[str] = ("ko", "en"), yt_dlp_command: tuple[str, ...] | None = None,
     runner: Runner = _run, frame_max_height: int = 480,
-    time_budget_seconds: float | None = None,
+    time_budget_seconds: float | None = None, probe_version: bool = True,
 ) -> dict[str, Any]:
     """Acquire public-only assets; this API never accepts an auth policy."""
     return _acquire_video_assets(url, output_dir, assets=assets, sections=sections,
         frames=frames, languages=languages, yt_dlp_command=yt_dlp_command, runner=runner,
-        frame_max_height=frame_max_height, time_budget_seconds=time_budget_seconds)
+        frame_max_height=frame_max_height, time_budget_seconds=time_budget_seconds, probe_version=probe_version)
 
 def acquire_public_whole_video(
     url: str, output_dir: Path, *, max_height: int = 360,

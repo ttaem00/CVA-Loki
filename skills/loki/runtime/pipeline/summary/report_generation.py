@@ -353,7 +353,24 @@ def _commit_generated_report_artifacts(
     except Exception as e:
         logger.warning(f"summary run ledger 참조 생성 실패 (metadata 는 계속): {e}")
 
-    from ..report_artifact_family import commit_next_report_artifact_family
+    from ..report_artifact_family import (
+        _report_family_lock, commit_next_report_artifact_family, ReportArtifactFamilyError,
+    )
+
+    database = None
+    assert_unretained_source = None
+    if work_dir:
+        from ..live_family_retention import ROUTE_SCHEMA
+        from ..vod_search_index import default_database_path, read_status
+
+        database = default_database_path(work_dir, vod_info.video_no)
+        report_base = Path(md_path).stem
+
+        def assert_unretained_source():
+            status = read_status(database, report_base)
+            marker = status.get("retention") if isinstance(status, dict) else None
+            if isinstance(marker, dict) and marker.get("schema_version") == ROUTE_SCHEMA:
+                raise ReportArtifactFamilyError("report_retained_source_changed")
 
     authority_revision_id = (
         str(authoritative_broadcast_map.get("revision_id") or "")
@@ -373,6 +390,7 @@ def _commit_generated_report_artifacts(
         html_text=html_content,
         metadata=metadata,
         authority_revision_id=authority_revision_id,
+        assert_current=assert_unretained_source,
     )
     logger.info(
         "리포트 산출물 세대 저장 완료: generation_id=%s md=%s html=%s metadata=%s",
@@ -414,34 +432,35 @@ def _commit_generated_report_artifacts(
 
 
 
-    if work_dir:
-        try:
-            from ..vod_search_index import default_database_path, register_report
-            database = default_database_path(work_dir, vod_info.video_no)
-            work_root = database.parent.parent
-            stored = register_report(database_path=database,
-                roots={"work": work_root, "output": Path(output_dir).resolve()},
-                metadata_path=Path(meta_path).resolve(), markdown_path=Path(md_path).resolve(),
-                html_path=Path(html_path).resolve(), local_vector_index=summary_local_vector_index,
-                timed_evidence_manifest=timed_evidence_manifest, srt_path=srt_path or None,
-                expected_source_md5=(summary_source_manifest or {}).get("manifest", {}).get("srt_hash"),
-                retention_enrollment=(dict(schema_version="vod.retention-enrollment.v1",
-                    video_no=str(vod_info.video_no), channel_id=str(vod_info.channel_id),
-                    source_platform="chzzk") if _source_platform(vod_info) == "chzzk"
-                    and re.fullmatch(r"[a-f0-9]{32}", str(vod_info.channel_id or "")) else None))
-        except Exception as error:
-            stored = {"schema_version": "vod_search_index.v1", "status": "unavailable",
-                      "error_code": str(error) if isinstance(error, ValueError) else type(error).__name__}
+    if database is not None:
+        with _report_family_lock(output_dir, video_no=vod_info.video_no):
+            assert_unretained_source()
+            try:
+                from ..vod_search_index import register_report
+                work_root = database.parent.parent
+                stored = register_report(database_path=database,
+                    roots={"work": work_root, "output": Path(output_dir).resolve()},
+                    metadata_path=Path(meta_path).resolve(), markdown_path=Path(md_path).resolve(),
+                    html_path=Path(html_path).resolve(), local_vector_index=summary_local_vector_index,
+                    timed_evidence_manifest=timed_evidence_manifest, srt_path=srt_path or None,
+                    expected_source_md5=(summary_source_manifest or {}).get("manifest", {}).get("srt_hash"),
+                    retention_enrollment=(dict(schema_version="vod.retention-enrollment.v1",
+                        video_no=str(vod_info.video_no), channel_id=str(vod_info.channel_id),
+                        source_platform="chzzk") if _source_platform(vod_info) == "chzzk"
+                        and re.fullmatch(r"[a-f0-9]{32}", str(vod_info.channel_id or "")) else None))
+            except Exception as error:
+                stored = {"schema_version": "vod_search_index.v1", "status": "unavailable",
+                          "error_code": str(error) if isinstance(error, ValueError) else type(error).__name__}
 
-            stored["error_code"] = (
-                stored["error_code"] if stored["error_code"].startswith(("search_", "summary_vector_"))
-                else f"SEARCH_INDEX_{type(error).__name__.upper()}")
-            logger.warning("VOD search persistence unavailable (code=%s)", stored["error_code"])
-        try:
-            from ..vod_search_index import default_database_path, write_status
-            write_status(default_database_path(work_dir, vod_info.video_no), Path(md_path).stem, stored)
-        except Exception:
-            logger.warning("VOD search persistence status unavailable (code=SEARCH_STATUS_WRITE_FAILED)")
+                stored["error_code"] = (
+                    stored["error_code"] if stored["error_code"].startswith(("search_", "summary_vector_"))
+                    else f"SEARCH_INDEX_{type(error).__name__.upper()}")
+                logger.warning("VOD search persistence unavailable (code=%s)", stored["error_code"])
+            try:
+                from ..vod_search_index import write_status
+                write_status(database, report_base, stored)
+            except Exception:
+                logger.warning("VOD search persistence status unavailable (code=SEARCH_STATUS_WRITE_FAILED)")
 
     if announce_proposal_source:
         from ..vod_proposals import source_ready

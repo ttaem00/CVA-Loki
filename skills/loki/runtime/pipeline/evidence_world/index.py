@@ -183,13 +183,37 @@ CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY, value_json TEXT NOT NU
 """
 
 class SnapshotConnection(sqlite3.Connection):
+    sealed_absent_audio_id = None
+
     def __exit__(self, *args):
         try:
             return super().__exit__(*args)
         finally:
             self.close()
 
-def open_snapshot(root, *, world_revision=None, source_id=None, verify_sources=True):
+def _sealed_optional_audio_absence(db, asset, manifest):
+
+
+    if (asset.family != "audio_features" or asset.asset_key != "audio_features:primary"
+            or asset.availability != "not_collected" or asset.bytes_sha256 is not None
+            or set(asset.collection_status) - {"audio_events"}
+            or asset.collection_status.get("audio_events", {}).get("status", "not_collected") != "not_collected"
+            or set(asset.source_locator) != {"path"}
+            or asset.family in manifest["identity"]["policy"]["required"]):
+        return False
+    from .derived_records import PATHS
+
+    path = asset.source_locator["path"]
+    canonical = Path(PATHS[asset.family]).parts
+    return (isinstance(path, str) and native_path(path).parts[-len(canonical):] == canonical
+            and asset.public() in manifest["identity"]["assets"]
+            and not db.execute("SELECT 1 FROM records WHERE family=? LIMIT 1",
+                               (asset.family,)).fetchone()
+            and not db.execute("SELECT 1 FROM units WHERE family=? LIMIT 1",
+                               (asset.family,)).fetchone())
+
+def open_snapshot(root, *, world_revision=None, source_id=None, verify_sources=True,
+                  sealed_optional_audio=False, expected_database_sha256=None):
     root = native_path(root)
     if not (root / "manifest.json").is_file():
         raise EvidenceError("index_not_published")
@@ -199,7 +223,9 @@ def open_snapshot(root, *, world_revision=None, source_id=None, verify_sources=T
         raise EvidenceError("world_revision_mismatch")
     if source_id and any(a["source_id"] != source_id for a in manifest["identity"]["assets"]):
         raise EvidenceError("wrong_source")
-    if file_hash(root / "world.sqlite") != manifest["database_sha256"]:
+    database_sha256 = manifest["database_sha256"]
+    if ((expected_database_sha256 is not None and database_sha256 != expected_database_sha256)
+            or file_hash(root / "world.sqlite") != database_sha256):
         raise EvidenceError("published_index_changed")
     uri = "file:" + quote(str(root / "world.sqlite"), safe="/:") + "?mode=ro"
     db = sqlite3.connect(uri, uri=True, factory=SnapshotConnection)
@@ -212,7 +238,11 @@ def open_snapshot(root, *, world_revision=None, source_id=None, verify_sources=T
         _validate_required_sources(db, manifest["identity"]["policy"]["required"])
         if verify_sources:
             for row in db.execute("SELECT binding_json FROM assets"):
-                assert_asset_fresh(AssetBinding(**json.loads(row[0])))
+                asset = AssetBinding(**json.loads(row[0]))
+                if sealed_optional_audio and _sealed_optional_audio_absence(db, asset, manifest):
+                    db.sealed_absent_audio_id = asset.asset_id
+                else:
+                    assert_asset_fresh(asset)
     except Exception:
         db.close()
         raise

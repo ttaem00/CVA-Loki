@@ -13,11 +13,31 @@ import json
 
 import re
 
-from pipeline.editorial_highlight_pipeline import broadcast_map_identity_hash
+from pipeline.editorial_highlight_pipeline import broadcast_map_identity_hash, validate_qg1_preview_payload
 
 from pipeline.manager_outline import parse_manager_outline_markdown, project_manager_outline_markdown, validate_structured_manager_outline
 
 from pipeline.summary.render import _strip_editorial_review_markdown, _validate_editorial_review_projection
+
+def _accepted_qg1_packet(
+    packet: object,
+    *,
+    expected_broadcast_map: dict,
+) -> dict | None:
+    """Return only a review candidate bound to the current BroadcastMap."""
+
+    if not isinstance(packet, dict):
+        return None
+    if packet.get("projection_mode") == "composed_review_draft":
+        from pipeline.editorial_review_import import validate_composed_review
+        return validate_composed_review(packet, expected_broadcast_map=expected_broadcast_map)
+    validated = validate_qg1_preview_payload(
+        packet,
+        expected_broadcast_map=expected_broadcast_map,
+    )
+    if validated.get("projection_mode") != "qg1_review_candidate":
+        raise ValueError("editorial_review_packet_not_accepted")
+    return validated
 
 def _validate_editorial_packet_edit(current: dict, proposed: dict, *, duration_sec=None) -> dict:
     """Allow bounded Point/Story edits while preserving Highlight authority.

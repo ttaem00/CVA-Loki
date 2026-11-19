@@ -80,6 +80,24 @@ def _project(origin, mapping, runtime):
         stage['path'] = mapping[stage['path']]
     return dict(spec=spec, input=material, result=result, binding=binding)
 
+def _registered_media_path(binding, origin, target):
+    """One typed cold media exception, with a fixed sibling path."""
+    media = origin['request']['binding']['media']
+    video = origin['spec']['source']['asset']['video_no']
+    if (not isinstance(binding, dict)
+            or set(binding) != {'video_no', 'archive', 'open_at_utc_ms', 'duration_ms', 'size_bytes', 'sha256'}
+            or not isinstance(video, str) or not re.fullmatch(r'[1-9]\d{0,15}', video)
+            or binding['video_no'] != video or binding['sha256'] != media['sha256']
+            or not mm._sha(binding['sha256'])
+            or not isinstance(binding['archive'], str)
+            or not re.fullmatch(r'[a-f0-9]{32}-[1-9]\d{0,15}', binding['archive'])
+            or type(binding['open_at_utc_ms']) is not int or binding['open_at_utc_ms'] <= 0
+            or type(binding['duration_ms']) is not int or binding['duration_ms'] <= 0
+            or type(binding['size_bytes']) is not int or binding['size_bytes'] <= 0
+            or target.parts[-4:-1] != ('work', '_multimodal-search', 'imported')):
+        raise ValueError('search_transport_registered_media_changed')
+    return target.parents[3] / 'vod' / f'{video}.mp4'
+
 def _validate_projection(request, resolver, *, verify_copies=False):
     marker = request['origin_provenance']
     if marker.get('schema') != SCHEMA or not mm._sha(marker.get('origin_digest')):
@@ -108,6 +126,14 @@ def _validate_projection(request, resolver, *, verify_copies=False):
     mm._validate_local_model_manifest(consumer_model)
     if search._basis(origin['model']) != search._basis(consumer_model):
         raise ValueError('search_transport_model_basis')
+    if 'registered_original' in archived:
+        if marker.get('kind') != 'retention':
+            raise ValueError('search_transport_registered_media_changed')
+        media_path = _registered_media_path(archived['registered_original'], origin, target)
+        original_media = original['binding']['media']['path']
+        if (archived['mapping'].get(original_media) != str(media_path)
+                or any(row['origin'] == original_media for row in archived['copies'])):
+            raise ValueError('search_transport_registered_media_changed')
     expected = _project(origin, archived['mapping'], archived['runtime_policy'])
     if (request['binding'] != expected['binding']
             or request['cache_ref']['model'] != archived['runtime_policy']['model_ref']):
@@ -138,16 +164,16 @@ def _validate_projection(request, resolver, *, verify_copies=False):
             raise ValueError('search_transport_job_changed')
         _validate_original_job(prepared, original_root=tie['original_root'], video_no=video_no,
                                job_id=cold_job.name, stt_sha256=original['binding']['stt_sha256'])
-    return True
+    return archived
 
-def validate_projection(request):
+def validate_projection(request, *, registered_original=False):
     """Consumer gate: prove only admitted path/receipt fields changed in transport."""
-    return _validate_projection(request, native_path)
+    archived = _validate_projection(request, native_path)
+    return archived.get('registered_original') if registered_original else True
 
 def projected_job_root(request):
     """Return an original-job tie only after the complete transport proof passes."""
-    validate_projection(request)
-    archived = _read(request['origin_provenance']['archive_ref'], native_path)
+    archived = _validate_projection(request, native_path)
     return (native_path(archived['job_tie']['cold_root'])
             if 'job_tie' in archived else None)
 

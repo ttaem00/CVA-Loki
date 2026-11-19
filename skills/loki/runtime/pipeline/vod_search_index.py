@@ -37,7 +37,10 @@ from threading import Lock
 
 from urllib.parse import quote
 
-from .summary_local_vector_index import EMBEDDING_MODEL, EMBEDDING_REVISION, validate_summary_local_vector_index
+from .summary_local_vector_index import (
+    EMBEDDING_MODEL, EMBEDDING_REVISION,
+    query_summary_local_vector_index, validate_summary_local_vector_index,
+)
 
 SCHEMA = "vod_search_index.v1"
 
@@ -128,6 +131,13 @@ def _fresh(binding, roots):
         content[_json(source["ref"])] = data
     return content
 
+def _canonical_map(records):
+    if records is None:
+        return None
+    if not isinstance(records, (list, tuple)) or any(not isinstance(r, dict) or not {"video_no", "base"} <= set(r) for r in records):
+        raise ValueError("search_canonical_catalog_invalid")
+    return {(str(r["video_no"]), str(r["base"])): r for r in records}
+
 def _registration_binding(row, tier):
     if row["vector_mode"] != "producer_memory" or not row["family_id"]:
         raise ValueError("search_historical_report_unsupported")
@@ -147,6 +157,26 @@ def _registration_binding(row, tier):
         raise ValueError("search_report_identity_invalid")
     return binding
 
+def _admit_row(row, roots, tier, canonical):
+    binding = _registration_binding(row, tier)
+    content = _fresh(binding, roots)
+    if content[_json(binding["files"]["markdown"]["ref"])].decode("utf-8-sig") != row["markdown_text"]:
+        raise ValueError("search_stored_text_changed")
+    meta = json.loads(content[_json(binding["files"]["metadata"]["ref"])].decode("utf-8-sig"))
+    if (not isinstance(meta, dict) or str(meta.get("video_no")) != row["video_no"]
+            or json.loads(row["presentation_json"]) != {key: str(meta.get(key) or "") for key in
+                ("title", "publish_date", "streamer_id", "channel")}):
+        raise ValueError("search_report_identity_invalid")
+    if canonical is not None:
+        record = canonical[(row["video_no"], row["base"])]
+        for name in ("metadata", "markdown", "html"):
+            path = record.get(name + "_path")
+            if path is not None:
+                _, data = _capture(path, roots)
+                if hashlib.sha256(data).hexdigest() != binding["files"][name]["sha256"]:
+                    raise ValueError("search_canonical_revision_changed")
+    return binding
+
 def default_database_path(work_dir, video_no=""):
     """Both established callers supply either work root or work/<video>."""
     root = _plain(work_dir)
@@ -163,6 +193,68 @@ def write_status(database_path, base, status):
     with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
         stream.write(_json(status))
     os.replace(temporary, destination)
+
+def read_status(database_path, base):
+    path = _plain(database_path).parent / ("status-" + _digest(str(base)) + ".json")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return dict(schema_version=SCHEMA, status="not_available")
+
+def read_statuses(database_path, bases):
+    """Read requested current markers once, without caching across requests."""
+    bases = dict.fromkeys(base for base in bases if isinstance(base, str))
+    result = {}
+    if not bases:
+        return result
+    if os.name == "nt":
+
+
+        for base in bases:
+            try:
+                result[base] = read_status(database_path, base)
+            except (OSError, ValueError):
+                pass
+        return result
+
+    descriptor = None
+    try:
+        database = Path(database_path)
+        if not database.is_absolute():
+            raise ValueError("search_root_absolute_required")
+        parent = database.parent
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        descriptor = os.open(parent.anchor, flags)
+
+
+        for component in parent.parts[1:]:
+            child = os.open(component, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        try:
+            database_stat = os.stat(database.name, dir_fd=descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            if stat.S_ISLNK(database_stat.st_mode):
+                raise ValueError("search_reparse_path_rejected")
+        requested = {"status-" + _digest(base) + ".json": base for base in bases}
+        with os.scandir(descriptor) as entries:
+            present = {entry.name for entry in entries if entry.name in requested}
+        for name in present:
+            try:
+                with os.fdopen(os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                      dir_fd=descriptor), "r", encoding="utf-8") as stream:
+                    if stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                        result[requested[name]] = json.load(stream)
+            except (OSError, ValueError):
+                continue
+    except (OSError, ValueError):
+        pass
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    return result
 
 def _connect(path, *, readonly=False):
     path = _plain(path)
@@ -322,6 +414,123 @@ def register_report(*, database_path, roots, metadata_path, markdown_path, html_
                 report_key=key, vector_status=status, vector_mode=vector_mode,
                 vector_count=len(vector["items"]) if vector else 0, provider_calls=0)
 
+def _relocation_snapshot(row, roots, *, tier):
+    """Pin current files while retaining the initial producer's search binding."""
+    from .report_artifact_family import ReportArtifactFamilyError, validate_report_artifact_family
+    binding = _registration_binding(row, tier)
+    files, paths = {}, {}
+    for name, source in binding["files"].items():
+        paths[name] = _resolve(source["ref"], roots)
+        files[name], _ = _capture(paths[name], roots)
+    metadata = json.loads(paths["metadata"].read_text(encoding="utf-8-sig"))
+    alias = metadata["report_artifact_family"].get("artifacts", {}).get("candidate_alias")
+    if alias is not None:
+        name = alias["name"]
+        if (not isinstance(name, str) or not name or Path(name).name != name
+                or any(c in name for c in "\\/:\x00")):
+            raise ValueError("search_report_location_invalid")
+        files["candidate_alias"], _ = _capture(paths["metadata"].parent / name, roots)
+    try:
+        current = validate_report_artifact_family(paths["markdown"], paths["html"], paths["metadata"])
+    except ReportArtifactFamilyError as error:
+        raise ValueError("search_report_family_invalid") from error
+    if str(current["metadata"].get("video_no")) != row["video_no"]:
+        raise ValueError("search_report_identity_invalid")
+    _fresh({"files": files}, roots)
+    return dict(report_key=row["report_key"], row_sha256=_digest(dict(row)),
+                current_family_id=current["generation_id"], files=files)
+
+def registration_relocation_snapshot(*, database_path, roots, report_key):
+    """Private retention input for an existing hot registration; no generation."""
+    roots = _roots(roots)
+    with closing(_connect(database_path, readonly=True)) as db:
+        _check_schema(db, "hot")
+        row = db.execute("SELECT * FROM reports WHERE report_key=?", (report_key,)).fetchone()
+        if row is None:
+            raise ValueError("search_registration_missing")
+        return _relocation_snapshot(row, roots, tier="hot")
+
+def relocate_report_registration(*, source_database_path, target_database_path,
+                                 source_roots, target_roots, expected_snapshot,
+                                 end_proof, now_ms):
+    """Publish an exact registered row after its current family was copied.
+
+    The original family/hash/text/vector binding stays unchanged. A manager
+    Save therefore remains stale for stored search, while normal report reading
+    can open the copied current committed family. Never re-encode or reinterpret
+    stored vectors as a new producer result. The retention owner separately
+    owns filesystem publication and hot cleanup.
+    """
+    source_roots, target_roots = _roots(source_roots), _roots(target_roots)
+    if (set(source_roots) != set(target_roots)
+            or any(a.is_relative_to(b) or b.is_relative_to(a)
+                   for a in source_roots.values() for b in target_roots.values())
+            or _plain(source_database_path) == _plain(target_database_path)):
+        raise ValueError("search_relocation_roots_invalid")
+    if not isinstance(expected_snapshot, dict) or not isinstance(expected_snapshot.get("report_key"), str):
+        raise ValueError("search_relocation_snapshot_invalid")
+    key = expected_snapshot["report_key"]
+    with closing(_connect(source_database_path, readonly=True)) as source:
+        _check_schema(source, "hot")
+        row = source.execute("SELECT * FROM reports WHERE report_key=?", (key,)).fetchone()
+        if row is None:
+            raise ValueError("search_registration_missing")
+        observed = _relocation_snapshot(row, source_roots, tier="hot")
+        if observed != expected_snapshot:
+            raise ValueError("search_source_revision_changed")
+        proof = validate_cold_end_proof(end_proof, video_no=row["video_no"], now_ms=now_ms)
+
+        if _relocation_snapshot(row, target_roots, tier="hot") != observed:
+            raise ValueError("search_relocation_copy_changed")
+        original = dict(row)
+        columns = ("report_key", "video_no", "base", "family_id", "binding_json",
+                   "presentation_json", "markdown_text", "markdown_fold", "vector_json",
+                   "manifest_json", "vector_revision", "vector_status", "vector_mode")
+        if set(original) != set(columns):
+            raise ValueError("search_schema_invalid")
+        binding = _registration_binding(row, "hot")
+        binding.update(tier="cold", end_proof=proof)
+        original["binding_json"] = _json(binding)
+        initialize_index(target_database_path, tier="cold")
+        with closing(_connect(target_database_path)) as target, target:
+            _check_schema(target, "cold")
+            target.execute("BEGIN IMMEDIATE")
+            existing = target.execute("SELECT * FROM reports WHERE report_key=?", (key,)).fetchone()
+            if existing is not None and dict(existing) != original:
+                raise ValueError("search_relocation_registration_conflict")
+            if existing is None:
+                target.execute("INSERT INTO reports VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                               tuple(original[column] for column in columns))
+            latest = source.execute("SELECT * FROM reports WHERE report_key=?", (key,)).fetchone()
+            if (latest is None or _relocation_snapshot(latest, source_roots, tier="hot") != observed
+                    or _relocation_snapshot(row, target_roots, tier="hot") != observed):
+                raise ValueError("search_source_revision_changed")
+    return dict(schema_version=SCHEMA, status="ready", tier="cold", report_key=key,
+                current_family_id=observed["current_family_id"],
+                row_sha256=observed["row_sha256"], provider_calls=0)
+
+def list_admitted_reports(*, database_path, roots, canonical_reports=None):
+    """Internal records only. Never serialize these resolved paths to HTTP."""
+    roots = _roots(roots)
+    allowed = _canonical_map(canonical_reports)
+    admitted, unavailable = [], 0
+    with closing(_connect(database_path, readonly=True)) as db:
+        tier = _check_schema(db)
+        for row in db.execute("SELECT * FROM reports WHERE vector_mode='producer_memory' AND family_id<>'' ORDER BY video_no,base,report_key"):
+            if allowed is not None and (row["video_no"], row["base"]) not in allowed:
+                continue
+            try:
+                binding = _admit_row(row, roots, tier, allowed)
+                admitted.append(dict(video_no=row["video_no"], base=row["base"], report_key=row["report_key"],
+                    family_id=row["family_id"], tier=tier, vector_status=row["vector_status"],
+                    metadata_path=_resolve(binding["files"]["metadata"]["ref"], roots),
+                    markdown_path=_resolve(binding["files"]["markdown"]["ref"], roots),
+                    html_path=_resolve(binding["files"]["html"]["ref"], roots)))
+            except (OSError, ValueError, KeyError, TypeError, AttributeError, IndexError):
+                unavailable += 1
+    return dict(schema_version=SCHEMA, status="partial" if unavailable else "ready",
+                reports=admitted, unavailable_reports=unavailable, tier=tier)
+
 def list_registered_reports(*, database_path, roots, base=None, video_no=None, catalog_cache=False,
                             include_context=False, exclude_bases=(), report_keys=None):
     """Internal current report locations, independent of old vector freshness.
@@ -468,3 +677,78 @@ def list_registered_reports(*, database_path, roots, base=None, video_no=None, c
             records.append(record)
     return dict(schema_version=SCHEMA, status="partial" if unavailable else "ready",
                 reports=records, unavailable_reports=unavailable, tier=tier)
+
+def search_words(query, sources, *, database_path, roots, canonical_reports=None, per_vod_cap=25, max_vods=200):
+    """Stored summary substring matches; STT/chat remain existing native readers.
+
+    The caller must keep its normal search for `unhandled_sources`, unindexed
+    canonical reports, and preserve explicit unavailable cold status.
+    """
+    from .admin_search import _search_summary
+    from dataclasses import asdict
+    q = str(query or "").strip()
+    result = dict(query=q, sources=["summary"] if "summary" in sources else [], total_matches=0,
+                  vods=[], unhandled_sources=[s for s in sources if s != "summary"],
+                  handled_reports=[], index_status=dict(schema_version=SCHEMA, status="ready", unavailable_reports=0))
+    if not q or "summary" not in sources:
+        return result
+    roots = _roots(roots)
+    allowed = _canonical_map(canonical_reports)
+    try:
+        with closing(_connect(database_path, readonly=True)) as db:
+            result["index_status"]["tier"] = _check_schema(db)
+            rows = db.execute("SELECT * FROM reports WHERE vector_mode='producer_memory' AND family_id<>'' AND instr(markdown_fold,?)>0 ORDER BY video_no,base", (q.casefold(),))
+            for row in rows:
+                if allowed is not None and (row["video_no"], row["base"]) not in allowed:
+                    continue
+                try:
+                    _admit_row(row, roots, result["index_status"]["tier"], allowed)
+                    presentation = json.loads(row["presentation_json"])
+                    matches = _search_summary(row["markdown_text"], q.lower(), per_vod_cap)
+                    if not matches:
+                        continue
+                    vod = dict(video_no=row["video_no"], base=row["base"], title=presentation["title"],
+                        publish_date=presentation["publish_date"], streamer_id=presentation["streamer_id"],
+                        streamer_name=presentation["channel"], matches=[asdict(m) for m in matches], match_count=len(matches))
+                    result["vods"].append(vod)
+                    result["handled_reports"].append(dict(video_no=row["video_no"], base=row["base"], source="summary"))
+                    result["total_matches"] += len(matches)
+                    if len(result["vods"]) >= max_vods:
+                        break
+                except (OSError, ValueError, TypeError, KeyError, AttributeError, IndexError):
+                    result["index_status"]["unavailable_reports"] += 1
+    except (OSError, sqlite3.Error, ValueError):
+        result["index_status"]["status"] = "unavailable"
+    if result["index_status"]["unavailable_reports"]:
+        result["index_status"]["status"] = "partial"
+    result["vods"].sort(key=lambda v: (-v["match_count"], v["video_no"]))
+    return result
+
+def query_text_vectors(query, *, database_path, roots, canonical_reports=None, top_k=3):
+    """Internal hash256 lookup, separate from word matches and Gemma search."""
+    roots = _roots(roots)
+    allowed = _canonical_map(canonical_reports)
+    hits, unavailable = [], 0
+    with closing(_connect(database_path, readonly=True)) as db:
+        tier = _check_schema(db)
+        for row in db.execute("SELECT * FROM reports WHERE vector_mode='producer_memory' AND family_id<>'' AND vector_status='ready_text_hash_vector'"):
+            if allowed is not None and (row["video_no"], row["base"]) not in allowed:
+                continue
+            try:
+                binding = _admit_row(row, roots, tier, allowed)
+                vector, manifest = json.loads(row["vector_json"]), json.loads(row["manifest_json"])
+                if (binding["vector_model"] != EMBEDDING_MODEL or row["vector_revision"] != EMBEDDING_REVISION
+                        or binding["vector_model_revision"] != EMBEDDING_REVISION
+                        or _digest(vector) != binding["vector_digest"] or _digest(manifest) != binding["manifest_digest"]):
+                    raise ValueError("search_vector_identity_invalid")
+                validate_summary_local_vector_index(vector, timed_evidence_manifest=manifest)
+                matches = query_summary_local_vector_index(vector, str(query or ""), top_k=top_k)
+                if matches:
+
+                    safe = [{k: m[k] for k in ("evidence_id", "rank", "score", "start_sec", "end_sec", "text_hash", "match_reason")} for m in matches]
+                    hits.append(dict(video_no=row["video_no"], base=row["base"], matches=safe,
+                        embedding_model=EMBEDDING_MODEL, model_revision=EMBEDDING_REVISION, dimensions=vector["dimensions"]))
+            except (OSError, ValueError, KeyError, TypeError, AttributeError, IndexError):
+                unavailable += 1
+    return dict(schema_version=SCHEMA, status="partial" if unavailable else "ready", vods=hits,
+                unavailable_reports=unavailable, multimodal=False, provider_calls=0)

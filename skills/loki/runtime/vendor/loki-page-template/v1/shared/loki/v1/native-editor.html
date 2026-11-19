@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html data-native-editor="original" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loki 편집 도구</title>
+  <link rel="stylesheet" href="native-editor/assets/report-document.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="native-editor/assets/viewer-editor-tools.css?v=c8b0660bde05428e">
+  <link rel="stylesheet" href="native-editor/native-editor-shell.css?v=c8b0660bde05428e">
+  <script src="report-source.js?v=c8b0660bde05428e" defer></script>
+  <script src="native-editor/native-editor-data.js?v=c8b0660bde05428e" defer></script>
+</head>
+<body class="loki-native-editor" data-default-editor-mode="companion" data-default-report="../../../reports/default.json">
+  <div id="nativeEditorLoadState" role="status" aria-live="polite" style="padding:20px;line-height:1.65">
+    <strong id="nativeEditorLoadTitle">편집 도구를 불러오는 중…</strong>
+    <p id="nativeEditorLoadMessage" style="margin:8px 0 0">선택한 보고서의 영상과 편집 자료를 읽고 있습니다.</p>
+    <button id="nativeEditorRetry" type="button" hidden style="margin-top:12px">다시 시도</button>
+  </div>
+  <div id="summaryPipelineIdentity" hidden></div>
+  <!-- The original companion runtime reads these nodes before building its controls. -->
+  <header><div class="bleed-inner">
+    <div class="crumb" id="nativeReportCrumb"></div>
+    <h1 id="nativeReportTitle"></h1>
+    <div class="meta">
+      <span id="nativeReportDate"></span>
+      <span id="nativeReportDuration"></span>
+      <span id="nativeReportGame"></span>
+      <span class="top-vod-link-row"><a class="top-vod-link" target="_blank" rel="noopener">원본 방송 보기</a></span>
+    </div>
+    <div class="editor-jump report-editor-entry" data-editor-entry data-editor-entry-state="fallback" data-editor-mode="companion">
+      <a class="report-editor-inline-button editor-companion-entry-link" data-editor-entry-primary target="ttaem-chzzk-companion" rel="opener" aria-label="영상 연결. 브라우저별 분할 보기 안내를 확인하세요">영상 연결</a>
+      <span class="editor-entry-status" data-editor-entry-status hidden></span>
+      <a class="editor-jump-link report-editor-tool-link" href="#youtube-editor-tools" aria-label="편집자용 장면 도구로 이동">장면 도구</a>
+    </div>
+  </div></header>
+  <div class="main bleed-inner" hidden aria-busy="true">
+    <div class="card broadcast-summary" hidden>
+      <div class="card-head"><h2>방송 요약</h2></div>
+      <div class="card-body"><div class="notes" id="nativeReportSummary"></div></div>
+    </div>
+    <div class="card" id="nativeReportChart">
+      <div class="card-head"><h2>채팅 밀도 시각화</h2></div>
+      <div class="card-body">
+        <div class="chart-wrap"><canvas id="chatChart"></canvas></div>
+        <p id="nativeChartEmpty" hidden></p>
+      </div>
+    </div>
+<div class="card viewer-editor-tools" id="youtube-editor-tools" data-report-block="viewer-editor-tools" data-viewer-editor-render-version="occurrence-first-density-v16">
+  <div class="viewer-editor-head">
+    <div>
+      <h2 class="viewer-editor-title">편집자 워크스페이스</h2>
+      <p class="viewer-editor-lead">유튜브 편집자가 훑어볼 만한 시각을 한곳에 모았습니다. 시간축에서 후보를 고르면 바로 아래에 자막, 요약, 채팅, 클립 근거가 이어서 표시됩니다.</p>
+    </div>
+  </div>
+  <div class="viewer-editor-grid">
+    <section class="viewer-editor-panel" aria-labelledby="viewerEditorSceneTitle">
+      <h3 id="viewerEditorSceneTitle">1. 장면 찾기</h3>
+      <p>요약에 이미 들어간 장면과 시청자 반응, 클립, 소리, 자막 신호를 같은 시간축에서 비교합니다.</p>
+      <div class="viewer-editor-filter">
+        <label for="viewerEditorFilter">자료 필터</label>
+        <select id="viewerEditorFilter"></select>
+        <span id="viewerEditorCount">자료를 불러오는 중</span>
+      </div>
+            <div class="viewer-editor-density-control">
+        <label for="viewerEditorDensityRange">알갱이 표시 밀도</label>
+        <input id="viewerEditorDensityRange" type="range" min="0" max="10" step="1" value="6" aria-label="장면 찾기 알갱이 표시 밀도">
+        <span id="viewerEditorDensityValue" class="viewer-editor-density-value">핵심</span>
+      </div>
+      <div class="viewer-editor-zoom" aria-label="장면 찾기 확대 축소">
+        <button type="button" class="viewer-editor-zoom-btn" id="viewerEditorZoomOutBtn" title="시간축 축소" aria-label="시간축 축소">-</button>
+        <button type="button" class="viewer-editor-zoom-btn" id="viewerEditorZoomInBtn" title="시간축 확대" aria-label="시간축 확대">+</button>
+        <button type="button" class="viewer-editor-zoom-btn" id="viewerEditorZoomResetBtn" title="시간축 기본 배율">기본</button>
+        <input id="viewerEditorZoomRange" type="range" min="10" max="260" step="5" value="100" aria-label="시간축 확대 배율">
+        <span id="viewerEditorZoomValue" class="viewer-editor-zoom-value">1.00x</span>
+        <span>전체 보기 0.10x · Ctrl+휠 확대/축소</span>
+      </div>
+      <div class="viewer-editor-axis" id="viewerEditorAxis" aria-label="유튜브 편집자용 전체 영상 장면 찾기"></div>
+    </section>
+    <section class="viewer-editor-panel evidence-panel" aria-labelledby="viewerEditorEvidenceTitle">
+      <h3 id="viewerEditorEvidenceTitle">2. 선택한 시각의 근거</h3>
+      <p id="viewerEditorEvidenceIntro">시간축에서 항목을 선택하면 근거와 방송 맥락이 표시됩니다.</p>
+      <div id="viewerEditorEvidence"></div>
+    </section>
+  </div>
+  <script id="viewerEditorToolsData" type="application/json">{}</script>
+</div>
+    <script id="reportDocumentData" type="application/json">{}</script>
+    <script id="summaryEvidencePackData" type="application/json">{}</script>
+  </div>
+  <noscript><p style="padding:20px">편집 도구를 사용하려면 JavaScript를 켜 주세요.</p></noscript>
+</body>
+</html>

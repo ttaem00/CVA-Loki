@@ -2,4 +2,4 @@
 
 from __future__ import annotations
 
-from .editorial_highlight_projection import broadcast_map_identity_hash
+from .editorial_highlight_projection import broadcast_map_identity_hash, validate_qg1_preview_payload

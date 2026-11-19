@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from .config import FULL_AUTHOR_PIPELINES
 
+from contextlib import nullcontext
+
 from dataclasses import dataclass, field
 
 import json
@@ -17,7 +19,7 @@ import os
 
 import re
 
-from .evidence_world.contracts import canonical_json, file_hash, native_path
+from .evidence_world.contracts import canonical_json, file_hash, native_path, scoped_path_resolver
 
 KEY = "_editorial_production_job"
 
@@ -57,7 +59,9 @@ def bind_current_conversation_job(*, work_root, run_root, video_no, source_asset
                                   job_id, code_version, base_revision, author,
                                   selected_pipeline="aemeth_3_0_2"):
     """Mint after checking prepared originals; serialized handles have no authority."""
-    work, root = native_path(work_root).resolve(), native_path(run_root).resolve()
+
+    with scoped_path_resolver(None):
+        work, root = native_path(work_root).resolve(), native_path(run_root).resolve()
     video_no = str(video_no)
     from .source_platforms import valid_work_id
     if (not (video_no.isdigit() or valid_work_id(video_no)) or root == work / video_no
@@ -74,14 +78,15 @@ def bind_current_conversation_job(*, work_root, run_root, video_no, source_asset
         admission_authority="current_conversation", external_transport_calls=0,
         code_version=code_version, video_no=video_no, work_root=str(work), run_root=str(root),
         base_revision=base_revision, author=dict(author),
-        source_assets=_sources(source_assets, video_no, work))
+        source_assets=_sources(source_assets, video_no, work, keep_logical_origins=True))
     return CurrentConversationJob(canonical_json(identity), _MINT)
 
 def current_conversation_job_binding(job):
     if type(job) is not CurrentConversationJob or job.authority is not _MINT:
         raise ValueError("current_conversation_serialized_authority_rejected")
     identity = json.loads(job.identity_json)
-    if _sources(identity["source_assets"], identity["video_no"], identity["work_root"]) != identity["source_assets"]:
+    if _sources(identity["source_assets"], identity["video_no"], identity["work_root"],
+                keep_logical_origins=True) != identity["source_assets"]:
         raise ValueError("current_conversation_source_changed")
     return identity
 
@@ -239,8 +244,9 @@ def job_file_hash(path, verified, *, hash_file=file_hash):
         verified[path] = before, actual
     return actual
 
-def _sources(assets, video_no, work_root, verified=None):
-    rows = _source_paths(assets, video_no, work_root)
+def _sources(assets, video_no, work_root, verified=None, *, keep_logical_origins=False):
+    with scoped_path_resolver(None) if keep_logical_origins else nullcontext():
+        rows = _source_paths(assets, video_no, work_root)
     for asset in rows:
         path = native_path(asset["path"])
         if job_file_hash(path, verified, hash_file=file_hash) != asset["sha256"]:

@@ -156,7 +156,7 @@
       [document.getElementById('saveBtn'), publishBtn].filter(Boolean).forEach(button => { button.disabled = false; });
       syncReportSaveRecovery();
       setStatus('확인한 저장본을 채택했습니다. 저장된 화면을 불러오는 중입니다. 저장·복원·공개 요청은 다시 보내지 않습니다.', 'ok');
-      await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(attempt.base)}&t=${Date.now()}`);
+      await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(attempt.base)}&format=latest&t=${Date.now()}`);
       setStatus('확인한 저장본을 열었습니다. 저장·복원·공개 요청은 다시 보내지 않았습니다.', 'ok');
       const status = document.getElementById('status');
       status.tabIndex = -1;
@@ -1844,7 +1844,7 @@
         if (typeof data.manager_markdown === 'string') {
           mdEditor.value = data.manager_markdown;
           savedMd = data.manager_markdown;
-          await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(context.base || base)}&t=${Date.now()}`);
+          await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(context.base || base)}&format=latest&t=${Date.now()}`);
         }
         setDirty(false);
         managerOutlineStatusEl.textContent = '변경사항을 저장했어요. 아직 공개되지 않았어요.';
@@ -1911,7 +1911,7 @@
         if (typeof data.manager_markdown === 'string') {
           mdEditor.value = data.manager_markdown;
           savedMd = data.manager_markdown;
-          await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(context.base || base)}&t=${Date.now()}`);
+          await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(context.base || base)}&format=latest&t=${Date.now()}`);
         }
         setDirty(false);
         managerOutlineStatusEl.textContent = '이전 버전을 새 로컬 수정본으로 복원했습니다. 공개 사이트는 바뀌지 않았습니다.';

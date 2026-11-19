@@ -1,0 +1,261 @@
+{
+  "source": "manager-supplied loki-template-v1.zip",
+  "archive_sha256": "e9a203de70b90fefddaab7ca4c91b12b16b6c545336e6d38cbe871c44f45f63e",
+  "template": "loki_page.v1",
+  "runtime_version": "c8b0660bde05428e",
+  "files": {
+    "DATA_CONTRACT.md": {
+      "sha256": "c7d8111a3cb8349bfd695486e8552e44387ffb6820e49f2b8710b4ed41737298",
+      "bytes": 9926
+    },
+    "INTEGRATION.md": {
+      "sha256": "63ba5493de19c18ef30dccc1f93eeb71c6167e4bc143ae47a4bb74413252fdd1",
+      "bytes": 7831
+    },
+    "README.md": {
+      "sha256": "42e2f8303af64d0175bc93f47a79ce4e34542631b1512ca3a01b976efa277a4c",
+      "bytes": 8499
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "sha256": "f640545a61da2f4a57f2c7b988a242434ea15a5c8d452e6c7a9121d5bc286aaa",
+      "bytes": 1154
+    },
+    "VALIDATION.md": {
+      "sha256": "a639382bb256303f1a5361e66a34c78c84335dd4d2ca7dde1941e9c3f1dc4229",
+      "bytes": 3541
+    },
+    "images/clip-01.jpg": {
+      "sha256": "1207c33add6400a97cc23da7615c9c2716f812618fa5af51e8c06103f33f3ed8",
+      "bytes": 129145
+    },
+    "images/clip-02.jpg": {
+      "sha256": "c69df9226ff173e848ab5dd1b42b811fc9122c163ce29a16e38f404936b5c14f",
+      "bytes": 125955
+    },
+    "images/clip-03.jpg": {
+      "sha256": "c055cf3955a13dc6422d60c84e7e9dc30a52933e34ad7819e2e22119d4d5f4a2",
+      "bytes": 126596
+    },
+    "images/clip-04.jpg": {
+      "sha256": "a4cb83f834b3868c9fb02db90b103bb9bd45ad478d25f4ed22d5a97848c47548",
+      "bytes": 127167
+    },
+    "images/clip-05.jpg": {
+      "sha256": "b237ffc12b77ebac40515af2da1834fcd583abac60d30727d4768b8b347030b0",
+      "bytes": 85145
+    },
+    "images/clip-06.jpg": {
+      "sha256": "91abe7c7a3822582c962deec7d23ca71d10b754a267a1b785a4017eaa246f093",
+      "bytes": 127275
+    },
+    "images/clip-07.jpg": {
+      "sha256": "0300fc2fa2afc3278aeae7eb4dc8e04b874a3a9ea1cad0ff8ab0c88b0e39b9fb",
+      "bytes": 125152
+    },
+    "images/clip-08.jpg": {
+      "sha256": "7c4b4deee40cf1cce644e5dd8033cf675f8c83793f0fbad778e191cf0bbfffd4",
+      "bytes": 123048
+    },
+    "images/clip-09.jpg": {
+      "sha256": "3d75e6015aa2778d59a7496afbf1f8574cd7ba5c100333983e9c0f954cea9545",
+      "bytes": 126314
+    },
+    "images/clip-10.jpg": {
+      "sha256": "f509850a4ca1040ba1ff545bb14203aa822505eacdfbd5a5174d7e9c8fbd4b82",
+      "bytes": 74908
+    },
+    "images/clip-11.jpg": {
+      "sha256": "7ce68adcb6c929220081552d9363b18ed8506f528a13e280d52ade9ac1083e1f",
+      "bytes": 74529
+    },
+    "images/clip-12.jpg": {
+      "sha256": "72592a21770017d571e7012eedbb3875040d6cb915e0b82fabfc65d2ca0f684f",
+      "bytes": 81081
+    },
+    "images/clip-13.jpg": {
+      "sha256": "05866922f24853a874d80d10446b0a85f757f8cfdbebe5b0f388975bc4167864",
+      "bytes": 76733
+    },
+    "images/clip-14.jpg": {
+      "sha256": "07890a9165d7f8996191b796599e65daa2db4d7cf0bf6477df207303b495557c",
+      "bytes": 76041
+    },
+    "images/clip-15.jpg": {
+      "sha256": "e00d707a3cb7b72ff41afab0b0198327555295b7fb6a5a57571c1654a998e6a6",
+      "bytes": 82412
+    },
+    "images/clip-16.jpg": {
+      "sha256": "a9222efcbd0ea1ba1c9c235d9de8e6fb19fb0e93fe421efed5131566c00b0981",
+      "bytes": 86956
+    },
+    "images/clip-17.jpg": {
+      "sha256": "b076bdbcdb265dee4317ae2640220d7ea6328141297ae48c482298c3447ef41b",
+      "bytes": 78283
+    },
+    "images/clip-18.jpg": {
+      "sha256": "332aca1e95d57bfdbb5b015409c909a499a5ed16d25838b3ce75d2e1ae98a681",
+      "bytes": 78635
+    },
+    "images/clip-19.jpg": {
+      "sha256": "10320e506d328f7e7e64040a528d0ba9eefb2f9f71a1b9f1419b139155df474d",
+      "bytes": 43803
+    },
+    "images/clip-20.jpg": {
+      "sha256": "8c90cb3788c1418bb98094b60c428ef1a88d97db80d7c17978f61b5ed548dedf",
+      "bytes": 40897
+    },
+    "images/highlight-06-stored.webp": {
+      "sha256": "952d95a15f2b84ac91576afe55db44ba063615999c87d3e8baa9c7b9a0bfa96a",
+      "bytes": 27312
+    },
+    "index.html": {
+      "sha256": "f2ed03c0b147b5365f818c272683d4b73bf5ab8d209d6a49a9a66439786b3f09",
+      "bytes": 19226
+    },
+    "reports/default.json": {
+      "sha256": "9acb5be18ca1e063c20c7eec7489107be92fb84d9d807ae3caa1a7a28c4e2d3b",
+      "bytes": 641435
+    },
+    "reports/empty.json": {
+      "sha256": "4ee49906c3c6c24490af143ba4e81ae53041b44bf03d71ce1c5cabb46ffc95dd",
+      "bytes": 936
+    },
+    "reports/example.json": {
+      "sha256": "ef4b5e3bf584b56dce37739b7d8126a9c1f6e84f974ec8228d6160a044e5fab1",
+      "bytes": 5676
+    },
+    "schema/loki-page.schema.json": {
+      "sha256": "3da7dffc0758c7ae3995bbe4239d83af5261f8be404671bd553557b6f094906c",
+      "bytes": 5535
+    },
+    "serve.py": {
+      "sha256": "932ebcbf8b7d7d00a67731e322afecf887bd5ca1d7c235928fc3e7592ba60d0a",
+      "bytes": 743
+    },
+    "shared/loki/v1/adapter.js": {
+      "sha256": "4314527847eb58a7022a40091b13e24bec957139c6ce82b10b9e6dc0df1d2e32",
+      "bytes": 19075
+    },
+    "shared/loki/v1/app.js": {
+      "sha256": "fb4c530b3d65cc417617ca4792dd63b1e2cb41cee4277fe0d9ce3b704ab05a5c",
+      "bytes": 68951
+    },
+    "shared/loki/v1/assets/PRETENDARD-LICENSE.md": {
+      "sha256": "771d26bcc8e9ed2e4121f937393b1b5f5e38c7d3260770db38f486c66d7afbe8",
+      "bytes": 4957
+    },
+    "shared/loki/v1/assets/PretendardVariable.woff2": {
+      "sha256": "9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4",
+      "bytes": 2057688
+    },
+    "shared/loki/v1/assets/cva-color.svg": {
+      "sha256": "dab72bdd840071148938361fe28f8e1b2c2d1588d13cc89c882118f5cbb11fbb",
+      "bytes": 479
+    },
+    "shared/loki/v1/assets/loki-color.svg": {
+      "sha256": "9caae1b07912349bcbb0c9760be303cc3e03ed2814fc8d1c25c2de662b1628f5",
+      "bytes": 521
+    },
+    "shared/loki/v1/bootstrap.js": {
+      "sha256": "bf6fafcad0b807f3809590e41852b0ab87da204ee57393bef1e2240d6ef9f349",
+      "bytes": 2292
+    },
+    "shared/loki/v1/collaboration-view.css": {
+      "sha256": "c6440a33c5ff26b9e5b0cbe1018f5da711705f9f04f00cf79cd3391f14d02d0e",
+      "bytes": 5486
+    },
+    "shared/loki/v1/collaboration-view.js": {
+      "sha256": "de89f4a085805288cbfc5e81a4efab578ece18f4a163455f6fe3aa8abe440c08",
+      "bytes": 19037
+    },
+    "shared/loki/v1/hierarchy.css": {
+      "sha256": "8ddc4a2d23f38ebd336f2697847531235c28d93cb74e52c977adc8e7b3a7f035",
+      "bytes": 13134
+    },
+    "shared/loki/v1/native-editor/assets/report-document.css": {
+      "sha256": "6a3b69024e158091598f11a7fb9892f1d474669265c28cb223fd6777a783cae6",
+      "bytes": 34676
+    },
+    "shared/loki/v1/native-editor/assets/report-document.js": {
+      "sha256": "2a957bca224d8349c16769129b4461062dff97b090eb3ae183060d79d0e25953",
+      "bytes": 6855
+    },
+    "shared/loki/v1/native-editor/assets/vendor/chart.umd.min.js": {
+      "sha256": "08dfa4730571b23810c34fc39c5101461ecafca56c3f92caf4850509cb158f30",
+      "bytes": 205488
+    },
+    "shared/loki/v1/native-editor/assets/viewer-editor-tools.css": {
+      "sha256": "cc166d9847ad300c243f44a1397f2161e9db653507f4226ac4cfefe4e6761116",
+      "bytes": 111299
+    },
+    "shared/loki/v1/native-editor/assets/viewer-editor-tools.js": {
+      "sha256": "1be4572df3ea5cc1866be013623d815e74dc82ca5126e67394ffca9d29f1792c",
+      "bytes": 211489
+    },
+    "shared/loki/v1/native-editor/brand/assets/fonts/PRETENDARD-LICENSE.md": {
+      "sha256": "2a973a259140f9c16158182fe4d23f2ac62f0b5cb3e53d0d7032eda18f4a52bf",
+      "bytes": 5062
+    },
+    "shared/loki/v1/native-editor/brand/assets/fonts/PretendardVariable.woff2": {
+      "sha256": "9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4",
+      "bytes": 2057688
+    },
+    "shared/loki/v1/native-editor/native-editor-bridge.js": {
+      "sha256": "2d00837b76398e59df6741ff64c6c190442601368211d45b3d28425e736f6219",
+      "bytes": 10050
+    },
+    "shared/loki/v1/native-editor/native-editor-data.js": {
+      "sha256": "c86677390d50c8304513589ca3d178350344b9b3ba463f9675f4424a3a7e3c54",
+      "bytes": 7903
+    },
+    "shared/loki/v1/native-editor/native-editor-shell.css": {
+      "sha256": "72361bda01e0ed9f0cfc9a793a6fb6a2f3aa52ea119e06addd538b1b8db8dfa7",
+      "bytes": 24230
+    },
+    "shared/loki/v1/native-editor.html": {
+      "sha256": "0acd38d3181dae1af8527c4216c0b93593e313c4b2c78b18ad36bcb5bb12d53f",
+      "bytes": 6147
+    },
+    "shared/loki/v1/refinements.css": {
+      "sha256": "9a64938f75aecb0044793311a6810d394e2b07e9eb7aba529d89a75a3cabfe4b",
+      "bytes": 48518
+    },
+    "shared/loki/v1/report-source.js": {
+      "sha256": "34d8361debacc0358325696c69a5f0e74c19a926533a240ae57304357c88849f",
+      "bytes": 8859
+    },
+    "shared/loki/v1/scene-polish.css": {
+      "sha256": "7d18c33afb6d790c544bfd68e81aa2b46436deefb8d3534636f2762ba5fd5b1f",
+      "bytes": 49016
+    },
+    "shared/loki/v1/styles.css": {
+      "sha256": "5ecb545200584a46cf558ae7973a57cf1f477a74187b11dd7a45bf1ac8b99a8c",
+      "bytes": 42520
+    },
+    "shared/loki/v1/template.css": {
+      "sha256": "f8ca0be4fa921b441fe5fab3dc9dbbcf0faf2ff3edb99da8c7ceacdd1df318b5",
+      "bytes": 1384
+    },
+    "shared/loki/v1/timeline-controller.js": {
+      "sha256": "af21efb765547a4115d5e2cb0cb9429bb138f5974925b619f2b15378f0ae4020",
+      "bytes": 11905
+    },
+    "shared/loki/v1/timeline-navigation.css": {
+      "sha256": "81a315703136e6b8ea5cda107a8417406913b6ad394097fa0a578980d0d68440",
+      "bytes": 15307
+    },
+    "template-version.json": {
+      "sha256": "d0b561718f242557e0a804c535fbbdb236c48acd0377a1949b8a6ff8c7a2c7a7",
+      "bytes": 174
+    },
+    "tools/prepare-template.cjs": {
+      "sha256": "4af8900ab5ec361b8ccb82eda21cc00c533419b424333347f9faa080f2b3a69d",
+      "bytes": 1502
+    },
+    "tools/validate-report.cjs": {
+      "sha256": "12dc6f1deb4a71ab42f9558836bfd19a3235b626c3741e07f972e4079ba8e47d",
+      "bytes": 3008
+    }
+  },
+  "modifications": "none"
+}

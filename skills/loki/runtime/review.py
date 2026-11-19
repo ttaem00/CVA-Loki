@@ -43,7 +43,7 @@ def handler(store, *, assets=HERE):
                 return None
             return value
 
-        def _send(self, status, data, content_type="application/json; charset=utf-8", *, report=False):
+        def _send(self, status, data, content_type="application/json; charset=utf-8", *, report=False, template=False):
             if not isinstance(data, bytes):
                 data = (json.dumps(data, ensure_ascii=False) if content_type.startswith("application/json") else data).encode("utf-8")
             self.send_response(status)
@@ -54,7 +54,10 @@ def handler(store, *, assets=HERE):
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", (
                 "default-src 'none'; img-src data: 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; sandbox allow-scripts"
-                if report else "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"))
+                if report else
+                "default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+                if template else
+                "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"))
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(data)
@@ -131,7 +134,19 @@ def handler(store, *, assets=HERE):
                     self._send(200, store.workspace_catalog(q=parameter("q"), streamer=parameter("streamer") or None,
                         offset=int(parameter("offset") or 0), limit=int(parameter("limit") or 100)))
                 elif path == "/api/saved-html":
-                    self._send(200, store.report_html(store.workspace_id(parameter("base"))), "text/html; charset=utf-8", report=True)
+                    identity = store.workspace_id(parameter("base"))
+                    projection = store.report_presentation(identity) if parameter("format") == "latest" else None
+                    self._send(200, projection["entry_html"] if projection is not None else store.report_html(identity),
+                        "text/html; charset=utf-8", report=projection is None, template=projection is not None)
+                elif path.startswith("/api/report-view/"):
+                    try:
+                        try:
+                            from .report_ui import read_report_view
+                        except ImportError:
+                            from report_ui import read_report_view
+                        self._send(200, *read_report_view(store, path))
+                    except FileNotFoundError:
+                        self._send(404, {"error": "없는 저장본 자산입니다."})
                 elif path == "/source-manifest":
                     sources = store.originals(store.workspace_id(parameter("base")))["sources"]
                     self._send(200, "\n\n".join(row["text"] for row in sources), "text/plain; charset=utf-8")
@@ -157,7 +172,7 @@ def handler(store, *, assets=HERE):
                     if resource is None:
                         self._send(404, {"error": "없는 주소입니다."})
                     else:
-                        self._send(200, *resource)
+                        self._send(200, *resource, template=path.startswith("/loki/"))
             except (ValueError, KeyError, OSError, RuntimeError) as error:
                 self._error(error)
 

@@ -56,11 +56,19 @@ def act(service, envelope):
     identity=[envelope,hierarchy,*([projection] if projection else []),*([navigation] if navigation else [])]
     path = service.run_root / "context-actions" / (digest(identity) + ".json")
     with build_lock(path.parent):
-        if path.exists():
+        original_path = path
+        while path.exists():
             saved = json.loads(path.read_text(encoding="utf-8"))
             if saved["action"] != envelope or saved["result_sha256"] != digest(saved["result"]):
                 raise EvidenceError("context_action_changed")
-            return saved["result"]
+            result = saved["result"]
+            if (path == original_path and envelope["action"] == "search_evidence"
+                    and service.sealed_optional_audio and service.family_status.get("audio_features") == "not_collected"
+                    and result.get("status") == "error" and result.get("error_code") == "source_revision_changed"):
+
+                path = path.with_name(digest([identity, "sealed-optional-audio-search.v1"]) + ".json")
+                continue
+            return result
         result = service.dispatch(envelope)
         atomic_json(path, dict(action=envelope, result=result, result_sha256=digest(result)))
         return result

@@ -1,0 +1,490 @@
+/* Loki presentation layer. Original runtime, data, track widths and hit areas stay intact. */
+@font-face {
+  font-family: Pretendard;
+  src: url('../assets/PretendardVariable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+/* The editor uses one quiet navy workspace in either surrounding page theme. */
+html[data-native-editor="original"] {
+  --bg: #111A28;
+  --surface: #172332;
+  --surface-2: #1D2B3C;
+  --track: #131F2E;
+  --border: #344155;
+  --border-soft: #28364A;
+  --control-border: #62768D;
+  --text: #EEF1F5;
+  --text-strong: #EEF1F5;
+  --muted: #A9B6C7;
+  --native-muted: #A9B6C7;
+  --faint: #8797AD;
+  --tc: #F4BE70;
+  --accent: #F4BE70;
+  --accent-warm: #F4BE70;
+  --accent-soft: #3B3022;
+  --signal: #ACD8C5;
+  --signal-strong: #ACD8C5;
+  --signal-soft: #223933;
+  --structure: #ADC9E5;
+  --structure-soft: #263648;
+  --topic: #ACD8C5;
+  --topic-soft: #203044;
+  --heat-low: #ADC9E5;
+  --heat-medium: #F4BE70;
+  --heat-high: #F4BE70;
+  --heat-line: #F4BE70;
+  --later: #8293A6;
+  --warning: #DB9B8A;
+  --shadow: 0 6px 24px #0003;
+  color-scheme: dark;
+}
+html[data-native-editor="original"],
+body.loki-native-editor {
+  --muted: var(--native-muted);
+  --text-strong: var(--text);
+  min-height: 0 !important;
+  height: auto;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+body.loki-native-editor {
+  --cva-result-text: var(--text);
+  --cva-result-strong: var(--text-strong);
+  --cva-result-muted: var(--muted);
+  --cva-result-line: var(--border-soft);
+  --cva-result-blue: var(--tc);
+  --cva-result-focus: var(--accent);
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans CJK KR', sans-serif;
+  letter-spacing: -.015em;
+  scrollbar-color: var(--border) var(--bg);
+}
+body.loki-native-editor [hidden] { display: none !important; }
+body.loki-native-editor :is(button, a, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+body.loki-native-editor ::selection { background: var(--accent-soft); color: var(--text); }
+body.loki-native-editor input[type="range"] { accent-color: var(--accent); }
+body.loki-native-editor :is(button, select, input) { font-family: inherit; }
+body.loki-native-editor a { text-underline-offset: 3px; }
+body.loki-native-editor .viewer-editor-tools {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
+}
+body.loki-native-editor :is(.viewer-editor-tools, .viewer-editor-head, .viewer-editor-panel)::after {
+  content: none;
+}
+body.loki-native-editor .viewer-editor-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 18px 20px;
+  gap: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+}
+body.loki-native-editor .viewer-editor-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.5;
+  letter-spacing: -.025em;
+}
+/* Remove repeated introductions; native evidence and empty states remain. */
+body.loki-native-editor .viewer-editor-lead,
+body.loki-native-editor #viewerEditorSceneTitle + p,
+body.loki-native-editor .viewer-editor-selected-kicker,
+body.loki-native-editor .viewer-editor-zoom > span:last-child:not(.viewer-editor-zoom-value) {
+  display: none;
+}
+/* The original connection controls live in the header, without a separate banner. */
+body.loki-native-editor .editor-companion-workspace-guide {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 420px;
+  margin: 0;
+  padding: 0;
+  gap: 6px 12px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body.loki-native-editor .editor-companion-workspace-tooltip { display: none; }
+body.loki-native-editor .editor-companion-workspace-link {
+  display: inline-flex;
+  width: auto;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+body.loki-native-editor .editor-companion-workspace-link:hover {
+  border-color: var(--control-border) !important;
+  background: var(--surface-2) !important;
+}
+body.loki-native-editor .editor-companion-workspace-link:focus-visible {
+  outline-color: var(--accent);
+  box-shadow: none;
+}
+body.loki-native-editor .editor-companion-help {
+  flex: 0 0 auto;
+  width: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+body.loki-native-editor .editor-companion-help summary {
+  margin: 0;
+  min-height: 36px;
+  padding: 8px 2px;
+  line-height: 20px;
+  text-align: left;
+}
+body.loki-native-editor .editor-companion-help[open] {
+  flex-basis: 100%;
+  max-width: 400px;
+  padding-top: 6px;
+}
+body.loki-native-editor .editor-companion-help p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  word-break: keep-all;
+}
+body.loki-native-editor .editor-companion-workspace-guide .editor-companion-status {
+  display: none;
+  order: 3;
+  text-align: left;
+  font-size: 12px;
+}
+body.loki-native-editor .editor-companion-workspace-guide .editor-companion-status[data-state] {
+  display: block;
+  color: var(--signal);
+}
+body.loki-native-editor .editor-companion-workspace-guide .editor-companion-status:is([data-state="error"],[data-state="disconnected"]) {
+  color: var(--warning);
+}
+body.loki-native-editor .viewer-editor-grid { padding: 20px; gap: 24px; background: var(--bg); }
+body.loki-native-editor .viewer-editor-panel,
+body.loki-native-editor .viewer-editor-panel.evidence-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body.loki-native-editor .viewer-editor-panel.evidence-panel {
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+body.loki-native-editor .viewer-editor-panel > h3 {
+  margin-bottom: 14px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+body.loki-native-editor .viewer-editor-filter { gap: 8px; margin-bottom: 10px; font-size: 12px; }
+body.loki-native-editor .viewer-editor-filter select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border-color: var(--control-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+body.loki-native-editor #viewerEditorCount { margin-left: 4px; font-size: 11px; color: var(--muted); }
+body.loki-native-editor .viewer-editor-density-control { margin: 10px 0; }
+body.loki-native-editor .viewer-editor-density-control label { font-weight: 500; }
+body.loki-native-editor .viewer-editor-density-value { font-weight: 500; }
+body.loki-native-editor .viewer-editor-zoom { gap: 6px; margin-bottom: 14px; }
+body.loki-native-editor .viewer-editor-zoom button,
+body.loki-native-editor .viewer-editor-button {
+  min-height: 36px;
+  border-color: var(--control-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 550;
+}
+body.loki-native-editor .viewer-editor-zoom button:hover,
+body.loki-native-editor .viewer-editor-button:hover { background: var(--surface-2); }
+body.loki-native-editor .viewer-editor-zoom-value {
+  padding-left: 4px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+body.loki-native-editor .viewer-editor-axis {
+  border-color: var(--border);
+  background: var(--track);
+  scrollbar-width: thin;
+  scrollbar-color: var(--control-border) var(--track);
+}
+/* 136px labels + 8px gap match the runtime's 144px time-axis origin. */
+body.loki-native-editor :is(.viewer-editor-lane-label,.viewer-editor-scale-label,.viewer-editor-cluster-label,.viewer-editor-density-label,.viewer-editor-waveform-label,.viewer-editor-highlight-group-label) {
+  background: var(--track);
+  color: var(--muted);
+  border-radius: 4px;
+}
+body.loki-native-editor :is(.viewer-editor-lane-label,.viewer-editor-scale-label,.viewer-editor-cluster-label,.viewer-editor-density-label,.viewer-editor-waveform-label) strong {
+  color: var(--text);
+  font-weight: 600;
+}
+body.loki-native-editor .viewer-editor-lane-label .viewer-editor-lane-source { color: var(--muted); }
+body.loki-native-editor :is(.viewer-editor-scale,.viewer-editor-track,.viewer-editor-density,.viewer-editor-outline-track,.viewer-editor-highlight-group-track,.viewer-editor-cluster-track,.viewer-editor-waveform) {
+  border-color: var(--border);
+  border-radius: 4px;
+  background: linear-gradient(90deg,color-mix(in srgb,var(--border) 35%,transparent) 1px,transparent 1px) 0 0 / 8.333% 100%,var(--surface);
+}
+body.loki-native-editor .viewer-editor-scale { background-color: transparent; }
+body.loki-native-editor .viewer-editor-heatmap-surface { filter: none; }
+body.loki-native-editor .viewer-editor-heatmap-surface .heatmap-fill { opacity: 1; }
+/* The original profile height carries the value; colour reinforces low to high. */
+body.loki-native-editor #viewerEditorHeatmapGradient stop:first-child { stop-color: var(--heat-low); stop-opacity: .14; }
+body.loki-native-editor #viewerEditorHeatmapGradient stop:nth-child(2) { stop-color: var(--heat-medium); stop-opacity: .3; }
+body.loki-native-editor #viewerEditorHeatmapGradient stop:last-child { stop-color: var(--heat-high); stop-opacity: .54; }
+body.loki-native-editor .heatmap-line { stroke: var(--heat-line); stroke-width: 1.8; }
+body.loki-native-editor .viewer-editor-heatmap-legend { gap: 4px 6px; }
+body.loki-native-editor .viewer-editor-heatmap-legend span::before { width: 12px; height: 5px; background: color-mix(in srgb,var(--heat-low) 38%,var(--surface)); }
+body.loki-native-editor .viewer-editor-heatmap-legend .medium::before { background: color-mix(in srgb,var(--heat-medium) 58%,var(--surface)); }
+body.loki-native-editor .viewer-editor-heatmap-legend .hot::before { background: var(--heat-high); }
+body.loki-native-editor .viewer-editor-heatmap-zone.selected {
+  outline-color: var(--accent);
+  background: color-mix(in srgb,var(--accent) 8%,transparent);
+  box-shadow: none;
+}
+body.loki-native-editor .viewer-editor-heatmap-zone.selected::after { background: var(--accent); box-shadow: none; }
+body.loki-native-editor .viewer-editor-heatmap-zone:hover { outline-color: var(--accent); }
+body.loki-native-editor .viewer-editor-density-bar span { background: color-mix(in srgb,var(--signal) 68%,var(--surface)); }
+body.loki-native-editor .viewer-editor-density-bar.hot span { background: var(--signal-strong); }
+body.loki-native-editor .viewer-editor-density-bar span::after { background: color-mix(in srgb,var(--text) 25%,transparent); }
+body.loki-native-editor .viewer-editor-density-bar.zero span { background: var(--border); }
+body.loki-native-editor .viewer-editor-density-bar.missing span { background: repeating-linear-gradient(90deg,var(--control-border) 0 3px,transparent 3px 6px); }
+/* Per-bucket values remain on the chart; the scale note is available on demand. */
+body.loki-native-editor .viewer-editor-density-label > span { display: none; }
+body.loki-native-editor .viewer-editor-waveform-bar { stroke: var(--control-border); }
+body.loki-native-editor .viewer-editor-waveform-bar.hot { stroke: var(--accent); }
+body.loki-native-editor .viewer-editor-waveform-midline { stroke: var(--border); }
+body.loki-native-editor .native-measure-help { position: absolute; right: 2px; top: 2px; }
+body.loki-native-editor .native-measure-help > summary {
+  width: 24px;
+  min-height: 24px;
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  text-align: center;
+  font: 500 12px/18px Georgia,serif;
+}
+body.loki-native-editor .native-measure-help > summary::-webkit-details-marker { display: none; }
+body.loki-native-editor .native-measure-help > span {
+  position: absolute;
+  left: -108px;
+  top: 30px;
+  width: min(280px,calc(100vw - 64px));
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: normal;
+}
+body.loki-native-editor .viewer-editor-density-label:has(.native-measure-help[open]) { z-index: 20; }
+body.loki-native-editor .viewer-editor-outline-row[data-outline-level="D1"] { --viewer-editor-outline-color: var(--structure) !important; }
+body.loki-native-editor .viewer-editor-outline-row[data-outline-level="D2"] { --viewer-editor-outline-color: var(--topic) !important; }
+body.loki-native-editor .viewer-editor-outline-row:is([data-outline-level="Point"],[data-outline-level="Highlight"]) { --viewer-editor-outline-color: var(--accent) !important; }
+body.loki-native-editor .viewer-editor-outline-row .viewer-editor-lane-label { border-left-width: 2px; }
+body.loki-native-editor .viewer-editor-outline-row[data-outline-level="D1"] .viewer-editor-lane-label,
+body.loki-native-editor .viewer-editor-outline-row[data-outline-level="D2"] .viewer-editor-lane-label { background: var(--track); }
+body.loki-native-editor .viewer-editor-outline-row[data-outline-level="Highlight"] > .viewer-editor-lane-label { background: var(--accent-soft); }
+body.loki-native-editor .viewer-editor-outline-range {
+  border-color: color-mix(in srgb,var(--viewer-editor-outline-color) 22%,var(--border));
+  background: color-mix(in srgb,var(--viewer-editor-outline-color) 12%,var(--surface));
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 550;
+}
+body.loki-native-editor .viewer-editor-outline-row[data-outline-level="D1"] .viewer-editor-outline-range { background: var(--structure-soft); }
+body.loki-native-editor .viewer-editor-outline-row[data-kind-row="viewer-editor-outline-subject"] .viewer-editor-outline-range {
+  background: var(--topic-soft);
+}
+body.loki-native-editor .viewer-editor-outline-range[data-label-state="tiny"] { color: transparent; }
+body.loki-native-editor .viewer-editor-outline-point { --point-priority-color: var(--muted); }
+body.loki-native-editor .viewer-editor-outline-point[data-priority="focus"] { --point-priority-color: var(--accent); }
+body.loki-native-editor .viewer-editor-outline-point[data-priority="normal"] { --point-priority-color: var(--structure); border-color: var(--structure); background: var(--surface); }
+body.loki-native-editor .viewer-editor-outline-point[data-priority="later"] { --point-priority-color: var(--later); background: color-mix(in srgb,var(--later) 55%,var(--surface)); }
+body.loki-native-editor .viewer-editor-outline-point.selected { outline: 2px solid var(--accent); outline-offset: 3px; border-color: var(--text); box-shadow: none; }
+body.loki-native-editor .viewer-editor-outline-point:focus-visible { outline: 2px dashed var(--accent); outline-offset: 4px; }
+body.loki-native-editor .viewer-editor-point-priority {
+  background: var(--surface);
+  color: var(--point-priority-color);
+  font-family: inherit;
+  font-size: 10px;
+  opacity: 0;
+}
+body.loki-native-editor .viewer-editor-outline-point:is(:hover,:focus-visible,.selected) .viewer-editor-point-priority { opacity: 1; }
+/* Hue identifies an H group; the original per-group variable is preserved. */
+body.loki-native-editor .viewer-editor-outline-marker[data-highlight-id] {
+  --native-group-ink: color-mix(in srgb,var(--viewer-editor-highlight-group-color,var(--accent)) 70%,var(--text));
+  border-color: var(--native-group-ink);
+  background: color-mix(in srgb,var(--viewer-editor-highlight-group-color,var(--accent)) 44%,var(--surface));
+  filter: none;
+}
+body.loki-native-editor .viewer-editor-outline-marker[data-highlight-id]:is(.highlight-group-emphasis,.highlight-group-selected) {
+  border-color: var(--native-group-ink);
+  background: color-mix(in srgb,var(--viewer-editor-highlight-group-color,var(--accent)) 58%,var(--surface));
+  outline-color: var(--accent);
+  filter: none;
+  box-shadow: none;
+}
+body.loki-native-editor .viewer-editor-outline-marker[data-highlight-id].highlight-span-current {
+  border-color: var(--native-group-ink);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background: color-mix(in srgb,var(--viewer-editor-highlight-group-color,var(--accent)) 74%,var(--surface));
+  filter: none;
+  box-shadow: none;
+}
+body.loki-native-editor .viewer-editor-outline-marker[data-highlight-id].highlight-span-current::after { background: var(--surface); box-shadow: none; }
+body.loki-native-editor .viewer-editor-outline-marker[data-highlight-id]:focus-visible {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+}
+body.loki-native-editor .viewer-editor-outline-marker[data-highlight-id].highlight-span-current:focus-visible {
+  outline-style: dashed;
+  outline-offset: 4px;
+}
+body.loki-native-editor .viewer-editor-highlight-selection-status {
+  border-color: var(--border);
+  background: var(--accent-soft);
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+body.loki-native-editor .viewer-editor-outline-row.highlight-group-active .viewer-editor-lane-label { box-shadow: none; }
+body.loki-native-editor .viewer-editor-highlight-group-label { border-left-color: color-mix(in srgb,var(--viewer-editor-highlight-group-color) 70%,var(--text)); }
+body.loki-native-editor .viewer-editor-highlight-group-label strong { color: var(--accent); }
+body.loki-native-editor .viewer-editor-highlight-lane-toggle::after { color: var(--muted); }
+body.loki-native-editor .viewer-editor-highlight-scene-chip[aria-current="true"] { outline-color: var(--accent); }
+body.loki-native-editor .viewer-editor-marker { --viewer-marker-color: var(--signal) !important; }
+body.loki-native-editor .viewer-editor-marker:is([data-kind="highlight"],[data-kind="highlight_candidate"],[data-kind="audio_peak"]) { --viewer-marker-color: var(--accent) !important; }
+body.loki-native-editor .viewer-editor-cluster-control::after,
+body.loki-native-editor .viewer-editor-marker.viewer-editor-cluster-grain::after { color: var(--surface); border-color: var(--surface); box-shadow: none; }
+body.loki-native-editor :is(.viewer-editor-marker,.viewer-editor-density-bar,.viewer-editor-outline-range,.viewer-editor-outline-point,.viewer-editor-lane-disclosure summary,.viewer-editor-highlight-lane-toggle):hover {
+  outline-color: var(--accent);
+  box-shadow: none;
+}
+body.loki-native-editor :is(.viewer-editor-selected-card,.viewer-editor-target-picker,.viewer-editor-context-card,.viewer-editor-row,.viewer-editor-stat,.viewer-editor-confirm,.viewer-editor-pre) {
+  border-color: var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+}
+body.loki-native-editor .viewer-editor-selected-card { border-left: 3px solid var(--accent); background: color-mix(in srgb,var(--accent-soft) 40%,var(--surface)); padding: 16px 18px; }
+body.loki-native-editor .viewer-editor-chip { border-color: var(--border); border-radius: 5px; background: var(--surface); color: var(--muted); font-weight: 500; }
+body.loki-native-editor :is(a.viewer-editor-chip,.viewer-editor-time-link,.viewer-editor-evidence-link,.viewer-editor-context-time) { color: var(--accent); }
+body.loki-native-editor .viewer-editor-chip.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+body.loki-native-editor .viewer-editor-chip.warning { border-color: var(--warning); color: var(--warning); }
+body.loki-native-editor .viewer-editor-row.reason { border-left: 2px solid var(--accent); background: var(--track); }
+body.loki-native-editor .viewer-editor-row.cluster-member { background: var(--track); }
+body.loki-native-editor .viewer-editor-row.cluster-member.rest { background: var(--surface); }
+body.loki-native-editor .viewer-editor-measurement { color: var(--text); background: var(--track); }
+body.loki-native-editor .viewer-editor-measurement.low { border-left-color: var(--signal); }
+body.loki-native-editor .viewer-editor-measurement.medium { border-left-color: var(--accent); }
+body.loki-native-editor .viewer-editor-measurement.hot { border-left-color: var(--warning); }
+body.loki-native-editor .viewer-editor-member-rank { background: var(--surface-2) !important; }
+body.loki-native-editor :is(.viewer-editor-collision-preview,.viewer-editor-collision-shared-preview,.viewer-editor-collision-pinned,.viewer-editor-floating-disclosure) { border-color: var(--border); background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+body.loki-native-editor .viewer-editor-outline-marker[data-evidence-preview]::after { border-color: var(--border); background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+body.loki-native-editor .viewer-editor-collision-preview-meta,
+body.loki-native-editor .viewer-editor-collision-shared-preview .viewer-editor-collision-preview-meta,
+body.loki-native-editor .viewer-editor-collision-member time { color: var(--accent); }
+body.loki-native-editor .viewer-editor-collision-member:hover { outline-color: var(--accent); background: var(--accent-soft); }
+body.loki-native-editor :is(.viewer-editor-status-badge,.cva-member-chip,.cva-member-chip.is-linked) { border-color: var(--border); background: var(--surface-2); color: var(--muted); }
+body.loki-native-editor .cva-member-chip.is-linked { color: var(--accent); }
+body.loki-native-editor :is(.cva-collaboration-label,.cva-period-time,.cva-collaboration-note) { color: var(--muted); }
+body.loki-native-editor .cva-member-vod-options { border-color: var(--border); background: var(--surface); box-shadow: var(--shadow); }
+body.loki-native-editor .cva-member-vod-options a { color: var(--accent); }
+body.loki-native-editor .cva-member-vod-options a:hover { background: var(--surface-2); }
+body.loki-native-editor > .public-report-nav,
+body.loki-native-editor > header,
+body.loki-native-editor > .stats-wrap,
+body.loki-native-editor > #summaryPipelineIdentity {
+  display: none !important;
+}
+body.loki-native-editor .main.bleed-inner {
+  display: block;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 0 !important;
+}
+/* Retain original authored nodes and tab listeners; show their editor panel. */
+body.loki-native-editor .main.bleed-inner > :not(#youtube-editor-tools):not(#cva-result-panel-editor):not(script):not(style):not(.public-report-toast) {
+  display: none !important;
+}
+body.loki-native-editor #cva-result-panel-editor {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+body.loki-native-editor #cva-result-panel-editor > .viewer-editor-tools {
+  margin-bottom: 0;
+}
+/* The original final card's collapsed margin escaped the measured iframe root. */
+body.loki-native-editor #cva-result-panel-editor > .card:last-child {
+  margin-bottom: 0;
+}
+/* Native runtime moves this chart outside .viewer-editor-grid. Match that
+   grid's outer gutter, leaving its independent canvas scale and clicks intact. */
+body.loki-native-editor #cva-result-panel-editor > .card:has(#chatChart) {
+  margin: 0;
+  padding: 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+@media (max-width: 680px) {
+  body.loki-native-editor .viewer-editor-head { padding: 14px 12px; gap: 10px; }
+  body.loki-native-editor .viewer-editor-title { font-size: 17px; }
+  body.loki-native-editor .editor-companion-workspace-guide { gap: 4px 8px; }
+  body.loki-native-editor .editor-companion-workspace-link { min-height: 40px; padding-inline: 9px; }
+  body.loki-native-editor .editor-companion-help summary { min-height: 40px; padding-block: 10px; }
+  body.loki-native-editor .viewer-editor-grid { padding: 16px 12px; gap: 20px; }
+  body.loki-native-editor #cva-result-panel-editor > .card:has(#chatChart) { padding: 16px 12px; }
+  body.loki-native-editor #viewerEditorCount { flex-basis: 100%; margin: 0; }
+  body.loki-native-editor .viewer-editor-filter select,
+  body.loki-native-editor .viewer-editor-zoom button { min-height: 40px; }
+  body.loki-native-editor input[type="range"] { min-height: 32px; }
+  body.loki-native-editor .viewer-editor-zoom input[type="range"] { width: 118px; }
+  body.loki-native-editor .viewer-editor-selected-card { padding: 14px; }
+  body.loki-native-editor .viewer-editor-chip { min-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-native-editor="original"] { scroll-behavior: auto; }
+}

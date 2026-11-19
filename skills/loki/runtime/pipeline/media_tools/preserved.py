@@ -10,7 +10,7 @@ from copy import deepcopy
 
 from .contracts import MediaToolError, ToolRequest
 
-from ..evidence_world.contracts import digest
+from ..evidence_world.contracts import digest, native_path
 
 from .executor import (_extract_frames, _tool_paths, _probe_duration,
                        _sha256, _artifact_rows, FRAME_PROFILES)
@@ -28,7 +28,7 @@ def _collected_decode_input(path, request, root):
 
 def _decode_input(media, request, root):
     """Keep the original binding; narrow a verified captured playlist for decoding."""
-    path = Path(media['path']).resolve(strict=True)
+    path = native_path(media['path']).resolve(strict=True)
     if _sha256(path) != media['sha']:
         raise MediaToolError('source_revision_changed', 'preserved media bytes changed')
     offset = request.start_sec - float(media['start'])
@@ -37,12 +37,16 @@ def _decode_input(media, request, root):
     collected = assert_collected_media_fresh(path, intervals=intervals)
     if collected:
         original = media.get('original_media')
-        if original and _sha256(Path(original['path'])) != original['sha256']:
+        if original and _sha256(native_path(original['path'])) != original['sha256']:
             raise MediaToolError('source_revision_changed', 'original media bytes changed')
         selected, offset = _collected_decode_input(path, request, root)
         return selected, offset, dict(path=str(selected), sha256=_sha256(selected),
             source_playlist=dict(path=str(path), sha256=media['sha']))
     return path, offset, None
+
+def _source_identity(path):
+    info = path.stat()
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 def extract_preserved_frames(request: ToolRequest, *, media: dict, output_root: Path):
     if request.action != "frames" or request.duration_sec is None:
@@ -53,6 +57,8 @@ def extract_preserved_frames(request: ToolRequest, *, media: dict, output_root: 
     ffmpeg, ffprobe = _tool_paths()
     root = output_root.resolve()
     root.mkdir(parents=True, exist_ok=True)
+    source = native_path(media['path'])
+    original_identity = _source_identity(source)
     path, offset, effective = _decode_input(media, request, root)
     observed = _probe_duration(path, ffprobe)
     if offset + request.duration_sec > observed + 0.05:
@@ -63,12 +69,17 @@ def extract_preserved_frames(request: ToolRequest, *, media: dict, output_root: 
     paths, times = _extract_frames(path, root, ffmpeg, request.duration_sec,
                                   request.start_sec, height, local_start_sec=offset,
                                   decode_from_start=effective is not None)
+    try:
+        if (_source_identity(source) != original_identity or _sha256(source) != media['sha']
+                or _source_identity(source) != original_identity):
+            raise MediaToolError('source_revision_changed', 'preserved source changed during decode')
+        original = media.get('original_media') if effective else None
+        if original and _sha256(native_path(original['path'])) != original['sha256']:
+            raise MediaToolError('source_revision_changed', 'preserved source changed during decode')
+    except OSError as exc:
+        raise MediaToolError('source_revision_changed', 'preserved source changed during decode') from exc
     if effective:
         from ..collected_vod_media import assert_collected_media_fresh
-        if _sha256(Path(media['path'])) != media['sha'] or (
-                media.get('original_media') and
-                _sha256(Path(media['original_media']['path'])) != media['original_media']['sha256']):
-            raise MediaToolError('source_revision_changed', 'preserved source changed during decode')
         assert_collected_media_fresh(path)
     return dict(schema_version="media.preserved-frames.v1", request=request.canonical_payload(),
                 media_sha256=media["sha"], frame_timestamps_sec=times,
@@ -78,8 +89,11 @@ def extract_preserved_frames(request: ToolRequest, *, media: dict, output_root: 
                 **(dict(effective_media=effective) if effective else {}),
                 audio_listened=False)
 
-def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path):
+def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path,
+                                   output_height: int | None = None):
     """Decode one owned local source batch, verifying unique bytes before/after."""
+    if output_height is not None and (type(output_height) is not int or output_height < 2):
+        raise MediaToolError("invalid_request", "output height must be an integer of at least two pixels")
     requests = tuple(requests)
     if not requests:
         return []
@@ -96,7 +110,7 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path):
     sources = {}
 
     def bind_source(locator, expected=None):
-        original = Path(locator)
+        original = native_path(locator)
         path = original.resolve(strict=True)
         if path not in sources:
             sources[path] = (original, _sha256(path))
@@ -113,7 +127,8 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path):
     from ..collected_vod_media import assert_collected_media_fresh
     plans = {}
     for request in requests:
-        key = digest(request.canonical_payload())
+        key = digest(request.canonical_payload() if output_height is None else
+                     [request.canonical_payload(), output_height])
         if key in plans:
             continue
         folder = root / key
@@ -133,7 +148,8 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path):
             observed = _probe_duration(path, ffprobe)
             if offset + request.duration_sec > observed + 0.05:
                 raise MediaToolError("media_truncated", "requested window exceeds the saved media")
-            height = min(FRAME_PROFILES[request.inspection_mode]["height"], int(media["saved_height"]))
+            height = min(FRAME_PROFILES[request.inspection_mode]["height"] if output_height is None
+                         else output_height, int(media["saved_height"]))
             if height < 2:
                 raise MediaToolError("invalid_request", "source height is missing")
             paths, times = _extract_frames(path, folder, ffmpeg, request.duration_sec,
@@ -150,4 +166,5 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path):
         for locator, expected in sources.values():
             if _sha256(locator) != expected:
                 raise MediaToolError("source_revision_changed", "preserved source changed during batch decode")
-    return [deepcopy(receipts[digest(request.canonical_payload())]) for request in requests]
+    return [deepcopy(receipts[digest(request.canonical_payload() if output_height is None else
+                                    [request.canonical_payload(), output_height])]) for request in requests]

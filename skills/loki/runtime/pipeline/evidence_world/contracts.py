@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 from contextvars import ContextVar
 
 from dataclasses import asdict, dataclass
@@ -52,6 +54,15 @@ def file_hash(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 _origin_path_resolver = ContextVar('evidence_origin_path_resolver', default=None)
+
+@contextmanager
+def scoped_path_resolver(resolve):
+    """Resolve trusted historical locators for one read, preserving stored strings."""
+    token = _origin_path_resolver.set(resolve)
+    try:
+        yield
+    finally:
+        _origin_path_resolver.reset(token)
 
 def native_path(path):
     """Keep full identity paths without relying on host-global long-path policy."""
