@@ -37,6 +37,16 @@ class ResolvedChzzkSource:
     source_revision: str
     media_url: str = field(repr=False)
 
+
+    identity_revision: str = field(default="", repr=False)
+
+def same_chzzk_source(source: Any, revision: Any, identity: Any = None) -> bool:
+    """Compare a fresh source with a stored binding; legacy bindings keep the full revision."""
+    current = getattr(source, "identity_revision", "")
+    if isinstance(identity, str) and identity and current:
+        return identity == current
+    return revision == getattr(source, "source_revision", None)
+
 def _select_representation(representations: list[list[Any]], target_height: int) -> tuple[int, str]:
     normalized: list[tuple[int, str]] = []
     for row in representations:
@@ -103,11 +113,13 @@ def resolve_chzzk_source(
                 video_no, dict(cookies or {}))
         representations: list[list[Any]] = []
         audio_representations: list[Mapping[str, Any]] = []
+        manifest_family = "dash"
         if video_id and in_key:
             media_manifest = NetworkManager.get_video_dash_media_manifest(video_id, in_key)
             representations = media_manifest["video"]
             audio_representations = media_manifest["audio"]
         if not representations and live_rewind:
+            manifest_family = "live_rewind"
             representations, _auto_height, _auto_url = NetworkManager.get_video_m3u8_manifest(live_rewind)
 
 
@@ -155,6 +167,11 @@ def resolve_chzzk_source(
     source_revision = hashlib.sha256(
         json.dumps(revision_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+    identity_payload = {key: revision_payload[key] for key in ("video_no", "video_id", "duration_sec")}
+    identity_revision = hashlib.sha256(
+        json.dumps({**identity_payload, "manifest": manifest_family}, sort_keys=True,
+                   separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     return ResolvedChzzkSource(
         video_no=video_no,
         video_id=str(video_id or "live-rewind"),
@@ -164,6 +181,7 @@ def resolve_chzzk_source(
         selected_audio_bitrate=selected_audio_bitrate,
         source_revision=source_revision,
         media_url=media_url,
+        identity_revision=identity_revision,
     )
 
 def resolve_chzzk_preview_catalog(video_no: str) -> dict[str, Any]:

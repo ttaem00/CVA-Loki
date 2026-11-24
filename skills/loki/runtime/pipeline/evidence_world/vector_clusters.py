@@ -58,7 +58,7 @@ def build_navigation(rows, vectors, *, source_id, world_revision):
     import numpy as np
     policy=deepcopy(DOCUMENT_COSINE_NAVIGATION)
     if (not isinstance(source_id,str) or not source_id or not isinstance(world_revision,str)
-            or not world_revision or not isinstance(rows,list) or not 1<=len(rows)<=policy['max_units']):
+            or not world_revision or not isinstance(rows,list) or not rows):
         raise EvidenceError('vector_navigation_input')
     occurrences=[_occurrence(row) for row in rows]
     if len({row['unit_id'] for row in rows})!=len(rows):
@@ -74,6 +74,10 @@ def build_navigation(rows, vectors, *, source_id, world_revision):
     values=values/np.linalg.norm(values,axis=1,keepdims=True)
     order=sorted(range(len(rows)),key=lambda i:(rows[i]['start_us'] is None,
         rows[i]['start_us'] or 0,rows[i]['family'],rows[i]['unit_id']))
+    budget=policy['max_pair_comparisons']
+
+
+    reserved_window=min(policy['max_units'],budget//len(order)+1)
     remaining=set(order)
     groups=[]
     comparisons=0
@@ -85,32 +89,56 @@ def build_navigation(rows, vectors, *, source_id, world_revision):
             representative_text=rows[indices[0]]['norm_text'],
             same_event_inferred=False,original_read=False))
 
-    for seed in order:
-        if seed not in remaining:
-            continue
-        candidates=[i for i in order if i in remaining and i!=seed]
-        matched=[seed]
-        complete=True
-        for offset in range(0,len(candidates),policy['comparison_batch']):
-            available=policy['max_pair_comparisons']-comparisons
-            batch=candidates[offset:offset+min(policy['comparison_batch'],available)]
-            if not batch:
-                complete=False
-                break
-            scores=values[batch] @ values[seed]
-            comparisons+=len(batch)
-            matched.extend(i for i,score in zip(batch,scores) if score>=policy['threshold'])
-            if len(batch)<min(policy['comparison_batch'],len(candidates)-offset):
-                complete=False
-                break
-        if len(matched)>=policy['min_group_size']:
-            add('cosine_group',matched)
-            remaining.difference_update(matched)
-        elif complete:
-            add('singleton',[seed])
-            remaining.remove(seed)
-        if not complete:
-            break
+    def compare_window(window, *, reserve_tail=False):
+        nonlocal comparisons
+        for seed in window:
+            if seed not in remaining:
+                continue
+            candidates=[i for i in window if i in remaining and i!=seed]
+            if reserve_tail:
+                count=len(candidates)+1
+                available=budget-comparisons
+                full_cost=count*(count-1)//2
+                reserve=count*(min(count,reserved_window)-1)//2
+                if full_cost>available and len(candidates)+reserve>available:
+                    return
+            matched=[seed]
+            complete=True
+            for offset in range(0,len(candidates),policy['comparison_batch']):
+                available=budget-comparisons
+                batch=candidates[offset:offset+min(policy['comparison_batch'],available)]
+                if not batch:
+                    complete=False
+                    break
+                scores=values[batch] @ values[seed]
+                comparisons+=len(batch)
+                matched.extend(i for i,score in zip(batch,scores) if score>=policy['threshold'])
+                if len(batch)<min(policy['comparison_batch'],len(candidates)-offset):
+                    complete=False
+                    break
+            if len(matched)>=policy['min_group_size']:
+                add('cosine_group',matched)
+                remaining.difference_update(matched)
+            elif complete:
+                add('singleton',[seed])
+                remaining.remove(seed)
+            if not complete:
+                return
+
+    if len(order)<=policy['max_units']:
+        compare_window(order,reserve_tail=reserved_window>=2)
+    global_comparisons=comparisons
+    windows=0
+    window_size=None
+    if remaining:
+        tail=[i for i in order if i in remaining]
+
+
+        window_size=min(policy['max_units'],2*(budget-comparisons)//len(tail)+1)
+        if window_size>=2:
+            for start in range(0,len(tail),window_size):
+                compare_window(tail[start:start+window_size])
+                windows+=1
     if remaining:
         add('uncompared',[i for i in order if i in remaining])
 
@@ -138,6 +166,9 @@ def build_navigation(rows, vectors, *, source_id, world_revision):
     return dict(schema_version='ew.document-cosine-navigation.v1',profile=policy['profile'],
         source_id=source_id,world_revision=world_revision,policy=policy,groups=groups,
         input_units=len(rows),pair_comparisons=comparisons,
+        **(dict(comparison_scope='global_then_source_order_windows' if global_comparisons
+                else 'within_source_order_windows', global_pair_comparisons=global_comparisons,
+                max_units_per_window=window_size, window_count=windows) if windows else {}),
         grouping_complete=not remaining,hierarchy=hierarchy,
         hierarchy_status='ready' if hierarchy is not None else 'section_limit',
         hierarchy_sections_required=len(sections),outside_navigation='source_order',

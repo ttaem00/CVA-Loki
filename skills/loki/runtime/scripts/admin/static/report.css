@@ -55,8 +55,7 @@
     .app.manager-outline-mode #publishRow,
     .app.manager-outline-mode #ctToggleRow,
     .app.manager-outline-mode .naver-post-panel,
-    .app.manager-outline-mode .youtube-section,
-    .app.manager-outline-mode #revisionHistoryBtn {
+    .app.manager-outline-mode .youtube-section {
       display: none;
     }
     .app.manager-outline-mode .sidebar { border-right: 0; }
@@ -551,126 +550,6 @@
     .ct-toggle-row .checkbox { color: var(--text); font-weight: 600; }
     .ct-toggle-row .ct-hint { font-size: 12px; color: var(--muted); margin-left: auto; }
     .ct-toggle-row.disabled .ct-hint { color: var(--danger); }
-    .topbar button.link-button {
-      border: 0;
-      background: transparent;
-      color: var(--tc);
-      padding: 0;
-      border-radius: 0;
-      font: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: none;
-      cursor: pointer;
-      transform: none;
-    }
-    .topbar button.link-button:hover {
-      color: var(--tc-soft);
-      background: transparent;
-      transform: none;
-    }
-    .revision-panel {
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      display: none;
-      align-items: stretch;
-      justify-content: flex-end;
-      background: rgba(10,12,20,0.62);
-    }
-    .revision-panel.open { display: flex; }
-    .revision-dialog {
-      width: min(520px, 100vw);
-      height: 100%;
-      overflow: auto;
-      padding: 18px;
-      border-left: 1px solid rgba(122,162,247,0.25);
-      background: linear-gradient(180deg, rgba(36,40,59,0.98), rgba(26,27,38,0.98));
-      box-shadow: -18px 0 38px rgba(0,0,0,0.35);
-    }
-    .revision-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .revision-title {
-      color: var(--text-strong);
-      font-size: 14px;
-      font-weight: 750;
-      line-height: 1.35;
-    }
-    .revision-lead {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.55;
-    }
-    .revision-badge {
-      flex: 0 0 auto;
-      padding: 3px 8px;
-      border: 1px solid rgba(122,162,247,0.42);
-      border-radius: var(--r-sm);
-      color: var(--tc);
-      font-size: 11px;
-      font-weight: 800;
-    }
-    .revision-state-legend { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
-    .revision-state-legend div { border:1px solid var(--border); border-radius:8px; padding:9px; color:var(--muted); font-size:12px; line-height:1.45; }
-    .revision-state-legend strong { display:block; color:var(--text-strong); }
-    .revision-item[aria-current="true"] { border-color:var(--tc); box-shadow:var(--shadow-glow); }
-    .revision-product-state { color:var(--tc-soft); font-weight:800; }
-    .revision-product-state.public { color:var(--accent); }
-    .revision-product-state.human { color:var(--accent-warm); }
-    .revision-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .revision-close {
-      min-height: 32px;
-      padding: 6px 10px;
-      border-radius: var(--r-sm);
-      font-size: 12px;
-    }
-    .revision-item {
-      border: 1px solid var(--border);
-      background: rgba(26,27,38,0.45);
-      border-radius: var(--r-sm);
-      padding: 10px;
-    }
-    .revision-meta {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
-    }
-    .revision-meta strong { color: var(--text-strong); font-size: 12px; }
-    .revision-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-    .revision-actions button,
-    .revision-actions a {
-      min-height: 32px;
-      padding: 6px 9px;
-      font-size: 12px;
-      border-radius: var(--r-sm);
-    }
-    .revision-empty {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.55;
-    }
-    @media (max-width: 640px) {
-      .revision-dialog { width: 100vw; }
-    }
     .naver-post-panel {
       margin-top: 12px;
       padding: 14px;
@@ -1912,9 +1791,6 @@
     .report-heading #meta { color:#9aa5c9; font-size:12px; }
     .preview-bar > .report-surfaces { flex:1 1 320px; }
     .report-context-strip .report-context-navigation { margin:10px 0; }
-    .outline-history-entry { padding:14px 0; border-top:1px solid var(--border); }
-    .outline-history-entry p { margin:8px 0; color:#9aa5c9; font-size:12px; }
-    .outline-history-entry > details > summary { min-height:44px; padding:12px 0; cursor:pointer; }
     .report-context-strip #reportVersions:empty { display: none; }
     .report-context-strip #reportWorkspaceLink { color: var(--tc); }
     .report-context-strip .canonical-conflict-banner { margin-top: 8px; }

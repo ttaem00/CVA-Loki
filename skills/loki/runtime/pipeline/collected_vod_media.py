@@ -1,5 +1,7 @@
 """Standalone inputs use confirmed VOD clocks; live-finalizer archives are not bundled."""
 
+HEADER = "#CHZZ-COLLECTED-VOD:"
+
 def collected_clock(srt_path, video_no, duration_sec):
     return None
 

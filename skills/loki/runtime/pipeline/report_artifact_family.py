@@ -10,6 +10,8 @@ import html
 
 import json
 
+import logging
+
 import os
 
 import re
@@ -31,6 +33,8 @@ from typing import Any
 from uuid import uuid4
 
 SCHEMA_VERSION = "report_artifact_family.v1"
+
+_LOGGER = logging.getLogger(__name__)
 
 class ReportArtifactFamilyError(RuntimeError):
     """Raised when a report family is partial, mixed, or unverifiable."""
@@ -129,6 +133,39 @@ def _viewer_payload(html_text: str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return value if isinstance(value, dict) else None
+
+def present_saved_report_html(html_text: str, metadata: dict[str, Any]) -> str:
+    """Use the common saved presentation for a new Loki 3.0.9 report revision."""
+    pipeline = metadata.get("summary_pipeline")
+    if not isinstance(pipeline, dict) or pipeline.get("actual_version") != "loki_3_0_9":
+        return html_text
+    try:
+        from publish.builder.loki_template import saved_report_html, saved_report_source_html
+        from publish.builder.report_sanitizers import (
+            _project_public_editorial_scene_images_payload,
+            _sanitize_public_bundle_viewer_editor_payload,
+            _strip_admin_only_timeline_comment_events,
+        )
+
+        html_text = saved_report_source_html(html_text)
+        payload = _viewer_payload(html_text)
+        if not payload:
+            return html_text
+        viewer = _project_public_editorial_scene_images_payload(
+            _sanitize_public_bundle_viewer_editor_payload(_strip_admin_only_timeline_comment_events(payload))
+        )
+        return saved_report_html(html_text, viewer, {
+            "video_no": metadata.get("video_no"),
+            "title": metadata.get("title"),
+            "streamer_name": metadata.get("channel"),
+            "published_at": metadata.get("publish_date"),
+            "platform_category": metadata.get("category"),
+        })
+    except Exception as error:
+
+        _LOGGER.warning("Loki saved presentation unavailable for VOD %s (%s)",
+                        metadata.get("video_no"), type(error).__name__)
+        return html_text
 
 def _editorial_packet_sha256(metadata: dict[str, Any]) -> str:
     packet = metadata.get("editorial_review_packet")
@@ -325,6 +362,11 @@ def prepare_report_artifact_family(
             "sha256": family["artifacts"]["html"]["sha256"],
         }
     prepared = copy.deepcopy(metadata)
+    owner = prepared.get("live_report_owner")
+    if isinstance(owner, dict) and "generation_id" not in owner:
+
+
+        owner["generation_id"] = generation_id
     prepared["report_artifact_family"] = family
     family["metadata_payload_sha256"] = _metadata_payload_hash(prepared)
     return prepared, generation_id
@@ -468,6 +510,7 @@ def commit_report_artifact_family(
     finals = [*content_finals, metadata_final]
     if len(set(finals)) != len(finals):
         raise ValueError("report artifact family paths must be unique")
+    html_text = present_saved_report_html(html_text, metadata)
     prepared, generation_id = prepare_report_artifact_family(
         metadata=metadata,
         markdown_text=markdown_text,

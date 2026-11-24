@@ -1,134 +1,13 @@
-    let selectedRevisionId = '';
-    let publishRevisionRecords = [];
     let savedMd = '';
     let editorialReviewReadError = null;
     let reportLoadSequence = 0;
     // A structured Report Admin shows BroadcastMap Markdown in the editor,
     // but Publish must keep using the complete report Markdown loaded from /api/report.
     let normalReportMarkdown = '';
-    function revisionSourceLabel(source) {
-      const map = {
-        admin_open_current: '현재 저장본',
-        before_admin_save: '저장 전 상태',
-        admin_save_local: '로컬 저장',
-        admin_save_publish: '공개 반영',
-      };
-      return map[source] || source || '기록';
-    }
-
-    function revisionProductState(item) {
-      const source = String(item && item.source || '');
-      const actor = String(item && item.actor_kind || 'unknown');
-      const publishState = String(item && item.publish_state || '');
-      const approval = item && item.approval || {};
-      const isPublic = publishState === 'published'
-        && actor === 'human_manager' && !item.test_mode && !!approval.approval_id;
-      if (isPublic) return { key: 'public', label: '공개 미리보기' };
-      if (actor === 'human_manager' || ['admin_save_local', 'manager_restore_exact_revision'].includes(source)) return { key: 'human', label: '사람 수정' };
-      return { key: 'ai', label: 'AI 원본' };
-    }
-
-    function revisionTimeLabel(value) {
-      const raw = String(value || '');
-      if (!raw) return '시간 미확인';
-      const date = new Date(raw);
-      if (Number.isNaN(date.getTime())) return raw;
-      return date.toLocaleString('ko-KR');
-    }
-
-    function renderPublishRevisions(payload) {
-      if (!revisionListEl) return;
-      const records = payload && Array.isArray(payload.records) ? payload.records : [];
-      publishRevisionRecords = records.slice();
-      const auditEvents = payload && payload.publish_audit && Array.isArray(payload.publish_audit.events)
-        ? payload.publish_audit.events : [];
-      if (!records.length) {
-        const blocked = auditEvents[0];
-        revisionListEl.innerHTML = blocked
-          ? `<div class="revision-empty">최근 공개 요청: ${escapeHtml(blocked.outcome || '기록')} · ${escapeHtml(blocked.reason || '')} · 행위자 ${escapeHtml(blocked.actor_kind || 'unknown')}</div>`
-          : '<div class="revision-empty">아직 되돌릴 기록이 없습니다. 다음 저장부터 저장 전/후 화면이 자동으로 남습니다.</div>';
-        return;
-      }
-      const auditHtml = auditEvents.slice(0, 4).map((event) => {
-        const before = event.before_hashes || {};
-        const after = event.after_hashes || {};
-        return `<div class="revision-empty">
-          공개 요청 ${escapeHtml(event.outcome || 'unknown')} · ${escapeHtml(event.reason || '')}<br>
-          행위자 ${escapeHtml(event.actor_kind || 'unknown')} · 승인 ${escapeHtml(event.approval_id || '없음')} · 대상 ${escapeHtml(event.target_revision_id || '없음')}<br>
-          본문 ${(before.md || '').slice(0, 8)} → ${(after.md || '').slice(0, 8)} · ${escapeHtml(revisionTimeLabel(event.occurred_at))}
-        </div>`;
-      }).join('');
-      const currentPublished = records.find((item) => revisionProductState(item).key === 'public');
-      const currentPublishedId = String(currentPublished && currentPublished.revision_id || '');
-      const revisionHtml = records.slice(0, 12).map((item, index) => {
-        const id = String(item.revision_id || '');
-        const template = item.template_ref || {};
-        const source = String(item.source || '');
-        const hashes = item.hashes || {};
-        const approval = item.approval || {};
-        const beforeHashes = approval.before_hashes || {};
-        const afterHashes = approval.after_hashes || hashes;
-        const actor = String(item.actor_kind || 'unknown');
-        const productState = revisionProductState(item);
-        const isSelected = id === selectedRevisionId;
-        const isCurrentPublic = id === currentPublishedId;
-        const mdLines = item.summary && item.summary.md_lines ? Number(item.summary.md_lines) : 0;
-        const htmlBytes = item.summary && item.summary.html_bytes ? Number(item.summary.html_bytes) : 0;
-        const templateLabel = template.git_head
-          ? `템플릿 ${escapeHtml(template.git_head)}${template.git_dirty ? ' · 작업 중 변경 포함' : ''}`
-          : '템플릿 기록 있음';
-        return `
-          <article class="revision-item" data-revision-id="${escapeHtml(id)}" data-product-state="${escapeHtml(productState.key)}" aria-current="${isSelected ? 'true' : 'false'}">
-            <div class="revision-meta">
-              <strong>${index === 0 ? '최신 · ' : ''}${escapeHtml(revisionSourceLabel(source))}</strong>
-              <span class="revision-product-state ${escapeHtml(productState.key)}">${escapeHtml(productState.label)}</span>
-              ${isSelected ? '<span>현재 선택</span>' : ''}
-              ${isCurrentPublic ? '<span>현재 공개본</span>' : '<span>공개 대상 아님</span>'}
-              <span>${escapeHtml(revisionTimeLabel(item.created_at))}</span>
-              <span>본문 ${mdLines.toLocaleString()}줄</span>
-              <span>화면 ${(htmlBytes / 1024).toFixed(1)}KB</span>
-              <span>${templateLabel}</span>
-              <span title="${escapeHtml(hashes.md || '')}">본문 해시 ${(hashes.md || '').slice(0, 8)}</span>
-              <span>행위자 ${escapeHtml(actor)}${item.test_mode ? ' · 테스트' : ''}</span>
-              ${approval.approval_id ? `<span>승인 ${escapeHtml(approval.approval_id)}</span>` : '<span>승인 영수증 없음</span>'}
-              ${approval.target_revision_id ? `<span>대상 ${escapeHtml(approval.target_revision_id)}</span>` : ''}
-              ${beforeHashes.md ? `<span>전후 ${(beforeHashes.md || '').slice(0, 8)} → ${(afterHashes.md || '').slice(0, 8)}</span>` : ''}
-            </div>
-            <div class="revision-actions">
-              <button type="button" class="ghost" data-preview-revision="${escapeHtml(id)}">이전 화면 보기</button>
-              <button type="button" class="ghost" data-restore-revision="${escapeHtml(id)}">${managerOutlineContext && managerOutlineContext.normalReport ? '이 버전 복원' : '본문으로 불러오기'}</button>
-            </div>
-          </article>`;
-      }).join('');
-      revisionListEl.innerHTML = auditHtml + revisionHtml;
-      revisionListEl.querySelectorAll('[data-preview-revision]').forEach((btn) => {
-        btn.addEventListener('click', () => previewRevision(btn.dataset.previewRevision || ''));
-      });
-      revisionListEl.querySelectorAll('[data-restore-revision]').forEach((btn) => {
-        btn.addEventListener('click', () => restoreRevisionFromHistory(btn.dataset.restoreRevision || ''));
-      });
-    }
-
-    function setRevisionPanelOpen(open) {
-      if (!revisionPanelEl) return;
-      revisionPanelEl.classList.toggle('open', !!open);
-      revisionPanelEl.setAttribute('aria-hidden', open ? 'false' : 'true');
-      if (open) {
-        refreshPublishRevisions().catch((err) => setStatus(err.message, 'err'));
-        if (revisionCloseBtn) revisionCloseBtn.focus();
-      } else if (revisionHistoryBtn) {
-        revisionHistoryBtn.focus();
-      }
-    }
-
-    async function refreshPublishRevisions(payload) {
-      if (!revisionListEl || !base) return;
-      if (payload) {
-        renderPublishRevisions(payload);
-        return;
-      }
-      const data = await api(`/api/publish-revisions?base=${encodeURIComponent(base)}`);
-      renderPublishRevisions(data);
+    function workspaceRevisionHistoryUrl() {
+      const query = new URLSearchParams(location.search);
+      query.set('history', '1');
+      return '/report-workspace?' + query;
     }
 
     function encodeFrameParam(value) {
@@ -147,128 +26,6 @@
       }
     }
 
-    async function previewRevision(revisionId) {
-      if (!revisionId) return;
-      selectedRevisionId = revisionId;
-      await loadPreviewFrameHtml(`/api/publish-revision-html?base=${encodeFrameParam(base)}&revision_id=${encodeFrameParam(revisionId)}&t=${Date.now()}`);
-      previewTitleEl.textContent = '이전 화면 미리보기';
-      refreshPublishRevisions().catch(() => {});
-      setStatus('이전 화면을 미리보기로 열었습니다. 현재 선택은 공개 대상으로 선택되지 않았습니다.', 'info');
-    }
-
-    async function restoreRevisionDraft(revisionId) {
-      if (!revisionId) return;
-      selectedRevisionId = revisionId;
-      const data = await api('/api/publish-revision-draft', {
-        method: 'POST',
-        body: JSON.stringify({ base, revision_id: revisionId }),
-      });
-      if (typeof data.md === 'string') {
-        mdEditor.value = data.md;
-        setDirty(mdEditor.value !== savedMd);
-      }
-      if (typeof data.html === 'string') {
-        previewFrame.srcdoc = data.html;
-      }
-      previewTitleEl.textContent = '되돌린 초안 미리보기';
-      refreshPublishRevisions(data.revisions || null).catch(() => {});
-      const diff = data.diff_summary || {};
-      const added = Number(diff.added_lines || 0);
-      const removed = Number(diff.removed_lines || 0);
-      setStatus(`이전 본문을 편집칸에 불러왔습니다. 공개 대상으로 선택되지 않았습니다. 저장 전까지 공개 사이트는 바뀌지 않습니다. (+${added} / -${removed})`, 'warn');
-    }
-
-    function outlineSignatureFromMarkdown(markdown) {
-      const broadcastMap = String(markdown || '').split(/\n---\s*\n|\n## 편집 Highlight\b/, 1)[0];
-      return broadcastMap.split(/\r?\n/).map(line => line.trim()).filter(line => (
-        /^#{3,4}\s+\d{2}:\d{2}:\d{2}(?:[–-]\d{2}:\d{2}:\d{2})?\s+\S/.test(line)
-      )).join('\n');
-    }
-
-    function outlineSignatureFromRevision(version) {
-      const outline = version && version.outline || {};
-      const ranges = Array.isArray(outline.ranges) ? outline.ranges : [];
-      const points = Array.isArray(outline.points) ? outline.points : [];
-      const rangeLines = ranges.map(item => {
-        const depth = String(item.level || '') === 'D2' ? '####' : '###';
-        return `${depth} ${String(item.start || '')}–${String(item.end || '')} ${String(item.title || '')}`.trim();
-      });
-      const pointLines = points.map(item => (
-        `### ${String(item.timestamp || '')} ${String(item.title || '')}`.trim()
-      ));
-      return [...rangeLines, ...pointLines].join('\n');
-    }
-
-    function combinedRevisionTimestamp(revisionId) {
-      const match = String(revisionId || '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3})/);
-      if (!match) return Number.NaN;
-      return Date.UTC(
-        Number(match[1]), Number(match[2]) - 1, Number(match[3]),
-        Number(match[4]), Number(match[5]), Number(match[6]), Number(match[7]),
-      );
-    }
-
-    function combinedRevisionForPublish(revisionId, outlineSignature, selectedMarkdown = null) {
-      let candidates = (managerOutlineContext.revisions || []).filter(version => (
-        outlineSignature
-        && outlineSignatureFromRevision(version) === outlineSignature
-      ));
-      if (!candidates.length) return null;
-      const exact = candidates.find(row => String(row.revision_id) === String(revisionId));
-      if (exact) return exact;
-      if (typeof selectedMarkdown === 'string') {
-        const exact = candidates.filter(version => version.md === selectedMarkdown);
-        if (exact.length) candidates = exact;
-        const contents = new Set(candidates.map(version => JSON.stringify({
-          md: version.md, outline: version.outline, packet: version.qg1_review_packet || null,
-        })));
-        if (contents.size > 1) return null;
-      }
-      const publishRecord = publishRevisionRecords.find(record => (
-        String(record && record.revision_id || '') === String(revisionId || '')
-      ));
-      const publishTime = new Date(publishRecord && publishRecord.created_at || '').getTime();
-      const timed = candidates.map(version => ({
-        version,
-        timestamp: combinedRevisionTimestamp(version.revision_id),
-      })).filter(row => Number.isFinite(row.timestamp));
-      if (Number.isFinite(publishTime)) {
-        const preceding = timed
-          .filter(row => row.timestamp <= publishTime)
-          .sort((left, right) => right.timestamp - left.timestamp);
-        if (preceding.length) return preceding[0].version;
-      }
-      const sourceSnapshot = timed
-        .filter(row => String(row.version.revision_id || '').endsWith('-source'))
-        .sort((left, right) => left.timestamp - right.timestamp);
-      if (sourceSnapshot.length) return sourceSnapshot[0].version;
-      return timed.sort((left, right) => left.timestamp - right.timestamp)[0]?.version || candidates[0];
-    }
-
-    async function restoreRevisionFromHistory(revisionId) {
-      if (!revisionId) return;
-      if (!(managerOutlineContext && managerOutlineContext.normalReport)) {
-        return restoreRevisionDraft(revisionId);
-      }
-      selectedRevisionId = revisionId;
-      setRevisionPanelOpen(false);
-      const draft = await api('/api/publish-revision-draft', {
-        method: 'POST',
-        body: JSON.stringify({ base, revision_id: revisionId }),
-      });
-      const draftOutlineSignature = outlineSignatureFromMarkdown(draft.md);
-      const matchingCombinedRevision = combinedRevisionForPublish(
-        revisionId,
-        draftOutlineSignature,
-        draft.md,
-      );
-      if (!matchingCombinedRevision || !matchingCombinedRevision.revision_id) {
-        throw new Error('목차 제목·시각만으로 이 본문에 맞는 구조·Highlight 이력을 하나로 정할 수 없습니다. 목차 저장본 이력에서 비교한 뒤 복원할 버전을 직접 선택하세요. 현재 초안은 그대로입니다.');
-      }
-      if (!await restoreManagerOutline(matchingCombinedRevision.revision_id, draft.md)) return;
-      await refreshPublishRevisions();
-      setStatus('이전 버전을 새 로컬 수정본으로 복원했습니다. 공개 사이트는 바뀌지 않았습니다.', 'ok');
-    }
     async function loadReportReviewTools(data, loadSequence) {
       try {
         const tools = await api(`/api/report?base=${encodeURIComponent(base)}&view=review-tools`);
@@ -289,6 +46,10 @@
 
     async function loadReport() {
       if (!base) throw new Error('base 파라미터가 없습니다.');
+      if (new URLSearchParams(location.search).get('history') === '1') {
+        location.replace(workspaceRevisionHistoryUrl());
+        return false;
+      }
       const loadSequence = ++reportLoadSequence;
       const previewReady = loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(base)}&format=latest&t=${Date.now()}`);
       const slowTimer = setTimeout(() => {
@@ -376,7 +137,6 @@
       renderManagerOutline(data);
       restoreDetailSceneSelection();
       updateDetailSceneLinks();
-      if (new URLSearchParams(location.search).get('history') === '1') setRevisionPanelOpen(true);
       const ctDisabled = data.md.includes('<!-- ct_disabled -->');
       ctEnabledCheckbox.checked = !ctDisabled;
       ctToggleRowEl.classList.toggle('disabled', ctDisabled);
@@ -420,7 +180,6 @@
       }
       previewReady.catch(() => {});
       renderStalenessBanner(data.staleness || {});
-      renderPublishRevisions(data.publish_revisions || {});
       if (data.review_tools_pending) {
         if (signalTimelineBodyEl) signalTimelineBodyEl.textContent = '장면 찾기·검토 자료를 불러오고 있습니다. 본문과 목차는 먼저 확인할 수 있습니다.';
         if (signalDraftControlsEl) signalDraftControlsEl.hidden = true;
@@ -672,13 +431,6 @@
       return 'info';
     }
 
-    async function refreshPublishRevisionStatus() {
-      try {
-        const revisions = await api(`/api/publish-revisions?base=${encodeURIComponent(base)}`);
-        renderPublishRevisions(revisions || {});
-      } catch (_) {}
-    }
-
     async function handlePublishOperation(operation, publishedMd) {
       if (!operation || !operation.operation_id) throw new Error('공개 작업 상태를 확인하지 못했습니다. 같은 요청을 다시 보내기 전에 상태를 확인하세요.');
       activePublishOperationId = operation.operation_id;
@@ -708,7 +460,6 @@
       setPublishConflictControlsBusy(false);
       hidePublishBusy();
       publishBusyDismissed = false;
-      await refreshPublishRevisionStatus();
       if (operation.status === 'succeeded' || operation.status === 'partial') {
         if (typeof publishedMd === 'string' && mdEditor.value === publishedMd) {
           savedMd = publishedMd;
@@ -769,7 +520,6 @@
           );
           if (!confirmed) {
             setStatus('공개 반영을 취소했습니다. 저장본과 공개본은 그대로입니다.', 'warn');
-            setRevisionPanelOpen(true);
             return;
           }
           approval = await api('/api/publish-approval', {
@@ -782,7 +532,6 @@
         }
         if (approval.blocked || !approval.approval_receipt) {
           setStatus('🚫 공개 승인 차단: ' + (approval.message || '승인 영수증을 만들 수 없습니다.'), 'err');
-          renderPublishRevisions(approval.publish_revisions || {});
           return;
         }
         if (typeof approval.md === 'string') {
@@ -867,7 +616,6 @@
             );
             if (!confirmed) {
               setStatus('공개 반영을 취소했습니다. 저장본과 공개본은 그대로입니다.', 'warn');
-              setRevisionPanelOpen(true);
               return;
             }
             approval = await api('/api/publish-approval', {
@@ -880,7 +628,6 @@
           }
           if (approval.blocked || !approval.approval_receipt) {
             setStatus('🚫 공개 승인 차단: ' + (approval.message || '승인 영수증을 만들 수 없습니다.'), 'err');
-            renderPublishRevisions(approval.publish_revisions || {});
             return;
           }
           if (typeof approval.md === 'string') {
@@ -915,11 +662,10 @@
             + Number(change.removed_chars || 0).toLocaleString() + '자 삭제 · '
             + Number(change.remaining_percent || 0).toLocaleString() + '% 남음'
             + publishWarning
-            + '\n\n취소하면 원본을 유지하고 되돌리기 기록을 엽니다.', '검토한 로컬 변경 저장'
+            + '\n\n취소하면 원본과 화면의 편집 내용을 유지합니다.', '검토한 로컬 변경 저장'
           );
           if (!confirmed) {
-            setStatus('저장을 취소했습니다. 원본은 그대로입니다. 되돌리기 기록에서 이전 버전도 확인할 수 있습니다.', 'warn');
-            setRevisionPanelOpen(true);
+            setStatus('저장을 취소했습니다. 원본과 화면의 편집 내용은 그대로입니다.', 'warn');
             return;
           }
           setStatus('명시적 확인을 받아 저장을 다시 검증하는 중...');
@@ -932,7 +678,6 @@
           });
           if (data.requires_destructive_confirmation) {
             setStatus('안전 확인이 만료되었거나 본문이 달라졌습니다. 원본은 그대로입니다. 다시 저장해 주세요.', 'err');
-            setRevisionPanelOpen(true);
             return;
           }
         }
@@ -961,7 +706,6 @@
           setStatus(data.message || '저장 완료', 'ok');
         }
         renderAdminOnlyPanel(data);
-        renderPublishRevisions(data.publish_revisions || {});
         return true;
         } catch (error) {
           if (committed) {

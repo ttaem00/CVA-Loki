@@ -376,16 +376,17 @@ def _report_records(*, output_dir, site_dir, work_dir, canonical_records,
             current = (markdown.parent.name == 'report' and job.parent.name == 'current-conversation'
                        and job.is_relative_to(selected_work / video / 'current-conversation'))
             provenance = meta.get('llm_provider_provenance') or {}
+            from .editorial_production_job import CURRENT_CONVERSATION_HOST_MODES, current_conversation_author_mode
+            local_host_modes = set(CURRENT_CONVERSATION_HOST_MODES.values())
             if (current and isinstance(provenance, dict)
                     and provenance.get('profile') == 'full_broadcast_v302'
-                    and provenance.get('actual_provider') in {
-                        'current_conversation_codex', 'current_conversation_chatgpt'}
+                    and provenance.get('actual_provider') in (
+                        {'current_conversation_codex'} | local_host_modes)
                     and provenance.get('job_id') == job.name):
-                from .editorial_production_job import current_conversation_author_mode
                 if ('author' in provenance and current_conversation_author_mode(provenance['author'])
                         != provenance['actual_provider']):
                     continue
-                if provenance['actual_provider'] == 'current_conversation_chatgpt':
+                if provenance['actual_provider'] in local_host_modes:
                     prepared = _json(job / 'prepared.json', max_bytes=64_000_000)
                     identity = prepared.get('identity') or {}
                     if (prepared.get('schema_version') != 'chzz.current_conversation_prepared.v1'

@@ -10,6 +10,8 @@ from copy import deepcopy
 
 from typing import Any, Mapping
 
+LIVE_VOD_CODEX_PIN_SCOPE = "live_vod_codex_author_pin"
+
 def validate_editorial_priority(value: Any) -> dict[str, str] | None:
     """Validate optional review metadata without selecting content or order."""
     if value is None:

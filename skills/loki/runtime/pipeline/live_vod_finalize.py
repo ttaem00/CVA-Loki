@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from contextlib import closing
 
+from dataclasses import dataclass
+
 from datetime import datetime, timedelta, timezone
+
+import errno
 
 import json
 
@@ -24,11 +28,97 @@ import stat
 
 import time
 
+from .config import FULL_AUTHOR_PIPELINES
+
+from .editorial_contract import LIVE_VOD_CODEX_PIN_SCOPE
+
 from .live_vod_repair import local_file, sha
 
 from .live_editorial_source import _cues
 
 POLICY = "missing-only-vod301-v1"
+
+DEFAULT_SUMMARY_VERSION = "loki_3_0_1"
+
+SUMMARY_VERSIONS = frozenset({"pipeline_2_5", DEFAULT_SUMMARY_VERSION, *FULL_AUTHOR_PIPELINES})
+
+_LIVE_VOD_CODEX_PIN = "_" + LIVE_VOD_CODEX_PIN_SCOPE
+
+_STANDING_CODEX_APPROVALS = "unattended_vod_codex_approvals"
+
+_AUTHOR_PIN_OWNER = object()
+
+@dataclass(frozen=True, slots=True)
+class _LiveVODCodexAuthorPin:
+    archive: str
+    video_no: str
+    source_revision: str
+    pipeline_version: str
+    model: str
+    authorization_id: str
+    not_after: datetime | None
+    owner: object
+
+    def __deepcopy__(self, memo):
+        return self
+
+    def record(self):
+        return dict(schemaVersion=1, archive=self.archive, channelId=self.archive.split("-", 1)[0],
+            videoNo=self.video_no, sourceRevision=self.source_revision, summaryPipelineVersion=self.pipeline_version,
+            provider="codex_cli", model=self.model, authorizationId=self.authorization_id,
+            notAfter=self.not_after.isoformat() if self.not_after is not None else None)
+
+def _codex_expiry(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            expiry = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+        else:
+            if expiry.tzinfo is not None:
+                return expiry.astimezone(timezone.utc)
+    raise ValueError("finalize_codex_approval_invalid")
+
+def _standing_codex_approval(cfg, channel):
+    approvals = cfg.get(_STANDING_CODEX_APPROVALS, [])
+    if not isinstance(approvals, list):
+        raise ValueError("finalize_codex_approval_invalid")
+    matches = [row for row in approvals if isinstance(row, dict) and row.get("channel_id") == channel]
+    if not matches:
+        return None
+    row = matches[0]
+    if (len(matches) != 1 or not set(row) <= {"channel_id", "authorization_id", "not_after"}
+            or not isinstance(row.get("authorization_id"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", row["authorization_id"])):
+        raise ValueError("finalize_codex_approval_invalid")
+    return row["authorization_id"], _codex_expiry(row.get("not_after"))
+
+def _current_codex_approval(channel):
+    from .config import _config_path
+
+    try:
+        settings = json.loads(_config_path().read_bytes())
+    except (OSError, ValueError):
+        raise OSError(errno.EAGAIN, "live writer approval temporarily unavailable") from None
+    if not isinstance(settings, dict):
+        raise OSError(errno.EAGAIN, "live writer approval temporarily unavailable")
+    return _standing_codex_approval(settings, channel)
+
+def live_vod_codex_author_pin(cfg, *, video_no=None):
+    """Read typed authority after the existing owner has bound the official source."""
+    if _LIVE_VOD_CODEX_PIN not in cfg:
+        return None
+    pin = cfg[_LIVE_VOD_CODEX_PIN]
+    source = cfg.get("live_finalize_source")
+    if (type(pin) is not _LiveVODCodexAuthorPin or pin.owner is not _AUTHOR_PIN_OWNER
+            or pin.archive != cfg.get("live_finalize_archive") or pin.pipeline_version != cfg.get("summary_pipeline_version")
+            or cfg.get("summary_author_mode") != "api_direct"
+            or video_no is not None and pin.video_no != str(video_no)
+            or not isinstance(source, dict) or source.get("source_revision") != pin.source_revision):
+        raise ValueError("finalize_codex_approval_invalid")
+    return pin
 
 def archive_folder(archive):
     """Use the same registered location for source, STOP and saved recovery."""
@@ -139,8 +229,99 @@ def _replay_qualified_handover_end(db, folder, broadcast):
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error, OverflowError):
         return False
 
-def guard(folder):
-    """Keep manual STOP, consent and both original end proofs authoritative."""
+def _summary_choice(folder):
+    try:
+        path = local_file(Path(folder), "summary-exclusion.json")
+        if not path.exists():
+            return {}
+        choice = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        choice = None
+    if (not isinstance(choice, dict) or choice.get("version") != 1
+            or type(choice.get("revision")) is not int or choice["revision"] < 1
+            or not isinstance(choice.get("excluded"), bool)):
+        raise ValueError("finalize_manager_stopped")
+    return choice
+
+def _codex_resume_grant(folder, revision, choice):
+    from .editorial_candidate_budget import REPORTED_USAGE_STOP
+
+    grant = choice.get("codexResume")
+    required = {"videoNo", "summaryPipelineVersion", "sourceRevision", "heldPageSha256", "accounting"}
+    if (type(revision) is not int or revision <= 0 or choice.get("revision") != revision
+            or choice.get("archive") != folder.name or choice.get("excluded") is not True
+            or not isinstance(grant, dict)
+            or not required <= set(grant) <= required | {"settledFromRevision", "recoverCollectedScene",
+                                                       "rejectedCollectedSceneProof"}
+            or "rejectedCollectedSceneProof" in grant and (grant.get("recoverCollectedScene") is not True
+                or not isinstance(grant["rejectedCollectedSceneProof"], str)
+                or not re.fullmatch(r"[a-f0-9]{64}", grant["rejectedCollectedSceneProof"]))
+            or "recoverCollectedScene" in grant and (grant["recoverCollectedScene"] is not True
+                or "settledFromRevision" not in grant)
+            or "settledFromRevision" in grant and (type(grant["settledFromRevision"]) is not int
+                or not 0 < grant["settledFromRevision"] == revision - 1)
+            or grant["accounting"] != REPORTED_USAGE_STOP
+            or not isinstance(grant["summaryPipelineVersion"], str)
+            or grant["summaryPipelineVersion"] not in FULL_AUTHOR_PIPELINES
+            or not isinstance(grant["videoNo"], str) or not re.fullmatch(r"[1-9]\d{0,11}", grant["videoNo"])
+            or not all(isinstance(grant[key], str) and re.fullmatch(r"[a-f0-9]{64}", grant[key])
+                       for key in ("sourceRevision", "heldPageSha256"))):
+        raise ValueError("finalize_manager_stopped")
+    return grant
+
+def _approved_summary_intent(folder, broadcast, settings):
+    intent = settings.get("analysisIntent")
+    if not isinstance(intent, dict):
+        return None
+    first, ended = broadcast.get("first_capture_at_ms"), broadcast.get("ended_at_ms")
+    started = intent.get("startedAtMs")
+    if (type(intent.get("schemaVersion")) is int and intent["schemaVersion"] == 1
+            and intent.get("archive") == folder.name
+            and intent.get("aiConsent") is True
+            and intent.get("finalSummaryEnabled", intent.get("summaryEnabled")) is True
+            and type(started) is int and type(first) is int and type(ended) is int
+            and 0 < first <= started <= ended
+            and broadcast.get("broadcast_id") == "chzzk:" + folder.name.replace("-", ":", 1)):
+        return intent
+    return None
+
+def _summary_consent(folder, broadcast, settings, *, selected_version=None):
+    recorded = settings.get("analysisIntent")
+    if isinstance(recorded, dict) and "finalSummaryEnabled" in recorded:
+        intent = _approved_summary_intent(folder, broadcast, settings)
+        version = (intent or {}).get("summaryPipelineVersion")
+        return (isinstance(version, str) and version in SUMMARY_VERSIONS
+                and (selected_version is None or version == selected_version))
+    if settings.get("aiConsent") is True:
+        return True
+
+
+    intent = _approved_summary_intent(folder, broadcast, settings)
+    pending = settings.get("analysisPreparation")
+    version = (intent or {}).get("summaryPipelineVersion")
+    if (not isinstance(version, str) or version not in SUMMARY_VERSIONS
+            or type(intent.get("runTokenCap")) is not int or not 1 <= intent["runTokenCap"] <= 14_000_000
+            or not isinstance(pending, dict) or type(pending.get("schemaVersion")) is not int
+            or pending["schemaVersion"] != 1 or pending.get("state") not in ("pending", "held", "applying")
+            or any(type(pending.get(key)) is not int or not 0 <= pending[key] < 2**53
+                   for key in ("collectionRevision", "reviewRevision", "attempt"))
+            or pending["attempt"] >= 2**53 - 1
+            or "targetRevision" not in pending
+            or pending["targetRevision"] is not None and
+                (type(pending["targetRevision"]) is not int or not 0 <= pending["targetRevision"] < 2**53)
+            or "selectedTargetPolicyDigest" in pending and
+                (not isinstance(pending["selectedTargetPolicyDigest"], str) or
+                 not re.fullmatch(r"[a-f0-9]{64}", pending["selectedTargetPolicyDigest"]))
+            or not isinstance(pending.get("reason"), str)
+            or not re.fullmatch(r"[a-z][a-z0-9_]{0,100}", pending["reason"])):
+        return False
+    basis = [False, settings.get("liveSummaryEnabled") is True, settings.get("chatReviewEnabled") is True,
+             settings.get("liveRunTokenCap"), settings.get("analysisHold")]
+    return pending.get("basis") == json.dumps(basis, ensure_ascii=False, separators=(",", ":"))
+
+def guard(folder, *, codex_resume_revision=None, selected_version=None, read_natural_summary_intent=False,
+          verify_end=True):
+    'Keep manual STOP, consent and both original end proofs authoritative.\n\n    The end proof is an admission fact: an ended broadcast stays ended, so per-send checks\n    (``verify_end=False``) keep STOP, exclusion, grant, consent and approval but do not reread\n    status/replay pages that may legitimately change mid-run.\n    '
     stop = local_file(folder, "STOP").read_text(encoding="utf-8").strip()
     models = local_file(folder, "MODELS_STOP").read_text(encoding="utf-8").strip()
     if stop not in {"broadcast_ended", "broadcast_changed"} or models != stop:
@@ -149,18 +330,11 @@ def guard(folder):
 
 
 
-    try:
-        choice_path = local_file(Path(folder), "summary-exclusion.json")
-    except ValueError:
-        raise ValueError("finalize_manager_stopped") from None
-    if choice_path.exists():
-        try:
-            choice = json.loads(choice_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            choice = None
-        if (not isinstance(choice, dict) or choice.get("version") != 1 or type(choice.get("revision")) is not int
-                or choice["revision"] < 1 or not isinstance(choice.get("excluded"), bool) or choice["excluded"]):
-            raise ValueError("finalize_manager_stopped")
+    choice = _summary_choice(folder)
+    if codex_resume_revision is not None:
+        _codex_resume_grant(folder, codex_resume_revision, choice)
+    elif choice.get("excluded"):
+        raise ValueError("finalize_manager_stopped")
     with closing(sqlite3.connect(local_file(folder, "session.sqlite").as_uri() + "?mode=ro", uri=True)) as db:
         db.row_factory = sqlite3.Row
         rows = db.execute("SELECT * FROM broadcasts").fetchall()
@@ -168,25 +342,41 @@ def guard(folder):
             raise ValueError("finalize_end_unverified")
         broadcast = dict(rows[0])
         settings = json.loads(db.execute("SELECT value FROM meta WHERE name='settings'").fetchone()[0])
-        if settings.get("aiConsent") is not True:
+        if not _summary_consent(folder, broadcast, settings, selected_version=selected_version):
             raise ValueError("finalize_consent_required")
-        collector_end = True
-        for source in ("chat", "metadata"):
-            row = db.execute("SELECT end_reason FROM collector_runs WHERE broadcast_id=? AND source=? "
-                "AND ended_at_ms=? ORDER BY run_id DESC LIMIT 1",
-                (broadcast["broadcast_id"], source, broadcast["ended_at_ms"])).fetchone()
-            if not row or row[0] != stop:
-                collector_end = False
-        if not collector_end and not (stop == 'broadcast_ended' and _replay_qualified_handover_end(db, folder, broadcast)):
-            raise ValueError("finalize_end_unverified")
+        if verify_end:
+            collector_end = True
+            for source in ("chat", "metadata"):
+                row = db.execute("SELECT end_reason FROM collector_runs WHERE broadcast_id=? AND source=? "
+                    "AND ended_at_ms=? ORDER BY run_id DESC LIMIT 1",
+                    (broadcast["broadcast_id"], source, broadcast["ended_at_ms"])).fetchone()
+                if not row or row[0] != stop:
+                    collector_end = False
+            if not collector_end and not (stop == 'broadcast_ended' and _replay_qualified_handover_end(db, folder, broadcast)):
+                raise ValueError("finalize_end_unverified")
+        if read_natural_summary_intent:
+            intent = _approved_summary_intent(folder, broadcast, settings)
+            return stop == "broadcast_ended" and bool(intent and intent.get("finalSummaryEnabled") is True)
         return broadcast
 
-def check_dispatch(cfg):
-    """Called by the normal Free transport before dispatch and after receipt."""
+def check_dispatch(cfg, *, verify_author_approval=True):
+    """Check STOP for source reads and the pinned grant for new sends."""
     archive = cfg.get("live_finalize_archive")
     if not archive:
         return
-    guard(archive_folder(archive))
+    revision = cfg.get("_live_finalize_codex_revision") if cfg.get("_live_finalize_codex_only") is True else None
+    folder = archive_folder(archive)
+    pin = live_vod_codex_author_pin(cfg)
+    if pin is None or not verify_author_approval:
+        guard(folder, codex_resume_revision=revision, selected_version=cfg.get("summary_pipeline_version"),
+              verify_end=False)
+        return
+    if not guard(folder, selected_version=pin.pipeline_version, read_natural_summary_intent=True, verify_end=False):
+        raise ValueError("finalize_codex_approval_changed")
+    if pin.not_after is not None and datetime.now(timezone.utc) >= pin.not_after:
+        raise ValueError("finalize_codex_approval_expired")
+    if _current_codex_approval(archive.split("-", 1)[0]) != (pin.authorization_id, pin.not_after):
+        raise ValueError("finalize_codex_approval_changed")
 
 def _verified_candidate_live_transcript(cfg, video_no, duration_sec, selected):
     """Verify the unchanged original owner before trusting a relocated view."""
@@ -228,7 +418,10 @@ def verified_live_transcript(cfg, video_no, duration_sec):
     selected = cfg.get("live_finalize_source") or {}
     if "source_original" in selected:
         return _verified_candidate_live_transcript(cfg, video_no, duration_sec, selected)
-    check_dispatch(cfg)
+    if _LIVE_VOD_CODEX_PIN in cfg:
+        check_dispatch(cfg, verify_author_approval=False)
+    else:
+        check_dispatch(cfg)
     work = Path(cfg["work_dir"]).resolve() / str(video_no)
     output = local_file(work, Path(selected.get("transcript") or "").relative_to(work).as_posix())
     provenance = local_file(work, output.with_suffix(".live-vod-source.json").relative_to(work).as_posix())
@@ -262,7 +455,8 @@ def verified_live_transcript(cfg, video_no, duration_sec):
     if selected.get("manager_context") is not None:
         from .live_editorial_source import load_live_manager_context
         clock = selected.get("manager_context_clock")
-        broadcast = guard(folder)
+        revision = cfg.get("_live_finalize_codex_revision")
+        broadcast = guard(folder, codex_resume_revision=revision) if revision is not None else guard(folder)
         expected_clock = dict(archive_id=archive, broadcast_start_at_ms=broadcast["open_at_utc_ms"])
         if isinstance(clock, dict) and "context_as_of_ms" in clock:
             expected_clock["context_as_of_ms"] = mapping["originMs"] + max(end for _, end, _ in _cues(output))

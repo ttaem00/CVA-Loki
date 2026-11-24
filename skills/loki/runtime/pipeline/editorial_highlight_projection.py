@@ -201,6 +201,7 @@ def build_qg1_preview(
     )
     if broadcast_map_sha256 != source_broadcast_map_sha256:
         raise ValueError("qg1_broadcast_map_authority_parity_failed")
+    author_budget_stop = (editorial_result.get("full_author_receipt") or {}).get("author_budget_stop_reason")
     preview = {
         "schema_version": "chzz.qg1_preview.v1",
         "projection_mode": projection_mode,
@@ -220,6 +221,7 @@ def build_qg1_preview(
             "unresolved_group_outcomes": editorial_result.get("unresolved_group_outcomes") or [],
             "unresolved_proposals": editorial_result.get("unresolved_proposals") or []}
            if editorial_result.get("completion_state") else {}),
+        **({"author_budget_stop_reason": author_budget_stop} if author_budget_stop else {}),
         **({"unresolved_questions": deepcopy(
             editorial_result["full_author_projection"].get("unresolved_questions") or [])}
            if isinstance(editorial_result.get("full_author_projection"), dict) else {}),
@@ -283,6 +285,11 @@ def validate_qg1_preview_payload(
         raise ValueError("invalid_qg1_preview_payload")
     if preview.get("schema_version") != "chzz.qg1_preview.v1":
         raise ValueError("invalid_qg1_preview_schema")
+    if "author_budget_stop_reason" in preview:
+        from .outline.progress import author_budget_stopped
+
+        if not author_budget_stopped(preview["author_budget_stop_reason"]):
+            raise ValueError("invalid_qg1_author_budget_stop")
 
 
 

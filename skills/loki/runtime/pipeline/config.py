@@ -1,8 +1,10 @@
 """Standalone metadata and engagement defaults, derived from pipeline.config. No account/provider config."""
 
-from .runtime_root import runtime_data_root
+from .runtime_root import runtime_data_root, runtime_data_path
 
 from pipeline.loki_version_policy import normalize_pipeline as _normalize_loki_pipeline, pipeline_identity as _loki_identity, pipeline_label as _loki_label, pipelines_for as _loki_pipelines
+
+CONFIG_FILENAME = "pipeline_config.json"
 
 SUMMARY_PIPELINE_LEGACY = "legacy_v1"
 
@@ -34,6 +36,13 @@ def summary_pipeline_release_identity(value: str) -> dict[str, str]:
     """Return additive product provenance for the selected summary mechanism."""
 
     return _loki_identity(value)
+
+def _config_path():
+    return runtime_data_path(CONFIG_FILENAME)
+
+def get_cookies(cfg=None):
+    """Standalone Loki is strictly anonymous and never loads host cookies."""
+    return {}
 
 def load_config(config_path=None):
     if config_path is not None:

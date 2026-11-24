@@ -134,8 +134,9 @@ def atomic_json(path, value):
     os.replace(temporary, path)
 
 @contextmanager
-def build_lock(root):
-    root.mkdir(parents=True, exist_ok=True)
+def build_lock(root, *, create_root=True):
+    if create_root:
+        root.mkdir(parents=True, exist_ok=True)
     lock = _LOCKS[str(root.resolve())]
     if not lock.acquire(blocking=False):
         raise EvidenceError("world_build_locked")

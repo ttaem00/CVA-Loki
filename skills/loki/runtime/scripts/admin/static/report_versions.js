@@ -4,16 +4,10 @@
   const videoNo = base.split('_', 1)[0];
   const host = document.getElementById('reportVersions');
   if (!host || !/^\d+$/.test(videoNo)) return;
-  const route = location.pathname === '/report-workspace' ? '/report-workspace' : '/report';
   const link = (version, label) => {
     const a = document.createElement('a');
-    const query=window.ReportNavigation.list(new URLSearchParams({base:version.base})),current=new URLSearchParams(location.search);
-    window.ReportNavigation.view(query);
-    const type=current.get('type'),id=current.get('id') || '',span=current.get('span') || '0';
-    if(['D1','D2','Point','Highlight'].includes(type)&&id&&id.length<=256&&!/[\x00-\x1f\x7f]/.test(id)&&/^\d{1,6}$/.test(span)){
-      query.set('type',type);query.set('id',id);query.set('span',span);
-    }
-    a.href = `${route}?${query}`;
+    a.href = window.ReportNavigation.report('/report-workspace', version.base);
+    if (version.workspace_ready === false) a.href += '&history=1';
     a.textContent = label;
     return a;
   };

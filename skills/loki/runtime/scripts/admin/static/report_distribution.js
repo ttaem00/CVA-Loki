@@ -1,5 +1,6 @@
     let cafeState = null;
     let cafeDraftKey = '';
+    let chzzkDraftKey = '';
     let cafeRequestOutcome = null;
     let cafeActionPending = false;
     let cafeReading = false;
@@ -45,6 +46,7 @@
 
     function resetChzzkCommentDraft(message = '본문이 바뀌었습니다. CHZZK 댓글을 만들려면 다시 초안을 확인하거나 채우기 버튼을 누르세요.') {
       chzzkCommentDraft = null;
+      chzzkDraftKey = '';
       if (chzzkCommentPreviewEl) {
         chzzkCommentPreviewEl.textContent = '';
         chzzkCommentPreviewEl.hidden = true;
@@ -156,21 +158,37 @@
       setNaverCafeStatus('표와 초록 배경 없이 붙여넣는 카페용 HTML을 복사했습니다. 요약/클립 URL은 필요하면 카페 화면에서 해당 줄 뒤에 Enter를 눌러 링크 카드로 바꾸세요.', 'ok');
     }
 
+    // #7318: the request body is the content key of a shown 전체 방송 목차.
+    function chzzkCommentRequestBody() {
+      return JSON.stringify({
+        base,
+        md: mdEditor.value,
+        ct_disabled: !ctEnabledCheckbox.checked,
+        ...(managerOutlineContext ? {
+          structured_outline: collectManagerOutline(),
+          editorial_review_packet: collectEditorialReviewPacket(),
+        } : {}),
+      });
+    }
+
     async function fetchChzzkCommentDraft() {
       if (!base) throw new Error('base 파라미터가 없습니다.');
-      chzzkCommentDraft = await api('/api/chzzk-comment-draft', {
-        method: 'POST',
-        body: JSON.stringify({
-          base,
-          md: mdEditor.value,
-          ct_disabled: !ctEnabledCheckbox.checked,
-          ...(managerOutlineContext ? {
-            structured_outline: collectManagerOutline(),
-            editorial_review_packet: collectEditorialReviewPacket(),
-          } : {}),
-        }),
-      });
+      const body = chzzkCommentRequestBody();
+      const data = await api('/api/chzzk-comment-draft', {method: 'POST', body});
+      chzzkCommentDraft = data;
+      chzzkDraftKey = body;
       return chzzkCommentDraft;
+    }
+
+    // The shown text is copied only while it still matches the current edit.
+    function shownChzzkCommentText() {
+      if (!chzzkCommentDraft || !chzzkDraftKey || chzzkDraftKey !== chzzkCommentRequestBody()) return '';
+      return chzzkCommentDraft.text || chzzkCommentDraft.comment_text || '';
+    }
+
+    function chzzkCommentSourceNote(data) {
+      return data && data.comment_source === 'markdown_sections'
+        ? ' 방송 구조 없이 요약 본문의 구간으로 만든 목차입니다.' : '';
     }
 
     function renderChzzkCommentDraft(data) {
@@ -185,8 +203,8 @@
             <strong>VOD ${Number(draft.vod_index || index + 1)}/${Number(draft.vod_count || drafts.length)} · ${escapeHtml(draft.title || draft.video_no || '')}</strong><br>
             <span class="mono">${escapeHtml(draft.video_no || '')}</span>
             <div class="tool-actions">
-              <button type="button" class="ghost" data-copy-chzzk-draft="${index}">이 VOD 댓글 복사</button>
-              <button type="button" class="ghost" data-open-chzzk-draft="${escapeHtml(draft.video_no || '')}">이 VOD 댓글창에 채우기</button>
+              <button type="button" class="ghost" data-copy-chzzk-draft="${index}">이 VOD 목차 복사</button>
+              <button type="button" class="ghost" data-open-chzzk-draft="${escapeHtml(draft.video_no || '')}">이 VOD 목차를 댓글창에 채우기</button>
             </div>
             <pre class="chzzk-comment-admin-preview">${escapeHtml(draft.text || draft.comment_text || '')}</pre>
           </div>
@@ -201,16 +219,16 @@
         chzzkCommentDraftListEl.querySelectorAll('[data-open-chzzk-draft]').forEach((btn) => {
           btn.addEventListener('click', () => openChzzkCommentWriter(btn.dataset.openChzzkDraft || ''));
         });
-        setChzzkCommentStatus(data.manager_message || `CHZZK 댓글 초안 ${drafts.length}개를 만들었습니다.`, 'ok');
+        setChzzkCommentStatus(data.manager_message || `VOD별 전체 방송 목차 ${drafts.length}개를 만들었습니다.`, 'ok');
         return;
       }
       if (chzzkCommentDraftListEl) chzzkCommentDraftListEl.innerHTML = '';
       const text = data && (data.text || data.comment_text) || '';
       if (chzzkCommentPreviewEl) {
-        chzzkCommentPreviewEl.textContent = text || '표시할 댓글 초안이 없습니다.';
+        chzzkCommentPreviewEl.textContent = text || '표시할 전체 방송 목차가 없습니다.';
         chzzkCommentPreviewEl.hidden = false;
       }
-      setChzzkCommentStatus(text ? (data.manager_message || 'CHZZK 댓글 초안을 만들었습니다.') : 'CHZZK 댓글로 쓸 타임라인 텍스트가 없습니다.', text ? 'ok' : 'warn');
+      setChzzkCommentStatus(text ? (data.manager_message || '전체 방송 목차를 만들었습니다.') + chzzkCommentSourceNote(data) : '전체 방송 목차로 쓸 타임라인 텍스트가 없습니다.', text ? 'ok' : 'warn');
     }
 
     async function previewChzzkCommentDraft() {
@@ -219,11 +237,29 @@
       return data;
     }
 
+    // #7318 (plan 2.9 items 6-7): copying the shown 전체 방송 목차 does not wait for the server.
+    // Recording the copy is a separate request, and its failure is a warning, never a copy failure.
     async function copyChzzkCommentDraft() {
+      const copied = '전체 방송 목차를 복사했습니다. CHZZK 댓글창에 붙여넣은 뒤 등록하세요.';
+      const shown = shownChzzkCommentText();
+      if (shown) {
+        await copyPlainText(shown);
+        setChzzkCommentStatus(copied, 'ok');
+        let recorded;
+        try {
+          recorded = await fetchChzzkCommentDraft();
+        } catch (error) {
+          setChzzkCommentStatus(copied + ' 복사 기록은 저장하지 못했습니다. 복사한 목차는 그대로 쓸 수 있습니다.', 'warn');
+          return;
+        }
+        if (recorded.record_warning) setChzzkCommentStatus(copied + ' ' + recorded.record_warning, 'warn');
+        return;
+      }
       const data = await fetchChzzkCommentDraft();
       await copyPlainText(data.text || data.comment_text || '');
       renderChzzkCommentDraft(data);
-      setChzzkCommentStatus('댓글 텍스트를 복사했습니다. CHZZK 댓글창에 붙여넣은 뒤 등록하세요.', 'ok');
+      setChzzkCommentStatus(data.record_warning ? copied + ' ' + data.record_warning : copied + chzzkCommentSourceNote(data),
+        data.record_warning ? 'warn' : 'ok');
     }
 
     function refreshCafeEligibility() {
@@ -430,9 +466,10 @@
           text: result.comment_text || (chzzkCommentDraft && chzzkCommentDraft.text) || '',
           vod_url: data.vod_url,
         };
+        chzzkDraftKey = '';
         setChzzkCommentStatus(
           inserted
-            ? 'CHZZK 댓글창에 초안을 채웠습니다. CHZZK 화면에서 확인한 뒤 등록하세요.'
+            ? 'CHZZK 댓글창에 전체 방송 목차를 채웠습니다. CHZZK 화면에서 확인한 뒤 등록하세요.'
             : 'CHZZK VOD를 열고 텍스트를 클립보드에 복사했습니다. 댓글창에 붙여넣은 뒤 등록하세요.',
           inserted ? 'ok' : 'warn'
         );

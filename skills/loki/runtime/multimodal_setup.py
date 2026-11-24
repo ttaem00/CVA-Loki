@@ -233,17 +233,16 @@ def verify(workspace, runtime, manifest, device):
         actual_device=actual, cache_root=str(cache), fresh_inference=True)
 
 
-def setup(workspace, *, model_source=None, device="auto", run_verification=False):
-    sdk = installed_sdk()
-    selection = select_device(device)
-    selected = selection["selected"]
+def prepare_model(workspace, *, model_source=None, download_cache=None):
     workspace = plain_path(workspace)
     workspace.mkdir(parents=True, exist_ok=True)
     source = plain_path(model_source) if model_source is not None else None
     if source is not None and not source.is_dir():
         raise ValueError("multimodal_model_source_missing")
     models = model_storage(workspace)
-    cache = plain_path(models / "huggingface")
+    cache = plain_path(download_cache) if download_cache is not None else plain_path(models / "huggingface")
+    if not cache.is_relative_to(workspace):
+        raise ValueError("multimodal_download_outside_workspace")
     os.environ.update(HF_HOME=str(cache), HF_HUB_CACHE=str(cache / "hub"),
         HF_TOKEN_PATH=str(cache / "token"), HF_HUB_DISABLE_IMPLICIT_TOKEN="1",
         HF_HUB_DISABLE_TELEMETRY="1", DO_NOT_TRACK="1",
@@ -268,6 +267,16 @@ def setup(workspace, *, model_source=None, device="auto", run_verification=False
                     root=str(model_root), files=rows)
     manifest_path = models / "embeddinggemma-2" / "model-files.json"
     write_json(manifest_path, manifest)
+    return manifest_path, manifest
+
+
+def setup(workspace, *, model_source=None, device="auto", run_verification=False):
+    sdk = installed_sdk()
+    selection = select_device(device)
+    selected = selection["selected"]
+    workspace = plain_path(workspace)
+    manifest_path, manifest = prepare_model(workspace, model_source=model_source)
+    models = manifest_path.parent.parent
     model_ref = dict(path=str(manifest_path), sha256=digest(manifest_path))
     runtime = dict(model_ref=model_ref, sdk_root=str(sdk), limits=dict(LIMITS), device=selected)
     runtime_path = models / ("multimodal-runtime." + selected + ".json")
@@ -277,7 +286,8 @@ def setup(workspace, *, model_source=None, device="auto", run_verification=False
         selection["actual"] = verification["actual_device"]
     return dict(status="ready", model_ref=model_ref,
         runtime_ref=dict(path=str(runtime_path), sha256=digest(runtime_path)),
-        model=dict(id=MODEL, revision=REVISION, files=len(rows), bytes=sum(row["bytes"] for row in rows)),
+        model=dict(id=MODEL, revision=REVISION, files=len(manifest["files"]),
+                   bytes=sum(row["bytes"] for row in manifest["files"])),
         device=selected, device_selection=selection, verification=verification)
 
 

@@ -25,8 +25,11 @@
           <button id="redoButton" class="quiet-action" type="button" aria-keyshortcuts="Control+Y Control+Shift+Z" disabled>다시 실행 ↷</button>
         </div>
         <a id="legacyLink" class="button ghost" aria-disabled="true">기존 상세 화면</a>
+        <a id="commentDraftLink" class="button ghost" hidden>댓글 초안</a>
+        <a id="scheduleProposalLink" class="button ghost" hidden>일정 제안</a>
+        <a id="shareLink" class="button ghost" title="상세 화면의 카페 글·전체 방송 목차·YouTube 도구를 같은 장면으로 엽니다. 저장한 수정본 기준입니다." hidden>공개·공유</a>
         <button id="previewButton" class="button ghost" type="button" disabled>현재 편집안 미리보기</button>
-        <a id="revisionLink" class="button ghost" aria-disabled="true">저장·공개 이력</a>
+        <button id="revisionLink" class="button ghost" type="button" aria-controls="historyPanel" disabled>저장·공개 이력</button>
         <button id="saveButton" class="button primary" type="button" disabled>수정본 저장</button>
         <button id="publishButton" class="button publish" type="button" aria-describedby="publishHint" aria-controls="publishDialog" disabled>공개 사이트에 반영…</button>
       </div>
@@ -155,9 +158,17 @@
             <div id="editorEmpty" class="editor-empty">위에서 장면을 선택하면 제목과 시간을 고칠 수 있습니다.</div>
             <div id="editorFields" hidden></div>
           </form>
-          <details class="history-block">
-            <summary>이전 저장본 <span id="historyCount">0</span>개</summary>
+          <details id="historyPanel" class="history-block">
+            <summary id="historyHeading">저장·공개 이력</summary>
+            <section id="historyOnlyReport" aria-labelledby="historyOnlyTitle" hidden>
+              <h3 id="historyOnlyTitle">선택한 저장본</h3>
+              <div id="historyOnlyBody" class="revision-content"></div>
+              <a id="historyOnlyDetailLink" class="button ghost">Markdown 편집 도구…</a>
+            </section>
+            <p id="localHistoryStatus">로컬 편집본 <span id="historyCount">0</span>개</p>
             <div id="historyList" class="history-list"></div>
+            <p id="snapshotHistoryStatus" role="status">저장·공개 시점의 기록을 불러오는 중…</p>
+            <div id="snapshotHistoryList" class="history-list"></div>
           </details>
           <div class="handoff-note">
             <strong>저장과 공개 반영은 별도입니다</strong>
@@ -191,10 +202,18 @@
     </div>
   </dialog>
 
+  <dialog id="revisionSnapshotDialog" class="revision-dialog" aria-labelledby="revisionSnapshotTitle" aria-describedby="revisionSnapshotStatus">
+    <div class="dialog-heading"><div><strong id="revisionSnapshotTitle">이전 저장본</strong><span id="revisionSnapshotLabel"></span></div><button id="closeRevisionSnapshotButton" class="icon-button" type="button">닫기</button></div>
+    <p id="revisionSnapshotStatus" role="status"></p>
+    <div id="revisionSnapshotContent" class="revision-changes revision-content" hidden></div>
+    <div class="dialog-actions"><a id="snapshotDraftLink" class="button ghost" hidden>현재 보고서에 편집 초안으로 가져오기…</a></div>
+  </dialog>
+
   <dialog id="revisionCompareDialog" class="revision-dialog" aria-labelledby="revisionCompareTitle">
     <div class="dialog-heading"><div><strong id="revisionCompareTitle">이전 저장본과 현재 편집안 비교</strong><span>복원 전에는 내용과 저장 이력이 바뀌지 않습니다.</span></div><button id="closeRevisionCompareButton" class="icon-button" type="button">닫기</button></div>
     <p id="revisionCompareSummary" role="status"></p>
     <div id="revisionCompareChanges" class="revision-changes"></div>
+    <details class="revision-changes"><summary>이전 저장본 읽기</summary><div id="revisionComparePrevious" class="revision-content"></div></details>
     <div class="dialog-actions"><button id="restoreComparedButton" class="button primary" type="button">이 저장본으로 복원…</button></div>
   </dialog>
 

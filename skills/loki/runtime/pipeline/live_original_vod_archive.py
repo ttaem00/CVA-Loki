@@ -100,6 +100,21 @@ def verify_saved_original_registration(cold, row, *, video_no, expected_sha256, 
         _reject("identity_unverified")
     return _checked_file(cold, row, deadline=deadline)
 
+def registered_original_binding(generation, cold, video_no):
+    """Return the existing catalogue binding for a private playback owner."""
+    if not isinstance(video_no, str) or not _VOD_NO.fullmatch(video_no):
+        return None
+    catalog = _plain(generation / "catalog.sqlite")
+    if not catalog.is_file():
+        return None
+    with _reader(catalog) as db:
+        row = _registered(db, video_no)
+    if row is None:
+        return None
+    if not _registered_identity_matches(row, video_no):
+        _reject("identity_unverified")
+    return _path(cold, video_no), row["size_bytes"], row["sha256"], row["duration_ms"] / 1000
+
 def resolve_saved_original(path, *, video_no, work_dir, expected_sha256, deadline=None):
     """Resolve one frozen full MP4 through the existing Loom owner at read time."""
     if (not isinstance(video_no, str) or not _VOD_NO.fullmatch(video_no)

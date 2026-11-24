@@ -36,7 +36,19 @@ with _reader(Path('/runtime/work/live-engine/catalog.sqlite')) as db:
         'SELECT a.broadcast_id, l.root_id, l.location_revision, l.receipt_json '
         'FROM original_vod_archives a JOIN archive_locations l USING (broadcast_id) '
         'WHERE a.video_no=?', (sys.argv[1],)).fetchone() if db.execute(ORIGINAL_ARCHIVE_TABLE_SQL).fetchone() else None
-    print(json.dumps(dict(row) if row else None))
+    selected = dict(row) if row else None
+    if selected is not None and selected['root_id'] == 'cold':
+        try:
+            receipt = json.loads(selected['receipt_json']) if selected['receipt_json'] else {}
+        except (TypeError, ValueError):
+            receipt = None
+        # Whole cold-session inventories can exceed the caller's output bound.
+        # This reader only needs the location binding and material publication.
+        fields = ('schema', 'status', 'archive', 'broadcastId', 'locationRevision',
+                  'retainedSourceRevision', 'materialFamily')
+        projected = {key: receipt[key] for key in fields if key in receipt} if isinstance(receipt, dict) else None
+        selected['receipt_json'] = json.dumps(projected, separators=(',', ':'))
+    print(json.dumps(selected, separators=(',', ':')))
 """
 
 def _path(value):
@@ -68,10 +80,19 @@ def _catalog(owner, video):
     if proof is None or proof.get("state") == "publishing":
         return None
     archive = row["broadcast_id"].removeprefix("chzzk:").replace(":", "-")
+    revision = row["location_revision"]
+    source_revision = revision
+    if row["root_id"] == "cold":
+        source_revision = receipt.get("retainedSourceRevision")
+        if (type(revision) is not int or type(source_revision) is not int or source_revision != revision - 1
+                or receipt.get("schema") != "loom.archive-relocation.v1" or receipt.get("status") != "complete"
+                or receipt.get("locationRevision") != revision or receipt.get("archive") != archive
+                or receipt.get("broadcastId") != row["broadcast_id"]):
+            raise ValueError("native_retained_material_not_active")
     if (not row["broadcast_id"].startswith("chzzk:") or not _ARCHIVE.fullmatch(archive)
-            or row["root_id"] != "hot" or type(row["location_revision"]) is not int
-            or row["location_revision"] < 1 or proof.get("schema") != "loom.retained-material-publication.v1"
-            or proof.get("state") != "published" or proof.get("locationRevision") != row["location_revision"]
+            or row["root_id"] not in ("hot", "cold") or type(source_revision) is not int
+            or source_revision < 1 or proof.get("schema") != "loom.retained-material-publication.v1"
+            or proof.get("state") != "published" or proof.get("locationRevision") != source_revision
             or proof.get("receiptPath") != "/archive/live/work/_vod-search/retention/" + archive + ".json"
             or any(not _SHA.fullmatch(str(proof.get(key) or "")) for key in (
                 "receiptSha256", "stagedPlanSha256", "publicationPlanSha256"))):
@@ -185,7 +206,7 @@ def _recognize(job_root, work):
 
 @contextmanager
 def native_retained_saved_read(job_root):
-    """Use an active published E copy for the two existing read-only operations."""
+    """Bind saved job reads to the active published copy, when available."""
     if os.name != "nt":
         yield
         return
@@ -217,7 +238,7 @@ def native_retained_saved_read(job_root):
     access = _SavedRead(work / video, _plain(cold / "work" / video), members)
     access.bind_saved_pages(job)
     with scoped_path_resolver(access.resolve):
-        yield
+        yield access
     access.bind_saved_pages(job)
     for relative in access.observed:
         access._observe(relative, recheck=True)

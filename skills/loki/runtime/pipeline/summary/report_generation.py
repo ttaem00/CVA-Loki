@@ -525,6 +525,7 @@ def generate_reports(
     work_dir: str | Path | None = None,
     artifact_discriminator: str = "",
     announce_proposal_source: bool = True,
+    live_report_owner: dict[str, str] | None = None,
 ) -> tuple[str, str, str]:
     """Markdown + HTML + metadata JSON 저장"""
     os.makedirs(output_dir, exist_ok=True)
@@ -974,6 +975,8 @@ def generate_reports(
             "status": "ready" if rendered_quote_citations.get("items") else rendered_quote_citations.get("status", "empty"),
         },
     }
+    if live_report_owner is not None:
+        metadata["live_report_owner"] = live_report_owner
     if safe_timeline_comment_context.get("anchors"):
 
 

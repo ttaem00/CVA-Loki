@@ -17,6 +17,16 @@ import uuid
 
 KIND = "synthetic_contract_selftest"
 SEMANTIC_AUTHOR = "synthetic_fixture_not_a_model"
+AUTHOR_MODES = (
+    "current_codex",
+    "current_chatgpt",
+    "current_claude",
+    "current_antigravity",
+    "current_gemini_cli",
+    "current_gemini_web",
+    "current_claude_web",
+    "current_local_llm",
+)
 
 
 def require(condition, error):
@@ -48,7 +58,7 @@ def original_records(page):
 
 def run(runtime, workspace, *, author_mode="current_codex"):
     """Exercise the installed CLI, writing only a new verification workspace."""
-    require(author_mode in {"current_codex", "current_chatgpt"}, "selftest_author_mode_invalid")
+    require(author_mode in AUTHOR_MODES, "selftest_author_mode_invalid")
     runtime = Path(runtime).resolve(strict=True)
     cli = runtime / "loki.py"
     require(cli.is_file(), "selftest_runtime_entrypoint_missing")
@@ -71,7 +81,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
         return json.loads(result.stdout)
 
     initialize = ["init", "--directory", str(workspace)]
-    if author_mode == "current_chatgpt":
+    if author_mode != "current_codex":
         initialize += ["--author-mode", author_mode]
     call(*initialize)
     doctor = call("doctor")
@@ -83,7 +93,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     version = policy["pipelines"][selected]["version"]
     require(manifest["version"] == version, "selftest_source_version_mismatch")
     require(doctor.get("version") == version, "selftest_runtime_version_mismatch")
-    if author_mode == "current_chatgpt":
+    if author_mode != "current_codex":
         require(doctor.get("author") == author_mode, "selftest_runtime_author_mode_mismatch")
     source = workspace / "work/1/sources"
     source.mkdir(parents=True)
@@ -100,8 +110,8 @@ def run(runtime, workspace, *, author_mode="current_codex"):
             "source_work_dir": "work/1/sources", "srt_path": "work/1/sources/source.srt",
             "base_path": "base.md", "job_id": "synthetic-contract-fixture", "authoring_minutes": 15,
             "author": {"thread_id": "synthetic-contract-fixture", "turn_id": "fixture-no-model-call", "actual_model": "unknown"}}
-    if author_mode == "current_chatgpt":
-        spec["author"] = dict(host="chatgpt", session_id=uuid.uuid4().hex,
+    if author_mode != "current_codex":
+        spec["author"] = dict(host=author_mode.removeprefix("current_"), session_id=uuid.uuid4().hex,
             actual_model="unknown", identity_basis="workspace_local")
 
     def write(name, value):
@@ -120,9 +130,10 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     job = prepared["job_root"]
     saved_preparation = json.loads((Path(job) / "prepared.json").read_text(encoding="utf-8"))
     require(saved_preparation["identity"]["selected_pipeline"] == selected, "selftest_selected_pipeline_mismatch")
-    if author_mode == "current_chatgpt":
+    if author_mode != "current_codex":
+        expected_provider = "current_conversation_" + author_mode.removeprefix("current_")
         require(saved_preparation["identity"]["author"] == spec["author"]
-            and saved_preparation["identity"]["summary_author_mode"] == "current_conversation_chatgpt",
+            and saved_preparation["identity"]["summary_author_mode"] == expected_provider,
             "selftest_job_author_mode_mismatch")
     revision = prepared["prepared_revision"]
     identity = ["--job-root", job, "--expected-revision", revision]
@@ -222,8 +233,9 @@ def run(runtime, workspace, *, author_mode="current_codex"):
     report_pipeline = metadata.get("summary_pipeline", {})
     require(report_pipeline.get("actual_version") == selected
             and report_pipeline.get("mechanism_version") == version, "selftest_report_version_mismatch")
-    if author_mode == "current_chatgpt":
-        require(metadata.get("llm_provider_provenance", {}).get("actual_provider") == "current_conversation_chatgpt",
+    if author_mode != "current_codex":
+        expected_provider = "current_conversation_" + author_mode.removeprefix("current_")
+        require(metadata.get("llm_provider_provenance", {}).get("actual_provider") == expected_provider,
             "selftest_report_author_mode_mismatch")
     review_check = subprocess.run([sys.executable, "-B", "-c",
         "import json,sys; from review_store import ReviewStore; "
@@ -249,7 +261,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
                          "opt-in advisory status and frozen terminal clock", "source-linked optional review metadata",
                          "normal HTML/Markdown/metadata renderer", "submit replay", "changed settled response conflict",
                          "source and existing report preserved", "zero model transport"]}
-    if author_mode == "current_chatgpt":
+    if author_mode != "current_codex":
         result["author_mode"] = author_mode
     write("selftest-result.json", result)
     return result
@@ -258,7 +270,7 @@ def run(runtime, workspace, *, author_mode="current_codex"):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, help="A new verification workspace; existing paths are refused")
-    parser.add_argument("--author-mode", choices=("current_codex", "current_chatgpt"), default="current_codex")
+    parser.add_argument("--author-mode", choices=AUTHOR_MODES, default="current_codex")
     args = parser.parse_args(argv)
     try:
         result = run(Path(__file__).resolve().parent, args.workspace, author_mode=args.author_mode)

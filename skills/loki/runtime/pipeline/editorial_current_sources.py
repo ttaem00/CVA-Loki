@@ -14,6 +14,68 @@ from .evidence_world.contracts import file_hash, native_path
 
 NAVIGATION_PROFILE = 'source_bound_navigation_v1'
 
+EXECUTION_MODES = ('lite', 'normal', 'full')
+
+MODE_DEFAULT_AUTHORING_MINUTES = {'lite': 15, 'normal': 30, 'full': 60}
+
+LITE_WARM_VECTOR_MAX_UNITS = 4000
+
+def should_use_cached_only_navigation(execution_mode, *, service, runtime):
+    """In LITE mode, reuse settled caches or allow fast warm-GPU small VODs; never cold-encode."""
+    if execution_mode != 'lite':
+        return False
+    if not isinstance(runtime, dict):
+        return True
+    from .editorial_multimodal_navigation import _local_runtime_assets
+    _, missing_asset = _local_runtime_assets(runtime)
+    if missing_asset is not None:
+        return True
+    device = str(runtime.get('device') or '').strip().lower()
+    if not (device.startswith('cuda') or device.startswith('mps')):
+        return True
+    from .editorial_embedding_index import document_unit_count
+    with service.open() as db:
+        unit_count = document_unit_count(db)
+    return unit_count > LITE_WARM_VECTOR_MAX_UNITS
+
+def build_local_chunk_hints(chunks, duration_sec, *, window_sec=300):
+    """Build deterministic zero-LLM time-bucket hints for FULL mode when live hints are absent."""
+    duration = max(0, int(duration_sec or 0))
+    step = max(60, int(window_sec))
+    buckets = {}
+    for row in chunks or []:
+        if isinstance(row, dict):
+            start = float(row.get('start_sec', row.get('start', 0)) or 0)
+            text = str(row.get('text') or '').strip()
+        else:
+            start = float(getattr(row, 'start_sec', getattr(row, 'start', 0)) or 0)
+            text = str(getattr(row, 'text', '') or '').strip()
+        if not text:
+            continue
+        idx = int(max(0.0, start) // step)
+        entry = buckets.setdefault(idx, {'texts': [], 'count': 0})
+        entry['count'] += 1
+        if len(entry['texts']) < 3:
+            entry['texts'].append(text[:120])
+    windows = []
+    for idx in sorted(buckets):
+        start_sec = idx * step
+        end_sec = min(duration, start_sec + step) if duration > 0 else start_sec + step
+        windows.append(dict(
+            start_sec=start_sec,
+            end_sec=end_sec,
+            cue_count=buckets[idx]['count'],
+            sample_lines=buckets[idx]['texts'],
+        ))
+    return dict(
+        schema_version='chzz.local_chunk_hints.v1',
+        window_sec=step,
+        derived=True,
+        original_read=False,
+        authority='deterministic_orientation_only; read originals before citing',
+        windows=windows,
+    )
+
 def prepare_local_source_files(*, vod, spec, source_dir, root):
     """Bind acquired local originals and copy only available support snapshots."""
     import shutil
@@ -72,7 +134,7 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
         with service.open() as db:
             try:
                 if materialize:
-                    return read_saved_documents(config, db=db, index_root=path, batch_rows=batch_rows), None
+                    return read_saved_documents(config, db=db, index_root=path, max_units=None, batch_rows=batch_rows), None
                 read_saved_documents(config, db=db, index_root=path, max_units=None,
                                      batch_rows=batch_rows, materialize=False)
                 return True, None
@@ -152,6 +214,7 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
     clusters = None
     cluster_reader = None
     grouping_complete = None
+    comparison_scope = {}
     owned_index = root / 'embedding-index'
     if runtime is not None and retrieval is None:
 
@@ -221,6 +284,7 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
                 continue
             clusters, cluster_reader = saved['clusters'], reader
             grouping_complete = saved_grouping_complete
+            comparison_scope = {key: groups[key] for key in ('comparison_scope', 'window_count') if key in groups}
             if hierarchy is None:
                 hierarchy = selected_hierarchy
             break
@@ -232,7 +296,7 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
         atomic_json(root / 'status' / 'document-navigation-status.json', dict(
             status='partial' if grouping_complete is False else 'ready' if clusters else 'deferred',
             reason=reason,
-            admitted=False, grouping_complete=grouping_complete,
+            admitted=False, grouping_complete=grouping_complete, **comparison_scope,
             retrieval_configured='dense_and_originals' if retrieval is not None else 'lexical_and_originals'))
         return dict(profile=NAVIGATION_PROFILE, derived_root=str(root),
             index_root=str(index_root) if retrieval is not None else None,
@@ -243,7 +307,6 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
     if runtime is not None or retrieval is not None:
         with service.open() as db:
             unit_count = document_unit_count(db)
-        cluster_limit = DOCUMENT_COSINE_NAVIGATION['max_units']
         cold_index = retrieval is None
         cpu_threads = (runtime or {}).get('limits', {}).get('cpu_threads', 1)
         unavailable = None
@@ -251,15 +314,13 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
             from .editorial_multimodal_navigation import _local_runtime_assets
             _, unavailable = _local_runtime_assets(runtime)
         with document_navigation_admission(source_dir, unit_count,
-                max_units=None if cold_index else cluster_limit, cpu_threads=cpu_threads,
+                max_units=None, cpu_threads=cpu_threads,
                 unavailable=unavailable, cold_index=cold_index) as admission:
             reason = admission['reason']
             if reason is None and retrieval is None:
                 index_root = owned_index
                 retrieval = prepare_optional(service, source_dir=source_dir, runtime=runtime,
                     index_root=index_root, status_root=root / 'status', cached_only=False)
-            if reason is None and retrieval is not None and unit_count > cluster_limit:
-                reason = 'cluster_unit_limit'
             if retrieval is not None and reason is None:
                 try:
                     documents, invalid_cache = read_candidate(retrieval, index_root, materialize=True,
@@ -280,6 +341,7 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
                         if hierarchy is None:
                             hierarchy = groups['hierarchy']
                         grouping_complete = groups['grouping_complete']
+                        comparison_scope = {key: groups[key] for key in ('comparison_scope', 'window_count') if key in groups}
                         clusters = dict(path=str(cluster_path), sha256=cluster_reader['artifact']['sha256'],
                                         profile=groups['profile'], original_read=False)
                 except MemoryError:
@@ -306,7 +368,7 @@ def prepare_navigation_features(*, service, source_dir, runtime, derived_root,
                     dict(status='unavailable', reason=reason, original_search_available=True))
             atomic_json(root / 'status' / 'document-navigation-status.json',
                 {**admission, 'status': 'partial' if grouping_complete is False else 'ready' if clusters else 'deferred',
-                 'reason': reason, 'grouping_complete': grouping_complete,
+                 'reason': reason, 'grouping_complete': grouping_complete, **comparison_scope,
                  **({'retained_index_validation': retained_validation_error} if retained_validation_error else {}),
                  'retrieval_configured': 'dense_and_originals' if retrieval is not None else 'lexical_and_originals'})
     return dict(profile=NAVIGATION_PROFILE, derived_root=str(root),

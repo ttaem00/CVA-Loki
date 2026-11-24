@@ -16,11 +16,15 @@ from pathlib import Path
 
 import re
 
+import sys
+
 import time
 
 from .loki_version_policy import uses_loki_308_profile
 
-from .evidence_world.contracts import EvidenceError, SourcePolicy, canonical_json, digest, file_hash, native_path
+from .evidence_world.contracts import (
+    EvidenceError, SourcePolicy, canonical_json, digest, file_hash, native_path, scoped_path_resolver,
+)
 
 from .evidence_world.index import build_lock
 
@@ -41,6 +45,28 @@ _CONTEXT_NOTE_FIELDS = {
     'read_ids': 'nonempty distinct list of actual read_id values returned by this job',
 }
 
+_QUICK_CONTRACT = dict(
+    required_fields=[
+        'base_revision', 'summary', 'summary_evidence_refs',
+        'ranges', 'points', 'stories', 'proposals',
+        'group_outcomes', 'unresolved_questions',
+    ],
+    id_rules='Unique stable IDs: ranges=r1.., points=p1.., stories=s1.., proposals=h1..; refs must be read e<N> or chat-original:<id>.',
+    alignment_rules='Every story_beat range must lie inside its proposal source_spans and cite used_evidence_ids; Point-only (point without highlight) and Point-free (highlight without point) are both valid.',
+    editorial_principles='Preserve entertainment/tiki-taka regardless of clip length; when rejecting a broad relation hypothesis, keep valid smaller exchanges; check distant premises, activity purpose, and counterevidence; update working draft early and reconcile remember notes into final fields.',
+    minimal_skeleton=dict(
+        base_revision='<prepare.base_revision>',
+        summary='...',
+        summary_evidence_refs=['e1'],
+        ranges=[dict(id='r1', level='D1', title='...', start='00:00:00', end='00:05:00', evidence_refs=['e1'])],
+        points=[],
+        stories=[],
+        proposals=[],
+        group_outcomes=[],
+        unresolved_questions=[],
+    ),
+)
+
 class SubmissionRejected(ValueError):
     """A repairable validation failure, with the original error code intact."""
     def __init__(self, rejection):
@@ -57,7 +83,7 @@ def _json(path):
 def _create(path, value):
     path = native_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = (canonical_json(value) + "\n").encode("utf-8")
+    data = value if isinstance(value, bytes) else (canonical_json(value) + "\n").encode("utf-8")
     if path.exists():
         if path.read_bytes() != data:
             raise ValueError("current_conversation_immutable_artifact_changed")
@@ -184,12 +210,18 @@ def prepare(spec):
     required = {"vod_info", "work_root", "source_work_dir", "srt_path", "base_path", "job_id",
                 "code_version", "author"}
     if (not isinstance(spec, dict) or not required <= set(spec)
-            or set(spec) - required - {"summary_pipeline_version", "packet_path", "orientation_paths", "hierarchy", "navigation_path", "media_path", "multimodal_runtime", "summary_hints", "source_output_dir", "source_data_dir", "retrieval", "read_page_policy", "search_mode", "authoring_minutes", "signal_priority_profile", "source_snapshot", "author_prompt_profile", "feature_profile", "read_index_root"}):
+            or set(spec) - required - {"summary_pipeline_version", "packet_path", "orientation_paths", "hierarchy", "navigation_path", "media_path", "multimodal_runtime", "summary_hints", "source_output_dir", "source_data_dir", "retrieval", "read_page_policy", "search_mode", "authoring_minutes", "signal_priority_profile", "source_snapshot", "author_prompt_profile", "feature_profile", "read_index_root", "execution_mode"}):
         raise ValueError("current_conversation_prepare_spec_shape")
     spec_sha256 = digest(spec)
+    from .editorial_current_sources import EXECUTION_MODES, MODE_DEFAULT_AUTHORING_MINUTES
+    execution_mode = spec.get('execution_mode')
+    if 'execution_mode' in spec and (not isinstance(execution_mode, str) or execution_mode not in EXECUTION_MODES):
+        raise ValueError('current_conversation_execution_mode_invalid')
     minutes = spec.get('authoring_minutes')
     if 'authoring_minutes' in spec and (type(minutes) is not int or minutes <= 0):
         raise ValueError('current_conversation_authoring_minutes_must_be_positive_integer')
+    if minutes is None and execution_mode is not None:
+        minutes = MODE_DEFAULT_AUTHORING_MINUTES[execution_mode]
     vod = VODInfo(**spec["vod_info"])
     video = str(vod.video_no)
     source_dir = native_path(spec["source_work_dir"]).resolve()
@@ -386,11 +418,19 @@ def prepare(spec):
         else:
             packet.pop('signal_priority_profile', None)
         view, source_evidence = full_source_context(source=source, packet=packet)
-        prompt_path = Path(__file__).resolve().parents[1] / prompt_asset.relative_path
+        prompt_root = Path(__file__).resolve().parents[1]
+        prompt_path = prompt_root / prompt_asset.relative_path
         prompt_text = prompt_path.read_text(encoding='utf-8-sig')
-        prompt_header = json.loads(prompt_text.splitlines()[1])
+        prompt_source_hashes = {}
+        if prompt_asset.supplement_path is not None:
+            supplement = prompt_root / prompt_asset.supplement_path
+            prompt_source_hashes = {str(path): file_hash(path) for path in (prompt_path, supplement)}
+            frontmatter, _ = prompt_text.split("\n---\n", 1)
+            prompt_text = frontmatter + "\n---\n" + prompt_asset.body
+            prompt_path = root / "author-prompt.md"
+            _create(prompt_path, prompt_text.encode("utf-8"))
         prompt = dict(path=str(prompt_path), sha256=file_hash(prompt_path),
-                      version=prompt_header['version'], text=prompt_text)
+                      version=prompt_asset.version, text=prompt_text)
         navigation = None
         if spec.get('navigation_path'):
             navigation, sha = _json(spec['navigation_path'])
@@ -417,6 +457,8 @@ def prepare(spec):
                      else spec.get('retrieval'))
         hierarchy = deepcopy(spec.get('hierarchy'))
         features = None
+        from .editorial_current_sources import build_local_chunk_hints, should_use_cached_only_navigation
+        lite_cached_only = should_use_cached_only_navigation(execution_mode, service=service, runtime=multimodal_runtime)
         if feature_profile is not None:
             from .editorial_current_sources import frozen_navigation_features, prepare_navigation_features
             if reuse_navigation:
@@ -425,7 +467,7 @@ def prepare(spec):
             if features is None:
                 features = prepare_navigation_features(service=service, source_dir=source_dir,
                     runtime=None if reuse_navigation else multimodal_runtime, derived_root=root / 'derived',
-                    retrieval=retrieval, hierarchy=hierarchy,
+                    retrieval=retrieval, hierarchy=hierarchy, cached_only=lite_cached_only,
                     **(dict(read_index_root=spec['read_index_root']) if 'read_index_root' in spec else {}))
             retrieval, hierarchy = features['retrieval'], features['hierarchy']
             service.configure_hierarchy(hierarchy)
@@ -445,7 +487,11 @@ def prepare(spec):
             explicit_lexical = uses_loki_308_profile(selected_pipeline) and spec.get('search_mode') == 'lexical'
             _, missing_asset = _local_runtime_assets(multimodal_runtime)
             retrieval=prepare_optional(service,source_dir=source_dir,runtime=multimodal_runtime,
-                                       cached_only=explicit_lexical or missing_asset is not None)
+                                       cached_only=explicit_lexical or missing_asset is not None or lite_cached_only)
+        if execution_mode == 'lite' and retrieval is None:
+            search_mode = 'lexical'
+        local_chunk_hints = (build_local_chunk_hints(chunks, vod.duration)
+                             if execution_mode == 'full' and not summary_hints else None)
         service.configure_retrieval(retrieval, search_mode=search_mode,
             **(dict(runtime=multimodal_runtime, index_root=features['index_root'],
                     query_root=features['query_root']) if features else {}))
@@ -453,7 +499,10 @@ def prepare(spec):
             multimodal_context = LocalNavigationSession(source=source, service=service, media_ref=media,
                 runtime=multimodal_runtime, root=root / 'multimodal',
                 **(dict(cache_root=features['derived_root']) if features else {})).snapshot()
-        _create(root / "author-input.json", dict(base_revision=base_revision, source_material=view,
+        _create(root / "author-input.json", dict(quick_contract=_QUICK_CONTRACT,
+            **(dict(execution_mode=execution_mode) if execution_mode is not None else {}),
+            **(dict(local_chunk_hints=local_chunk_hints) if local_chunk_hints is not None else {}),
+            base_revision=base_revision, source_material=view,
             response_fields=sorted(RESPONSE_FIELDS), source_id=service.source_id,
             response_optional_fields=dict(collaboration_periods='Optional source_evidence/provisional periods '
                 'with actual original evidence_refs. Never claim manager/verified authority or invent member_vods.'),
@@ -540,7 +589,9 @@ def prepare(spec):
                 memory=dict(query_argument='--query', query_optional=True))))
         manifest_path = service.root / "manifest.json"
         prepared = dict(schema_version=SCHEMA, identity=identity, spec_sha256=spec_sha256,
-            code_hashes=_code_hashes(prompt_path), source=source, source_sha256=digest(source),
+            **(dict(execution_mode=execution_mode) if execution_mode is not None else {}),
+            code_hashes={**_code_hashes(prompt_path), **prompt_source_hashes},
+            source=source, source_sha256=digest(source),
             base_path=str(base), vod_info=deepcopy(spec["vod_info"]), packet=packet,
             source_bundle=bundle, retrieval=deepcopy(retrieval), read_page_policy=read_page_policy,
             search_mode=search_mode,
@@ -607,18 +658,156 @@ def _authoring_time(root, prepared):
         tool_wait_seconds=None, repair_seconds=None, connection_recovery_seconds=None,
         manager_saved=False)
 
-def status(job_root, *, expected_revision):
-    """Observe this job without rewriting its input or bounded original-read wire."""
+def _merge_sec_intervals(intervals):
+    ordered = sorted((round(float(a), 2), round(float(b), 2)) for a, b in intervals if b >= a)
+    merged = []
+    for start, end in ordered:
+        if merged and start <= merged[-1][1] + 1.0:
+            merged[-1] = [merged[-1][0], max(merged[-1][1], end)]
+        else:
+            merged.append([start, end])
+    return merged
+
+def _session_read_summary(root, prepared):
+    """Summarize delivered original read windows without mutating read pages."""
+    stt_windows, chat_windows, read_ids, record_ids = [], [], set(), set()
+    action_dir = root / 'action-results'
+    if action_dir.is_dir():
+        for path in sorted(action_dir.glob('*.json')):
+            entry, _ = _json(path)
+            page = entry.get('result') or {}
+            if not page.get('read_id'):
+                continue
+            read_ids.add(page['read_id'])
+            for row in page.get('records') or []:
+                rid = row.get('record_id')
+                if rid:
+                    record_ids.add(rid)
+                ti = row.get('time_index') or {}
+                if 'start_us' in ti:
+                    s = ti['start_us'] / 1_000_000
+                    e = ti.get('end_us', ti['start_us']) / 1_000_000
+                    if row.get('family') == 'stt':
+                        stt_windows.append((s, max(s, e)))
+                    elif row.get('family') == 'chat':
+                        chat_windows.append((s, max(s, e)))
+    return dict(
+        completed_read_count=len(read_ids),
+        distinct_read_record_count=len(record_ids),
+        already_delivered_stt_windows_sec=_merge_sec_intervals(stt_windows),
+        already_delivered_chat_windows_sec=_merge_sec_intervals(chat_windows),
+    )
+
+def _unreconciled_note_reads(root, prepared, payload):
+    """Non-blocking check: warn when remember() notes cite reads absent from final citations."""
+    from .evidence_world.context_session import memory as recall
+    try:
+        service = _service(root, prepared)
+        recalled = recall(service)
+    except Exception:
+        return []
+    notes = recalled.get('notes') if isinstance(recalled, dict) else []
+    if not notes:
+        return []
+    ref_ids = {'e' + str(r['ordinal'] + 1): r['record_id'] for r in prepared['source']['records']}
+    cited_record_ids = set()
+    for ref in _citation_paths(payload):
+        if ref in ref_ids:
+            cited_record_ids.add(ref_ids[ref])
+        elif ref.startswith('chat-original:'):
+            cited_record_ids.add(ref[len('chat-original:'):])
+    warnings = []
+    for note in notes:
+        note_read_ids = note.get('read_ids') or []
+        qid = note.get('question_id') or 'note'
+        matched = False
+        for rid in note_read_ids:
+            try:
+                page = service.load_read(rid)
+            except Exception:
+                continue
+            page_records = {row.get('record_id') for row in page.get('records') or [] if row.get('record_id')}
+            if page_records & cited_record_ids:
+                matched = True
+                break
+        if note_read_ids and not matched:
+            warnings.append(f'unreconciled_note_reads:{qid}:{",".join(note_read_ids[:3])}')
+    return warnings
+
+def _job_status(job_root, expected_revision, *, include_read_summary=False):
     root, prepared, _ = _load(job_root)
-    with build_lock(root):
-        if expected_revision != prepared['prepared_revision']:
-            raise ValueError('current_conversation_prepare_conflict')
-        state, clock = 'not_submitted', _authoring_time(root, prepared)
-        if (root / 'submission.json').exists():
-            state = 'accepted_render_pending'
-            if (root / 'submission-result.json').exists():
-                state = 'terminal_record_present'
-        return dict(prepared_revision=prepared['prepared_revision'], submission_state=state, authoring_time=clock)
+    if expected_revision != prepared['prepared_revision']:
+        raise ValueError('current_conversation_prepare_conflict')
+    state, clock = 'not_submitted', _authoring_time(root, prepared)
+    if native_path(root / 'submission.json').exists():
+        state = 'accepted_render_pending'
+        if native_path(root / 'submission-result.json').exists():
+            state = 'terminal_record_present'
+    result = dict(prepared_revision=prepared['prepared_revision'], submission_state=state, authoring_time=clock)
+    if include_read_summary:
+        result['read_summary'] = _session_read_summary(root, prepared)
+        if prepared.get('execution_mode'):
+            result['execution_mode'] = prepared['execution_mode']
+    return result
+
+def _local_job_status(job_root, expected_revision, *, include_read_summary=False):
+    prepared_file = job_root / 'prepared.json'
+    if prepared_file.is_file():
+        if sys.platform == 'win32':
+            from .vod_search_index import _plain
+            _plain(prepared_file)
+            _plain(job_root / 'build.lock')
+        try:
+
+
+            record, _ = _json(prepared_file)
+            identity = record.get('identity') if isinstance(record, dict) else None
+            run_root = identity.get('run_root') if isinstance(identity, dict) else None
+            if not isinstance(run_root, str):
+                raise ValueError('current_conversation_prepared_changed')
+            bound_root = native_path(run_root)
+            if sys.platform == 'win32':
+                _plain(bound_root)
+            if bound_root.resolve() != job_root.resolve():
+                raise ValueError('current_conversation_prepared_changed')
+            with build_lock(job_root, create_root=False):
+                return _job_status(job_root, expected_revision, include_read_summary=include_read_summary)
+        except FileNotFoundError:
+            if prepared_file.exists():
+                raise
+    for name in ('prepared.json', 'submission.json', 'submission-result.json'):
+        try:
+            (job_root / name).lstat()
+        except FileNotFoundError:
+            continue
+        raise ValueError('current_conversation_prepared_changed')
+    return None
+
+def status(job_root, *, expected_revision, include_read_summary=False):
+    """Observe the current job or reopen its verified published copy."""
+    from .editorial_native_retained import native_retained_saved_read
+
+    with scoped_path_resolver(None):
+        logical_job = native_path(job_root)
+        current = _local_job_status(logical_job, expected_revision, include_read_summary=include_read_summary)
+        if current is not None:
+            return current
+        try:
+            with native_retained_saved_read(logical_job) as retained:
+                saved = (_job_status(logical_job, expected_revision, include_read_summary=include_read_summary)
+                         if retained else None)
+        except (OSError, ValueError):
+            current = _local_job_status(logical_job, expected_revision, include_read_summary=include_read_summary)
+            if current is not None:
+                return current
+            raise
+
+        current = _local_job_status(logical_job, expected_revision, include_read_summary=include_read_summary)
+        if current is not None:
+            return current
+        if saved is None:
+            raise FileNotFoundError(logical_job / 'prepared.json')
+        return saved
 
 def read(job_root, action, *, expected_revision):
     root, prepared, _ = _load(job_root)
@@ -946,9 +1135,9 @@ def _multimodal_final_review(prepared, payload, navigation_receipts):
         decision=deepcopy(decision), initial_status=review.get('initial_context', {}).get('status'),
         semantic_adoption='UNVERIFIED; compare authored output and original reads')
 
-def submit(job_root, response_path, *, expected_revision):
+def submit(job_root, response_path, *, expected_revision, validate_only=False):
     """Validate one new author response; terminal unknown submissions are never resent."""
-    from .editorial_full_author import validate_current_conversation_response
+    from .editorial_full_author import _prepare_author_highlight_images, validate_current_conversation_response
     from .editorial_highlight_projection import build_qg1_preview, validate_qg1_preview_payload
     root, prepared, job = _load(job_root)
     payload, raw_sha = _json(response_path)
@@ -957,7 +1146,7 @@ def submit(job_root, response_path, *, expected_revision):
             raise ValueError("current_conversation_prepare_conflict")
         submission = root / "submission.json"
         terminal = root / "submission-result.json"
-        if submission.exists():
+        if submission.exists() and not validate_only:
             prior, _ = _json(submission)
             if prior["raw_response_sha256"] != raw_sha:
                 raise ValueError("current_conversation_submit_conflict")
@@ -971,19 +1160,21 @@ def submit(job_root, response_path, *, expected_revision):
         raw = native_path(response_path).read_bytes()
         if hashlib.sha256(raw).hexdigest() != raw_sha:
             raise ValueError("current_conversation_response_changed")
-        candidate = root / "response-candidates" / (raw_sha + ".json")
-        candidate.parent.mkdir(parents=True, exist_ok=True)
-        if candidate.exists():
-            if candidate.read_bytes() != raw:
-                raise ValueError("current_conversation_response_archive_changed")
-        else:
-            with candidate.open("xb") as stream:
-                stream.write(raw)
+        if not validate_only:
+            candidate = root / "response-candidates" / (raw_sha + ".json")
+            candidate.parent.mkdir(parents=True, exist_ok=True)
+            if candidate.exists():
+                if candidate.read_bytes() != raw:
+                    raise ValueError("current_conversation_response_archive_changed")
+            else:
+                with candidate.open("xb") as stream:
+                    stream.write(raw)
         receipts, complete_ids, chats = _reads(root, prepared)
         ref_ids = {"e" + str(r["ordinal"] + 1): r["record_id"] for r in prepared["source"]["records"]}
         cited = _citation_paths(payload)
         packet = deepcopy(prepared["packet"])
         packet.update(chat_rows=chats, chat_source_revision=digest(prepared["identity"]["source_assets"]))
+        media = None
         try:
             missing = [dict(ref=ref, record_id=ref_ids[ref], paths=cited[ref])
                        for ref in sorted(cited) if ref in ref_ids and ref_ids[ref] not in complete_ids]
@@ -996,7 +1187,7 @@ def submit(job_root, response_path, *, expected_revision):
                         'and unrelated items; resubmit only after genuine reads or a supported local correction.')
                 raise error
             if any(ref.startswith('frame:') for ref in cited):
-                _, frames = _frame_session(root, prepared)
+                media, frames = _frame_session(root, prepared)
                 packet['_delivered_media_frames'] = frames
             navigation_receipts = _navigation_receipts(root, prepared)
             multimodal_review = _multimodal_final_review(prepared, payload, navigation_receipts)
@@ -1014,7 +1205,8 @@ def submit(job_root, response_path, *, expected_revision):
                 error=str(exc), diagnostics=diagnostics, external_transport_calls=0)
 
 
-            _create(root / 'response-rejections' / (raw_sha + '-' + digest(rejection) + '.json'), rejection)
+            if not validate_only:
+                _create(root / 'response-rejections' / (raw_sha + '-' + digest(rejection) + '.json'), rejection)
             raise SubmissionRejected(rejection) from exc
         quality = dict(schema_version="chzz.editorial_highlight_quality.v1",
             authority_revision_id=result["authority_revision_id"], cumulative_call_count=0,
@@ -1045,20 +1237,27 @@ def submit(job_root, response_path, *, expected_revision):
         bind_collaboration_lane(result, retained=retained.get('collaboration_periods'),
             retained_diagnostics=retained.get('collaboration_diagnostics'),
             duration_sec=prepared['vod_info']['duration'])
-        if uses_loki_308_profile(prepared['identity']['selected_pipeline']) and any(
-                not row.get('image') for row in result.get('highlights', [])):
-            from .editorial_media_request import current_conversation_media_session, fill_highlight_images
-            from .highlight_story_window import _editorial_highlight_id
+        if not validate_only and uses_loki_308_profile(prepared['identity']['selected_pipeline']) and result.get('highlights'):
 
 
-            media = current_conversation_media_session(root=root, prepared=prepared)
-            result['highlights'] = fill_highlight_images(result['highlights'], media)
-            for row in result['highlights']:
-                row['highlight_id'] = _editorial_highlight_id(row)
+            if media is None and any(row.get('image') is None for row in result['highlights']):
+                from .editorial_media_request import current_conversation_media_session
+                media = current_conversation_media_session(root=root, prepared=prepared)
+            result['highlights'] = _prepare_author_highlight_images(result['highlights'], media)
         preview = build_qg1_preview(broadcast_map=projected["outline"], editorial_result=result,
             quality=quality, story_selection=projected["story_shadow"]["story_point_selection"],
             source_broadcast_map=projected["outline"], projection_mode="qg1_review_candidate")
         validate_qg1_preview_payload(preview, expected_broadcast_map=projected["outline"])
+        if validate_only:
+            return dict(
+                status='valid_dry_run',
+                prepared_revision=expected_revision,
+                raw_response_sha256=raw_sha,
+                warnings=_unreconciled_note_reads(root, prepared, payload),
+                read_summary=_session_read_summary(root, prepared),
+                written=False,
+                external_transport_calls=0,
+            )
 
         raw = native_path(response_path).read_bytes()
         if hashlib.sha256(raw).hexdigest() != raw_sha:
