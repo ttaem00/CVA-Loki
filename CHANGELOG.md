@@ -1,5 +1,12 @@
 # 변경 기록
 
+## 3.0.9.1
+
+- **HTML 다크모드 기본 표시 보정**: 단독 저장 HTML(`saved_report_html`), 공용 웹 진입 HTML(`entry_html`), 로컬 검토 UI 투영이 이전 세션의 자동 저장 라이트 키(`loki-design-theme-v1`)나 `localStorage` 차단 환경에서도 항상 다크모드로 먼저 열리도록 `loki-theme-explicit-v2` 명시 선택 키와 마운트 전 `visibility` 보정 및 `review.py` CSP(`font-src data:;`, `img-src data: 'self' https: http:;`)를 적용했습니다. 사용자가 테마 전환 버튼으로 바꾼 라이트/다크 선택은 계속 기억합니다.
+- **4대 CLI 네이티브 플러그인·확장 및 LLM 배너·가이드 완성**: `.codex-plugin/plugin.json`(Codex), `plugin.json` + `cva-icon-512.png`(Antigravity), `.claude-plugin/{plugin,marketplace}.json`(Claude Code), `gemini-extension.json` + `rules/GEMINI.md`(Gemini CLI), `rules/AGENTS.md` 및 `docs/llm-guides/` 4종 가이드를 번들에 함께 수록하고 히어로 배너와 `README.md`를 멀티 LLM 기준으로 보완했습니다.
+- **Web AI 분할 팩 · 무열람 보완 제출 · 로컬 LLM `--model auto` · 짧은 영상 검증 안정화**: `export-pack`이 업로드 제한에 맞춘 `<stem>_files/`(최대 8개 파일, 초대형 자막 최대 5파트 분할)를 함께 생성하며, `import-draft`는 미열람 인용 근거를 오프라인에서 보완해 제출합니다. `local_llm_author.py`는 `--model auto`와 `--config` 자동 탐색, `<think>` 제거 및 Ollama `num_ctx=32768`을 지원하고, `short_video_check.py`와 `<720p` Windows `PermissionError` 처리를 포함했습니다.
+- 새 작업의 `latest`는 `3.0.9.1`(`loki_3_0_9_1`)을 선택하며, `3.0.9`의 작성 프롬프트(`evidence_retention_d2_v1`)·근거 세계 메커니즘·기존 `3.0.9` 이하 작업·공개 `v3.0.9` 태그와 ZIP은 그대로 보존합니다.
+
 ## 3.0.9
 
 - **다중 LLM 작성자 지원**: 기존 `current_codex`·`current_chatgpt` 외에 `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm`을 작업공간 로컬 신원으로 정식 지원하며, `@google/gemini-cli` 확장(`gemini-extension.json`·`policies/loki-author.toml`)과 Ollama/vLLM용 3-Pass 로컬 실행기(`local_llm_author.py`)를 포함합니다.

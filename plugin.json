@@ -1,0 +1,18 @@
+{
+  "name": "loki",
+  "displayName": "CVA-Loki",
+  "version": "3.0.9.1",
+  "description": "CHZZK·YouTube·SOOP 다시보기 원문과 프레임을 직접 읽고 요약·타임라인·Point·Story·Highlight를 작성하는 증거 기반 워크플로 플러그인입니다.",
+  "logo": "docs/assets/cva-icon-512.png",
+  "author": {
+    "name": "CVA contributors",
+    "url": "https://ttaem.com"
+  },
+  "homepage": "https://ttaem.com",
+  "repository": "https://github.com/ttaem00/CVA-Loki",
+  "suggestedPrompts": [
+    "Loki로 이 치지직 VOD를 NORMAL 모드로 준비하고 원문과 프레임을 직접 읽어 요약·타임라인·Highlight를 작성해줘.",
+    "Loki LITE(15분) 모드로 이 다시보기의 핵심 흐름과 타임라인 댓글을 빠르게 정리해줘.",
+    "기존 Loki 보고서 결과를 검토 UI로 열고 치지직 댓글·마커 내보내기까지 확인해줘."
+  ]
+}

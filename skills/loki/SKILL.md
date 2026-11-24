@@ -1,16 +1,17 @@
 ---
 name: loki
-description: 치지직을 중심으로 공개 YouTube 라이브 다시보기·SOOP VOD 또는 같은 방송의 로컬 자료를 읽고, 현재 대화의 ChatGPT 또는 Codex가 요약·타임라인·Point·Story·Highlight와 선택 이미지를 직접 작성한 뒤 검토·저장한다.
+description: 치지직을 중심으로 공개 YouTube 라이브 다시보기·SOOP VOD 또는 같은 방송의 로컬 자료를 읽고, 선택한 작성자 호스트(Codex·Claude·Antigravity·Gemini CLI·Web AI·로컬 LLM)가 요약·타임라인·Point·Story·Highlight와 선택 이미지를 직접 작성한 뒤 검토·내보내기·저장한다.
 ---
 
 # Loki로 직접 작성하기
 
-전담 대화의 ChatGPT 또는 Codex가 동봉 런타임으로 실제 원문과 이미지를 읽고 편집 판단을 내려
-새 보고서를 작성한다. 다른 Codex/Claude CLI·API 모델·에이전트 브리지나 이전 생성
-보고서에 의미 작성을 맡기지 않는다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색,
-스크립트는 준비·기록·검사·렌더를 맡는다.
+선택한 전담 작성자(`current_<host>`)가 동봉 런타임으로 실제 원문과 이미지를 읽고 편집 판단을 내려
+새 보고서를 작성한다. 다른 유료 API 모델·에이전트 브리지나 이전 생성 보고서에 의미 작성을 맡기지 않는다.
+Whisper는 전사, EmbeddingGemma 2는 근거 탐색, 스크립트는 준비·기록·검사·렌더·내보내기를 맡는다.
 
-[출시 버전 정책](https://github.com/ttaem00/CVA-Loki#release-version-policy)에 따라 정식 공개 전 오류·재빌드는 현재 후보 버전 안에서 해결하며, 공개한 태그·ZIP은 보존한다.
+호스트 모델 선택은 동적 호스트 라우팅을 따른다(멀티에이전트 호스트는 기본 `inherit`,
+로컬 LLM은 `--model auto`). 특정 시점 모델 버전에 고정하지 않으며,
+권장 능력 티어와 웹/로컬/Gemini CLI 가이드는 배포 루트의 `docs/llm-guides/`를 참고한다.
 
 ## 경로와 읽을 문서
 
@@ -25,22 +26,23 @@ description: 치지직을 중심으로 공개 YouTube 라이브 다시보기·SO
 | 보안 문제 보고·재배포 | [보안 안내](references/SECURITY.md), [제3자 고지](references/THIRD_PARTY_NOTICES.md), [이용허락](LICENSE) |
 | 외부 코드·문서 기여 | [기여 안내와 동의 문안](CONTRIBUTING.md) |
 
-배포·플러그인·스킬·요약 메커니즘은 3.0.9이며 `latest`도 Loki 3.0.9이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
+배포·플러그인·스킬·요약 메커니즘은 3.0.9.1이며 `latest`도 Loki 3.0.9.1이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
 작업의 버전·원자료·응답·예산은 별칭 변경을 이유로 다시 쓰지 않는다.
 
-### 3.0.9 실행 모드·다중 호스트·내보내기
+### 3.0.9.1 실행 모드·다중 호스트·내보내기
 
-- **실행 모드 (`--mode lite|normal|full`)**: `source_acquire.py`와 `prepare`는 `lite`(15분, Warm-Only 벡터 색인·빠른 탐색), `normal`(30분, 전체 채팅·공개 클립·댓글), `full`(60분, 전체 사전 수집·결정론적 5분 구간 힌트) 모드를 지원한다.
+- **실행 모드 (`--mode lite|normal|full`)**: `source_acquire.py`와 `prepare`는 `lite`(360p 빠른 취득·Warm-Only 벡터·15분 작성 목표), `normal`(480p·전체 채팅·공개 클립·댓글·30분), `full`(720p·전체 사전 수집·결정론적 5분 구간 힌트·60분) 모드를 지원한다.
+- **준비 시간 vs 작성 시간 분리**: 다운로드·STT·임베딩 준비 시간(`prep_time_note`)은 사전 단계이며 작성 예산(`authoring_minutes`)에서 차감하지 않는다.
 - **다중 작성자 호스트 (`--author-mode`)**: `current_codex`, `current_chatgpt`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm`을 지원한다.
 - **무부작용 사전 검사 및 중복 읽기 방지**: 최종 제출 전 `loki.py submit --validate-only`로 스키마·근거·미반영 메모(`unreconciled_note_reads`)를 확인하고, `loki.py status --include-read-summary`로 이미 읽은 STT/채팅 구간을 조회한다.
-- **웹 AI·로컬 LLM·크리에이터 내보내기**: `loki.py export-pack` / `import-draft`, `local_llm_author.py`(Ollama/vLLM 3-Pass), `loki.py export --format comment|markers-csv|fcpxml`을 오프라인(`network=deny`) 계약 안에서 사용할 수 있다.
-- **선택적 짧은 영상 확인 (`gemini-api`)**: 움직임·음향 확인이 필요한 60초 이내 구간만 `editorial_short_video_check`로 보조 확인하며, 미설치·미인증 시 차단을 일으키지 않고 건너뛴다.
+- **웹 AI·로컬 LLM·크리에이터 내보내기**: `loki.py export-pack` / `import-draft`, `local_llm_author.py`(Ollama/vLLM 3-Pass `--model auto`), `loki.py export --format comment|markers-csv|fcpxml`을 오프라인(`network=deny`) 계약 안에서 사용할 수 있다.
+- **선택적 짧은 영상 확인 (`gemini-api`)**: 움직임·음향 확인이 필요한 <=60초 구간만 `short_video_check.py`(`editorial_short_video_check`)로 보조 확인하며, 미설치·미인증·14MiB 초과 시 차단을 일으키지 않고 건너뛴다.
 
 ## 1. 설치와 자료 준비
 
-설치가 필요하면 `python <skill>/runtime/install.py --workspace <new-user-workspace> --mode setup`을
+설치가 필요하면 `python <skill>/runtime/install.py --workspace <new-user-workspace> --mode setup --author-mode <author-mode>`를
 사용한다. 기본값은 전체 기능 `--features multimodal`과 GPU 자동 선택 `--device auto`다.
-ChatGPT 자체 Linux에서는 설치 명령에 `--author-mode current_chatgpt`를 명시한다. 스킬 또는 setup 모드는 별도 Codex 작성자를 실행하지 않는다. 실제 셸·허용된 네트워크·저장공간·모델 자원을 먼저 확인한다.
+선택 가능한 작성자 호스트는 `current_codex`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`, `current_gemini_web`, `current_claude_web`, `current_local_llm`이다. 스킬 또는 setup 모드는 별도 유료 CLI 작성자를 실행하지 않는다. 실제 셸·허용된 네트워크·저장공간·모델 자원을 먼저 확인한다.
 Node/npm·FFmpeg·장치별 PyTorch·EmbeddingGemma 2·Whisper·Silero·익명 F2를 준비한다.
 호환 GPU가 없으면 CPU를 선택하며, 감지된 GPU의 실행 실패를 CPU 성공으로 숨기지 않는다.
 호스트 드라이버·Docker GPU 노출은 먼저 준비돼 있어야 한다. 설치로 이를 변경하지 않는다.
@@ -96,7 +98,7 @@ Report Admin의 목록·영상 작업실·상세 편집기에서 확인한다.
 
 ## 지켜야 할 실행·출처 조건
 
-- 선택한 `author_mode=current_codex` 또는 `current_chatgpt`와 `network=deny`를 유지한다. 작업을 끝내기 위해 provider를
+- 선택한 `author_mode` (`current_codex`, `current_chatgpt`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm`)와 `network=deny`를 유지한다. 작업을 끝내기 위해 provider를
   바꾸거나 API 키를 요청하거나 실행 정책을 우회하지 않는다.
 - 실제로 전달받고 확인하지 않은 자료를 들었거나 봤다고 기록하지 않는다. 시각·원문의
   의미를 임의로 바꾸지 않는다. 도구 실행 기록은 검사 성공을 보여주며 편집 품질을 보증하지 않는다.
@@ -105,4 +107,4 @@ Report Admin의 목록·영상 작업실·상세 편집기에서 확인한다.
   로고가 표시되지 않아도 텍스트 출처는 남긴다. 제3자 이용 조건도 보존한다.
 - 상업 이용·배포·정책 문의는 [ttaem00@naver.com](mailto:ttaem00@naver.com)이다.
   외부 기여 병합 전에는 실제 기여자·권리자의 명시적 동의와 기록을 확인한다.
-  현재 Codex가 타인의 동의나 서명을 대신 만들지 않는다.
+  작성자 AI가 타인의 동의나 서명을 대신 만들지 않는다.

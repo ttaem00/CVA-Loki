@@ -52,19 +52,37 @@ _QUICK_CONTRACT = dict(
         'group_outcomes', 'unresolved_questions',
     ],
     id_rules='Unique stable IDs: ranges=r1.., points=p1.., stories=s1.., proposals=h1..; refs must be read e<N> or chat-original:<id>.',
-    alignment_rules='Every story_beat range must lie inside its proposal source_spans and cite used_evidence_ids; Point-only (point without highlight) and Point-free (highlight without point) are both valid.',
+    alignment_rules='Every story_beat range must lie inside its proposal source_spans and cite used_evidence_ids; Point-only (point without highlight) and Point-free (highlight without point) are both valid; D1 ranges must omit parent_id while D2 requires valid parent_id and content.',
     editorial_principles='Preserve entertainment/tiki-taka regardless of clip length; when rejecting a broad relation hypothesis, keep valid smaller exchanges; check distant premises, activity purpose, and counterevidence; update working draft early and reconcile remember notes into final fields.',
     minimal_skeleton=dict(
         base_revision='<prepare.base_revision>',
-        summary='...',
+        summary='Single-line broadcast summary without newlines.',
         summary_evidence_refs=['e1'],
-        ranges=[dict(id='r1', level='D1', title='...', start='00:00:00', end='00:05:00', evidence_refs=['e1'])],
+        ranges=[dict(id='r1', level='D1', title='Main segment', content='Segment description without newlines.', start='00:00:00', end='00:05:00', evidence_refs=['e1'])],
         points=[],
         stories=[],
         proposals=[],
-        group_outcomes=[],
+        group_outcomes=[dict(flow_refs=['broadcast'], terminal_state='represented', reason='All topics covered.', evidence_refs=['e1'])],
         unresolved_questions=[],
+        multimodal_decision=dict(decision='defer', reason='Include ONLY when multimodal_context is ready and intentionally deferred.'),
     ),
+    tool_examples={
+        'envelope': {
+            'schema_version': 'ew.tool.v1',
+            'source_id': '<author_input.source_id>',
+            'world_revision': '<author_input.world_revision>',
+            'question_id': '<your_question_id>',
+            'action': '<action>',
+            'args': {},
+        },
+        'read_evidence': {'intervals_sec': [[0, 120], [1800, 1920]], 'families': ['stt', 'chat'], 'context_cues': 2, 'max_bytes': 16000},
+        'search_evidence': {'query': {'text': '<topic keywords>'}, 'families': ['stt', 'chat']},
+        'browse': {'level': 'chunk'},
+        'remember': {'question_id': '<your_question_id>', 'text': '<hypothesis>', 'read_ids': ['<returned read_id>']},
+        'read_frames': {'start_sec': 120, 'duration_sec': 10, 'inspection_mode': 'scene'},
+        'continuation_cli': 'continuation --job-root <job> --expected-revision <rev> --read-id <returned read_id>',
+        'status_with_summary_cli': 'status --job-root <job> --expected-revision <rev> --include-read-summary',
+    },
 )
 
 class SubmissionRejected(ValueError):
@@ -718,7 +736,8 @@ def _unreconciled_note_reads(root, prepared, payload):
             cited_record_ids.add(ref[len('chat-original:'):])
     warnings = []
     for note in notes:
-        note_read_ids = note.get('read_ids') or []
+        payload_dict = note.get('payload') if isinstance(note.get('payload'), dict) else {}
+        note_read_ids = payload_dict.get('read_ids') or note.get('read_ids') or []
         qid = note.get('question_id') or 'note'
         matched = False
         for rid in note_read_ids:
@@ -1314,12 +1333,17 @@ def _report_source_kwargs(prepared):
     kwargs.pop('signal_highlights')
     return kwargs
 
-def cli_result_json(result):
+def cli_result_json(result, *, job_root=None, include_read_summary=False):
     """Share the exact bounded read wire with the standalone Loki CLI."""
     if isinstance(result, dict):
         if result.get('schema_version') == 'ew.read_result.v1' and result.get('read_page_policy') == 'balanced_compact_v1':
             from .evidence_world.owner_payload import compact_read
             result = compact_read(result)
         if result.get('schema_version') in {'ew.owner_read.v1', 'ew.read_result.v1'}:
+            if include_read_summary and job_root is not None:
+                prepared_file = native_path(job_root) / 'prepared.json'
+                if prepared_file.is_file():
+                    root, prepared, _ = _load(job_root)
+                    result = {**result, 'session_read_summary': _session_read_summary(root, prepared)}
             return canonical_json(result)
     return json.dumps(result, ensure_ascii=False, indent=2) + '\n'

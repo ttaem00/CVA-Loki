@@ -49,6 +49,8 @@ def original_media_scope(*, video_no, duration_sec):
         source = resolve_chzzk_source(str(video_no), target_height=720, public_only=True)
     except MediaToolError as exc:
         return dict(original_source_error=exc.code)
+    except PermissionError:
+        return dict(original_source_error="source_unavailable")
     if not same_media_clock(source.duration_sec, duration_sec):
         return dict(original_source_error="source_clock_mismatch")
     return dict(original_source=dict(profile="chzzk_bounded_v1",
@@ -941,6 +943,8 @@ def _fill_highlight_images(highlights, session, selected_image_indexes, allow_mi
                 try:
                     scope_result = (original_media_scope(video_no=catalog["video_no"], duration_sec=float(duration_sec))
                         if duration_sec is not None else dict(original_source_error="source_clock_unavailable"))
+                except PermissionError:
+                    scope_result = dict(original_source_error="source_unavailable")
                 except (OSError, ValueError):
                     if original is None:
                         raise

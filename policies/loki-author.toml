@@ -1,21 +1,22 @@
-# Workspace-local policy template for Gemini CLI (@google/gemini-cli v0.70+)
-# Keeps Loki authoring strictly inside the owned workspace with network=deny.
+# Extension Policy Engine rules for @google/gemini-cli (Tier 2: ask_user / deny only)
+# Note: Extension policies intentionally forbid `allow` rules. See docs/llm-guides/GEMINI_CLI_SETUP.md
+# for an optional user-tier ~/.gemini/policies/ snippet if you want auto-approval for offline reads.
 
-[policy]
-name = "cva-loki-3.0.9-author"
-description = "Allow workspace-local Loki read/draft/submit/export commands while preserving network=deny during authoring."
-
-[[rules]]
-tool = "run_shell_command"
-decision = "allow"
-command_prefix = ["python", "skills/loki/runtime/loki.py"]
-
-[[rules]]
-tool = "run_shell_command"
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "source_acquire.py"
 decision = "ask_user"
-command_prefix = ["python", "skills/loki/runtime/source_acquire.py"]
+priority = 100
 
-[[rules]]
-tool = "run_shell_command"
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "gemini-api"
 decision = "ask_user"
-command_prefix = ["gemini-api"]
+priority = 100
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(?:NID_AUT|NID_SES|\\.env|credentials|cookies)"
+decision = "deny"
+denyMessage = "Loki policy forbids accessing browser credentials, cookies, or secret environment files."
+priority = 200
