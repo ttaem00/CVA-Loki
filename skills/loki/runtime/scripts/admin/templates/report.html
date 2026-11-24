@@ -96,7 +96,6 @@
             <div data-outline-readonly="model_calls"><h4>모델/호출</h4><pre></pre></div>
           </section>
         </details>
-        <details class="manager-outline-secondary"><summary id="managerOutlineHistorySummary">이전 버전 0개</summary><div id="managerOutlineHistory" class="manager-outline-readonly"></div></details>
       </section>
       <div class="row save-row">
         <button id="saveBtn" class="primary" type="button">저장</button>
@@ -113,11 +112,12 @@
         <label class="checkbox"><input id="ctEnabledCheckbox" type="checkbox" checked> 챕터 인덱스 포함</label>
         <span id="ctHint" class="ct-hint">끄면 챕터 인덱스 카드와 댓글 복사에서 제외됩니다.</span>
       </div>
+      <p class="share-short-link"><a id="reportShortLinksLink" href="/short-links" target="_blank" rel="noopener">짧은 주소 만들기 ↗</a></p>
       <section class="naver-post-panel" aria-labelledby="naverCafeTitle" data-testid="naver-cafe-post-panel">
         <div class="naver-post-head">
           <div>
             <div id="naverCafeTitle" class="naver-post-title">게시/댓글 내보내기</div>
-            <p class="naver-post-lead">요약 페이지 본문에는 넣지 않는 관리자 전용 도구입니다. 현재 수정본 기준으로 카페 글과 CHZZK 댓글 초안을 만듭니다.</p>
+            <p class="naver-post-lead">요약 페이지 본문에는 넣지 않는 관리자 전용 도구입니다. 현재 수정본 기준으로 카페 글과 전체 방송 목차를 만듭니다. CHZZK에 올릴 댓글은 ‘댓글 초안’의 자동 댓글 초안입니다.</p>
           </div>
           <span class="naver-post-badge">관리자 전용</span>
         </div>
@@ -178,14 +178,14 @@
         </details>
         <div class="naver-action-group chzzk-comment-group" data-testid="chzzk-comment-group">
           <div>
-            <div class="naver-action-title">복붙용 댓글</div>
+            <div class="naver-action-title">전체 방송 목차</div>
           </div>
           <div class="naver-post-actions">
-            <button id="chzzkCommentCopyBtn" type="button">댓글 복사</button>
+            <button id="chzzkCommentCopyBtn" type="button">목차 복사</button>
             <button id="chzzkCommentPreviewBtn" type="button">새로고침</button>
             <details class="manager-outline-field-help"><summary>ⓘ</summary>
-              <p>TTaempad에서 읽을 수 있는 구간·Point·Highlight 댓글입니다. 현재 편집 내용을 복사하며 댓글 등록은 직접 합니다.</p>
-              <button id="chzzkCommentFillBtn" type="button">CHZZK 댓글창에 채우기</button>
+              <p>TTaempad에서 읽을 수 있는 구간·Point·Highlight 전체 목차입니다. 현재 편집 내용을 복사하며 댓글 등록은 직접 합니다. CHZZK에 올릴 짧은 댓글은 ‘댓글 초안’의 자동 댓글 초안을 사용하세요.</p>
+              <button id="chzzkCommentFillBtn" type="button">목차를 댓글창에 채우기</button>
             </details>
           </div>
           <div id="chzzkCommentStatus" class="naver-post-status" aria-live="polite"></div>
@@ -194,9 +194,9 @@
         </div>
         <div id="naverCafeClipboardSandbox" class="clipboard-sandbox" aria-hidden="true"></div>
       </section>
-      <details class="section youtube-section">
+      <details id="youtube-alignment" class="section youtube-section">
         <summary>
-          <span class="summary-title">유튜브 댓글 만들기</span>
+          <span class="summary-title">YouTube 시간 보정 목차</span>
           <span class="summary-hint">타임스탬프 정렬 — 클릭해서 펼치기</span>
         </summary>
         <ol class="steps">
@@ -241,9 +241,11 @@
       <section class="report-context-strip" aria-label="현재 요약과 저장 상태">
       <nav class="topbar report-context-navigation" aria-label="현재 방송의 자료와 복귀">
         <a href="/reports">← 리포트 목록으로</a>
+        <a id="reportCommentDraftLink" hidden>댓글 초안</a>
+        <a id="reportScheduleProposalLink" hidden>일정 제안</a>
         <a id="sourceManifestLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 자막/채팅/커뮤니티/클립/맥락 재료 수집 상태를 한눈에 확인합니다 (관리자 전용, LLM 호출 없음)">재료 상태</a>
         <a id="workEvidenceLink" href="#" target="_blank" rel="noopener" title="이 VOD 의 로컬 work 폴더 산출물을 내용 노출 없이 확인합니다 (관리자 전용)">작업자료·ZIP</a>
-        <button id="revisionHistoryBtn" class="link-button" type="button" title="저장/공개 반영 시점의 본문과 화면 기록을 확인합니다">저장·공개 이력</button>
+        <a id="reportHistoryLink">저장·공개 이력</a>
         <a id="editorBriefLink" href="#" target="_blank" rel="noopener">편집 브리프</a>
         <a id="vodOutputsLink" href="#" target="_blank" rel="noopener">결과 모음</a>
         <a id="publicLink" href="#" target="_blank" rel="noopener">공개 리포트 열기</a>
@@ -371,26 +373,6 @@
       </div>
     </aside>
   </div>
-  <section id="revisionPanel" class="revision-panel" aria-labelledby="revisionTitle" data-testid="publish-revision-panel" aria-hidden="true">
-    <div class="revision-dialog" role="dialog" aria-modal="true" aria-describedby="revisionLead">
-      <div class="revision-head">
-        <div>
-          <div id="revisionTitle" class="revision-title">되돌리기 기록</div>
-          <p id="revisionLead" class="revision-lead">저장/공개 반영 시점의 본문과 화면을 봅니다. 이전 버전을 불러와도 저장 전까지 파일과 공개 사이트는 바뀌지 않습니다.</p>
-        </div>
-        <button id="revisionCloseBtn" class="revision-close ghost" type="button">닫기</button>
-      </div>
-      <span class="revision-badge">복구 안전망</span>
-      <div class="revision-state-legend" data-testid="revision-state-legend" aria-label="버전 출처 구분">
-        <div><strong>AI 원본</strong>AI가 처음 만든 기준본입니다. 공개 대상 아님.</div>
-        <div><strong>사람 수정</strong>관리자가 저장하거나 불러온 편집본입니다. 공개 대상 아님.</div>
-        <div><strong>공개 미리보기</strong>승인 기록이 있는 현재 공개본 화면입니다.</div>
-      </div>
-      <div id="revisionList" class="revision-list" aria-live="polite">
-        <div class="revision-empty">기록을 불러오는 중입니다.</div>
-      </div>
-    </div>
-  </section>
   <div id="busyOverlay" class="busy-overlay" role="dialog" aria-modal="true" aria-labelledby="busyTitle" aria-describedby="busyMessage" aria-hidden="true" tabindex="-1">
     <div class="busy-dialog">
       <span class="busy-spinner" aria-hidden="true"></span>

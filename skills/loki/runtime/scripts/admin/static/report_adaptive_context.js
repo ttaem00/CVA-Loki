@@ -493,12 +493,12 @@
           '.sidebar', '#sidebarResizer', '#previewFrame', '#adminPanelSummary',
           '#bundleMembershipSection', '#summaryCandidateSection', '#commentUsefulnessSection',
           '#managerNoteSection', '#approvalInboxSection', '#diagnosticsSection',
-          '#contextVocabSection', '#revisionPanel', '#busyOverlay',
+          '#contextVocabSection', '#busyOverlay',
         ].forEach(detachRoleNode);
         setSplitView(true, { silent: true });
       } else if (reportPageRole === 'viewer') {
         adaptiveContextMode = 'viewer';
-        ['#revisionPanel', '#busyOverlay'].forEach(detachRoleNode);
+        ['#busyOverlay'].forEach(detachRoleNode);
         renderViewerRoleSurface();
         const viewerPlayer = document.getElementById('splitPlayerPane');
         if (viewerPlayer && viewerRoleSurfaceEl) {

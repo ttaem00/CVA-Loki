@@ -5,7 +5,7 @@ description: 치지직을 중심으로 공개 YouTube 라이브 다시보기·SO
 
 # Loki로 직접 작성하기
 
-현재 대화의 ChatGPT 또는 Codex가 동봉 런타임으로 실제 원문과 이미지를 읽고 편집 판단을 내려
+전담 대화의 ChatGPT 또는 Codex가 동봉 런타임으로 실제 원문과 이미지를 읽고 편집 판단을 내려
 새 보고서를 작성한다. 다른 Codex/Claude CLI·API 모델·에이전트 브리지나 이전 생성
 보고서에 의미 작성을 맡기지 않는다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색,
 스크립트는 준비·기록·검사·렌더를 맡는다.
@@ -25,8 +25,16 @@ description: 치지직을 중심으로 공개 YouTube 라이브 다시보기·SO
 | 보안 문제 보고·재배포 | [보안 안내](references/SECURITY.md), [제3자 고지](references/THIRD_PARTY_NOTICES.md), [이용허락](LICENSE) |
 | 외부 코드·문서 기여 | [기여 안내와 동의 문안](CONTRIBUTING.md) |
 
-배포·플러그인·스킬·요약 메커니즘은 3.0.8.2이며 `latest`도 Loki 3.0.8.2이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
+배포·플러그인·스킬·요약 메커니즘은 3.0.9이며 `latest`도 Loki 3.0.9이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
 작업의 버전·원자료·응답·예산은 별칭 변경을 이유로 다시 쓰지 않는다.
+
+### 3.0.9 실행 모드·다중 호스트·내보내기
+
+- **실행 모드 (`--mode lite|normal|full`)**: `source_acquire.py`와 `prepare`는 `lite`(15분, Warm-Only 벡터 색인·빠른 탐색), `normal`(30분, 전체 채팅·공개 클립·댓글), `full`(60분, 전체 사전 수집·결정론적 5분 구간 힌트) 모드를 지원한다.
+- **다중 작성자 호스트 (`--author-mode`)**: `current_codex`, `current_chatgpt`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm`을 지원한다.
+- **무부작용 사전 검사 및 중복 읽기 방지**: 최종 제출 전 `loki.py submit --validate-only`로 스키마·근거·미반영 메모(`unreconciled_note_reads`)를 확인하고, `loki.py status --include-read-summary`로 이미 읽은 STT/채팅 구간을 조회한다.
+- **웹 AI·로컬 LLM·크리에이터 내보내기**: `loki.py export-pack` / `import-draft`, `local_llm_author.py`(Ollama/vLLM 3-Pass), `loki.py export --format comment|markers-csv|fcpxml`을 오프라인(`network=deny`) 계약 안에서 사용할 수 있다.
+- **선택적 짧은 영상 확인 (`gemini-api`)**: 움직임·음향 확인이 필요한 60초 이내 구간만 `editorial_short_video_check`로 보조 확인하며, 미설치·미인증 시 차단을 일으키지 않고 건너뛴다.
 
 ## 1. 설치와 자료 준비
 
@@ -50,18 +58,25 @@ Node/npm·FFmpeg·장치별 PyTorch·EmbeddingGemma 2·Whisper·Silero·익명 F
 
 ## 2. 준비 → 원문·이미지 읽기 → 직접 작성 → 제출
 
+새 보고서는 이 VOD만 맡는 전담 대화에서 작성한다. 코드 작업, 다른 VOD 또는 무관한 요청을
+처리하던 대화라면 `prepare` 전에 새 전담 대화로 넘긴다. Codex 호스트가 자체적으로 제공하는
+독립 에이전트를 사용할 때는 이전 대화 이력 없이 배정하고 그 에이전트가 직접 전담 작성자로 진행한다.
+독립 에이전트 기능이 없으면 전담 대화에서 진행한다. 작성자는 기존 설치의 작성자 모드와 신원을
+사용해 준비·원문 읽기·제출을 이어가고, 기존 작업 재개 시 원래 소유와 준비 개정을 확인한다.
+
 [작성 절차](references/workflow.md)의 명령과 이 작업이 반환한 계약을 사용한다.
 
 1. `prepare`가 반환한 작업 경로와 revision, 원자료 식별 값을 보존한다.
    `author-input.json`의 작성 프롬프트·방송 정보·응답 필드·읽기 계약을 읽는다.
-2. `read`로 실제 원자료를 확인한다. 인용할 완전한 STT cue와 필요한 앞뒤 맥락을 읽고,
+2. 장면을 고르기 전에 기존 시간순 원문 탐색으로 방송 전편을 훑고, 조용한 중간·끝 구간에서 흐름이 달라지는 단서도 확인한다.
+   `read`로 인용할 완전한 STT cue와 필요한 앞뒤 맥락을 읽고,
    원문 조각·페이지가 남으면 cursor를 따라 이어 읽는다. 검색·요약·피크·메모는 탐색 단서다.
 3. 필요한 시각 근거는 `read_frames`/`read_frame_page`가 반환한 실제 로컬 이미지를 연다.
    경로·임베딩·이미지 모음의 위치 정보만으로 봤다고 기록하지 않는다. 선택한 프레임은
    작업의 `image` 계약에 맞는 `{frame_ref, alt, caption}`으로 연결한다.
 4. 유용한 출처 연결 메모와 반대 근거를 대조하고, 원문의 순서와 독립적으로 완결된 장면을
    판단한다. 없는 음성·영상·맥락은 미확인으로 남긴다. 로컬 검색 모델은 판단을 대신하지 않는다.
-5. 설정된 `ko`/`en` 언어로 새 응답 JSON을 직접 작성하고 정확한 준비 revision으로
+5. 작성한 타임라인을 전편 탐색 결과와 대조한 뒤, 설정된 `ko`/`en` 언어로 새 응답 JSON을 직접 작성하고 정확한 준비 revision으로
    `submit`한다. 반환된 Markdown·HTML·메타데이터와 중요한 불확실성을 확인한다.
 
 원본 응답·원문 읽기 기록·생성 결과를 보존한다. 중단되거나 응답이 바뀌면 먼저 기존 제출

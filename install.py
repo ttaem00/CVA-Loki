@@ -109,7 +109,12 @@ class Installer:
             raise ValueError(stage + " did not return JSON") from exc
 
     def install(self, mode, *, features="multimodal", model_source=None, device="auto", author_mode=None):
-        if author_mode not in {None, "current_codex", "current_chatgpt"}:
+        allowed_author_modes = {
+            None, "current_codex", "current_chatgpt", "current_claude",
+            "current_antigravity", "current_gemini_cli", "current_gemini_web",
+            "current_claude_web", "current_local_llm",
+        }
+        if author_mode not in allowed_author_modes:
             raise ValueError("installation_author_mode_invalid")
         here = Path(__file__).resolve().parent
         bundle = here if (here / "release-manifest.json").is_file() else None
@@ -144,7 +149,7 @@ class Installer:
             raise ValueError("unowned_virtual_environment_preserved")
         if not config.is_file():
             initialize = [sys.executable, "-B", runtime / "loki.py", "init", "--directory", self.workspace]
-            if author_mode == "current_chatgpt":
+            if author_mode is not None and author_mode != "current_codex":
                 initialize += ["--author-mode", author_mode]
             self.command("initialize_workspace", initialize)
         _, _, policy = module(runtime / "loki.py", "loki_installer_config").configuration(config)
@@ -330,10 +335,11 @@ class Installer:
                              "url": "http://127.0.0.1:8787/", "status": "available_not_started"},
                   "dependencies": dependencies, "commands": self.commands, "logs": str(self.log_dir),
                   "attempt_id": self.log_dir.name,
-                  "semantic_author": ("current_ChatGPT_required_for_real_sources" if selected_author_mode == "current_chatgpt"
-                                      else "current_Codex_required_for_real_sources"),
+                  "semantic_author": ("current_Codex_required_for_real_sources" if selected_author_mode == "current_codex"
+                                      else "current_ChatGPT_required_for_real_sources" if selected_author_mode == "current_chatgpt"
+                                      else f"{selected_author_mode}_required_for_real_sources"),
                   "evidence_scope": "installation_and_synthetic_contract; not_model_generation_or_broadcast_quality"}
-        if selected_author_mode == "current_chatgpt":
+        if selected_author_mode != "current_codex":
             result["author_mode"] = selected_author_mode
         save(self.log_dir / "result.json", result)
         save(self.workspace / "installation-result.json", result)
@@ -349,7 +355,12 @@ def main(argv=None):
     parser.add_argument("--workspace", required=True, help="New/owned user workspace; installation files remain read-only")
     parser.add_argument("--mode", choices=("skill", "plugin", "setup"), default=None)
     parser.add_argument("--features", choices=("core", "media", "multimodal"), default="multimodal")
-    parser.add_argument("--author-mode", choices=("current_codex", "current_chatgpt"), default=None)
+    parser.add_argument(
+        "--author-mode",
+        choices=("current_codex", "current_chatgpt", "current_claude", "current_antigravity",
+                 "current_gemini_cli", "current_gemini_web", "current_claude_web", "current_local_llm"),
+        default=None,
+    )
     parser.add_argument("--model-source", help="Optional existing directory containing the pinned public model files")
     parser.add_argument("--device", choices=("auto", "cpu"), default="auto",
                         help="Detect a supported GPU before installing PyTorch; cpu explicitly disables GPU use")

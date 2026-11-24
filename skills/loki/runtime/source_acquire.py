@@ -144,17 +144,35 @@ def download_processes(root, tools):
         subprocess.run = original
 
 
-def collect_chat(network, video, duration, target):
+EXECUTION_MODES = ("lite", "normal", "full")
+CHAT_MODE_LIMITS = {
+    "lite": dict(max_pages=500, max_seconds=90, max_rows=100_000),
+    "normal": dict(max_pages=20000, max_seconds=1800, max_rows=1_000_000),
+    "full": dict(max_pages=20000, max_seconds=1800, max_rows=1_000_000),
+}
+
+
+def collect_chat(network, video, duration, target, *, max_pages=20000, max_seconds=1800, max_rows=1_000_000):
     """Optional anonymous chat never determines whether speech preparation succeeds."""
     meta_path = target.with_name(target.stem + ".meta.json")
     if any(path.exists() or path.is_symlink() for path in (target, meta_path)):
         return dict(status="preserved_existing", path=str(target), meta_path=str(meta_path))
+    ckpt_path = target.with_name(target.stem + ".checkpoint.json")
     rows, cursor, seen, skipped = [], 0, set(), 0
+    if ckpt_path.is_file():
+        try:
+            saved = json.loads(ckpt_path.read_text(encoding="utf-8"))
+            if saved.get("video_no") == video and isinstance(saved.get("rows"), list):
+                rows = saved["rows"]
+                cursor = int(saved.get("cursor", 0))
+                skipped = int(saved.get("skipped", 0))
+        except (OSError, ValueError, TypeError):
+            rows, cursor, skipped = [], 0, 0
     started = time.monotonic()
     status = "unavailable"
     try:
-        for _ in range(300):
-            if cursor in seen or time.monotonic() - started > 60:
+        for page_idx in range(max_pages):
+            if cursor in seen or time.monotonic() - started > max_seconds:
                 break
             seen.add(cursor)
             data = json.loads(network.public_document("https://api.chzzk.naver.com/service/v1/videos/" + video
@@ -173,17 +191,91 @@ def collect_chat(network, video, duration, target):
             if not page or next_cursor is None:
                 status = "partial" if skipped else "complete"
                 break
-            if type(next_cursor) is not int or next_cursor < 0 or len(rows) >= 200_000:
+            if type(next_cursor) is not int or next_cursor < 0 or len(rows) >= max_rows:
                 break
             cursor = next_cursor
+            if (page_idx + 1) % 250 == 0:
+                save(ckpt_path, dict(video_no=video, cursor=cursor, skipped=skipped, rows=rows))
     except (ValueError, OSError, RuntimeError, PermissionError):
-        pass
+        if rows:
+            try:
+                save(ckpt_path, dict(video_no=video, cursor=cursor, skipped=skipped, rows=rows))
+            except OSError:
+                pass
     if status != "complete":
         status = "partial" if rows else "unavailable"
     save(target, rows)
     save(meta_path, dict(status=status, video_no=video, message_count=len(rows), clock_basis="vod_player_time",
                          unbound_clock_count=skipped))
+    if ckpt_path.is_file():
+        try:
+            ckpt_path.unlink()
+        except OSError:
+            pass
     return dict(status=status, path=str(target), meta_path=str(meta_path))
+
+
+def collect_clips(network, video, channel_id, target):
+    """Optional anonymous CHZZK clips; never blocks source preparation."""
+    if target.exists() or target.is_symlink():
+        return dict(status="preserved_existing", path=str(target))
+    clips = []
+    status = "unavailable"
+    try:
+        url = f"https://api.chzzk.naver.com/service/v1/videos/{video}/clips?orderType=POPULAR&size=50"
+        data = json.loads(network.public_document(url))
+        if data.get("code") == 200:
+            items = ((data.get("content") or {}).get("data")) or []
+            for row in items:
+                if not isinstance(row, dict):
+                    continue
+                clips.append(dict(
+                    clip_uid=str(row.get("clipUID") or ""),
+                    title=str(row.get("clipTitle") or "")[:300],
+                    duration_sec=row.get("duration"),
+                    read_count=int(row.get("readCount") or 0),
+                    created_date=row.get("createdDate"),
+                    video_no=video,
+                ))
+            status = "ready" if clips else "no_clips"
+    except (ValueError, OSError, RuntimeError, PermissionError):
+        status = "unavailable"
+    payload = dict(video_no=video, channel_id=channel_id or "", status=status,
+                   order_type="POPULAR", clips=clips)
+    save(target, payload)
+    return dict(status=status, path=str(target), clip_count=len(clips))
+
+
+def collect_timeline_comments(network, video, target):
+    """Optional anonymous CHZZK VOD comments with timestamps; never blocks preparation."""
+    if target.exists() or target.is_symlink():
+        return dict(status="preserved_existing", path=str(target))
+    comments = []
+    status = "unavailable"
+    try:
+        url = f"https://api.chzzk.naver.com/service/v1/videos/{video}/comments?size=50&sort=POPULAR"
+        data = json.loads(network.public_document(url))
+        if data.get("code") == 200:
+            items = ((data.get("content") or {}).get("data")) or []
+            for row in items:
+                comment = row.get("comment") if isinstance(row, dict) else None
+                if not isinstance(comment, dict):
+                    continue
+                text = str(comment.get("content") or "").strip()
+                if text:
+                    comments.append(dict(
+                        comment_id=str(comment.get("commentId") or ""),
+                        content=text[:4000],
+                        like_count=int(comment.get("likeCount") or 0),
+                        created_date=comment.get("createdDate"),
+                    ))
+            status = "ready" if comments else "no_timeline_comments"
+    except (ValueError, OSError, RuntimeError, PermissionError):
+        status = "unavailable"
+    payload = dict(video_no=video, source_url=f"https://chzzk.naver.com/video/{video}",
+                   status=status, comments=comments)
+    save(target, payload)
+    return dict(status=status, path=str(target), comment_count=len(comments))
 
 
 def _move_stt_intermediates(root, source, attempt, media):
@@ -205,10 +297,12 @@ def _move_stt_intermediates(root, source, attempt, media):
         part.rename(target)
 
 
-def run(workspace, vod, *, height=480, max_download_seconds=21600):
+def run(workspace, vod, *, height=480, max_download_seconds=21600, mode=None, glossary_path=None):
     from pipeline.source_platforms import resolve_source
     reference = resolve_source(vod)
     video, vod = reference.work_id, reference.url
+    if mode is not None and mode not in EXECUTION_MODES:
+        raise ValueError("loki_source_mode_invalid")
     if height not in HEIGHTS or type(max_download_seconds) is not int or not 60 <= max_download_seconds <= 21600:
         raise ValueError("loki_source_limits_invalid")
     root = Path(workspace).resolve(strict=True)
@@ -298,10 +392,16 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
             phase = "public_chat"
             os.environ["LOKI_SOURCE_PREPARATION"] = str(root)
             target = source / (video + "_chat.log.json")
+            chat_limits = CHAT_MODE_LIMITS.get(mode) if mode is not None else None
+            chat_timeout = chat_limits["max_seconds"] if chat_limits else 60
             try:
                 if reference.platform == "chzzk":
-                    with network.public_requests(limit, 60):
-                        state["chat"] = collect_chat(network, video, state["metadata"]["duration"], target)
+                    with network.public_requests(limit, chat_timeout):
+                        if chat_limits:
+                            state["chat"] = collect_chat(
+                                network, video, state["metadata"]["duration"], target, **chat_limits)
+                        else:
+                            state["chat"] = collect_chat(network, video, state["metadata"]["duration"], target)
                 else:
                     from source_adapters import collect_chat as collect_external_chat
                     state["chat"] = collect_external_chat(reference, state["metadata"]["duration"], target,
@@ -311,6 +411,40 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
                     meta_path=str(target.with_suffix(".meta.json")),
                     error_code="optional_chat_" + type(error).__name__)
             save(checkpoint, state)
+        if mode in {"normal", "full"} and reference.platform == "chzzk":
+            os.environ["LOKI_SOURCE_PREPARATION"] = str(root)
+            if "clips" not in state:
+                phase = "public_clips"
+                try:
+                    with network.public_requests(limit, 60):
+                        state["clips"] = collect_clips(
+                            network, video, state["metadata"].get("channelId"), source / "user_clips.json")
+                except (OSError, ValueError, RuntimeError) as error:
+                    state["clips"] = dict(status="unavailable", error_code="optional_clips_" + type(error).__name__)
+                save(checkpoint, state)
+            if "timeline_comments" not in state:
+                phase = "public_comments"
+                try:
+                    with network.public_requests(limit, 60):
+                        state["timeline_comments"] = collect_timeline_comments(
+                            network, video, source / "timeline_comments.json")
+                except (OSError, ValueError, RuntimeError) as error:
+                    state["timeline_comments"] = dict(
+                        status="unavailable", error_code="optional_comments_" + type(error).__name__)
+                save(checkpoint, state)
+        if glossary_path is not None and "glossary" not in state:
+            glossary_src = owned(root, glossary_path)
+            if glossary_src.is_file():
+                glossary_dst = source / "channel_glossary.json"
+                if not glossary_dst.exists():
+                    raw_text = glossary_src.read_text(encoding="utf-8-sig")
+                    try:
+                        parsed = json.loads(raw_text)
+                    except ValueError:
+                        parsed = {"terms": [line.strip() for line in raw_text.splitlines() if line.strip()]}
+                    save(glossary_dst, parsed)
+                state["glossary"] = dict(status="ready", path=str(glossary_dst), sha256=digest(glossary_dst))
+                save(checkpoint, state)
         os.environ.pop("LOKI_SOURCE_PREPARATION", None)
         phase = "local_stt"
         if "speech" not in state:
@@ -336,6 +470,8 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
                 stream.write("")
         template = dict(vod_info=vod_info, source_work_dir=str(source), srt_path=str(srt),
                         media_path=str(media), base_path=str(base), job_id="vod-" + video + "-" + attempt.name)
+        if mode is not None:
+            template["execution_mode"] = mode
         template_path = attempt / "prepare-spec.template.json"
         author_mode = policy["author_mode"]
         existing = None
@@ -345,33 +481,48 @@ def run(workspace, vod, *, height=480, max_download_seconds=21600):
                 raise ValueError("loki_source_prepare_template_changed")
         if state.get("chatgpt_session_id") and author_mode != "current_chatgpt":
             raise ValueError("loki_author_mode_mismatch")
+        if state.get("local_session_host") and author_mode != "current_" + state["local_session_host"]:
+            raise ValueError("loki_author_mode_mismatch")
         if existing is not None and "author" in existing:
             validate_author_mode(existing["author"], author_mode)
-        if author_mode == "current_chatgpt":
+        if author_mode != "current_codex":
+            host = author_mode.removeprefix("current_")
             author = existing.get("author") if existing is not None else None
-            pinned = state.get("chatgpt_session_id")
+            session_key = "chatgpt_session_id" if host == "chatgpt" else "local_session_id"
+            pinned = state.get(session_key)
             if author is None:
                 if pinned:
                     raise ValueError("loki_source_author_changed")
-                author = dict(host="chatgpt", session_id=uuid.uuid4().hex,
+                author = dict(host=host, session_id=uuid.uuid4().hex,
                     actual_model="unknown", identity_basis="workspace_local")
             validate_author_mode(author, author_mode)
             if pinned is not None and pinned != author["session_id"]:
                 raise ValueError("loki_source_author_changed")
             if existing is None or "author" not in existing:
                 save(template_path, dict(existing or template, author=author))
-            state["chatgpt_session_id"] = author["session_id"]
+            state[session_key] = author["session_id"]
+            if host != "chatgpt":
+                state["local_session_host"] = host
             save(checkpoint, state)
         elif existing is None:
             save(template_path, template)
+        next_action_text = (
+            "Current ChatGPT must read the prepared originals, author and submit; the session ID is workspace-local, not a platform identity."
+            if author_mode == "current_chatgpt" else
+            "Current Codex must add its actual author identity to the spec, then prepare/read/author/submit."
+            if author_mode == "current_codex" else
+            f"Current {author_mode} must read the prepared originals, author and submit; the session ID is workspace-local, not a platform identity."
+        )
         result = dict(status="ready", schema_version=SCHEMA, video_no=video, workspace=str(root),
             prepare_spec_path=str(template_path), author_required=author_mode == "current_codex", source_work_dir=str(source),
             media=state["media"], srt_path=str(srt), srt_sha256=state["srt_sha256"], clock=state["clock"],
             speech_receipt=state["speech"].get("receipt_path"), cookies_used=False, model_author_calls=0,
             optional_chat=state.get("chat"),
-            next_action=("Current ChatGPT must read the prepared originals, author and submit; the session ID is workspace-local, not a platform identity."
-                if author_mode == "current_chatgpt" else
-                "Current Codex must add its actual author identity to the spec, then prepare/read/author/submit."))
+            **(dict(execution_mode=mode) if mode is not None else {}),
+            **(dict(optional_clips=state["clips"]) if "clips" in state else {}),
+            **(dict(optional_timeline_comments=state["timeline_comments"]) if "timeline_comments" in state else {}),
+            **(dict(optional_glossary=state["glossary"]) if "glossary" in state else {}),
+            next_action=next_action_text)
         save(attempt / "source-result.json", result)
         state["status"] = "ready"
         save(checkpoint, state)
@@ -401,9 +552,13 @@ def main(argv=None):
     parser.add_argument("--vod", required=True)
     parser.add_argument("--height", type=int, choices=HEIGHTS, default=480)
     parser.add_argument("--max-download-seconds", type=int, default=21600)
+    parser.add_argument("--mode", choices=EXECUTION_MODES, default=None)
+    parser.add_argument("--glossary", default=None)
     args = parser.parse_args(argv)
     try:
-        result = run(args.workspace, args.vod, height=args.height, max_download_seconds=args.max_download_seconds)
+        result = run(args.workspace, args.vod, height=args.height,
+                     max_download_seconds=args.max_download_seconds,
+                     mode=args.mode, glossary_path=args.glossary)
     except (OSError, ValueError, RuntimeError, KeyError, PermissionError, subprocess.SubprocessError) as error:
         print(json.dumps(dict(status="FAIL", error=str(error), local_prepared_source_fallback=True), ensure_ascii=False))
         return 1

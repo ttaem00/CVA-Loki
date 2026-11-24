@@ -150,6 +150,7 @@ def validate(root):
                      "runtime/device_setup.py", "runtime/multimodal_setup.py", "runtime/multimodal_worker.py",
                      "runtime/media_selftest.py", "runtime/review.py", "runtime/review_store.py",
                      "runtime/public_ui.py", "runtime/report_ui.py", "runtime/speech_setup.py", "runtime/transcribe_source.py", "runtime/source_acquire.py",
+                     "runtime/exporters.py", "runtime/local_llm_author.py",
                      "runtime/publish/builder/loki_template.py", "runtime/publish/builder/loki_runtime.py",
                      "runtime/publish/builder/report_sanitizers.py",
                      "runtime/scripts/admin/static/report_workspace_state.js", "runtime/scripts/admin/static/report_workspace_history.js",

@@ -1012,7 +1012,8 @@
 
     /* report-admin-ux-sidequest-1.0: keep the established palette while making
        recent-summary exploration the one dominant home task. */
-    .page > .app-shell-nav { width: 100%; margin: 0 0 30px; }
+    /* #7279: the shared menu keeps its own width (as on every other page) so it stays one row. */
+    .page > .app-shell-nav { margin: 0 0 30px; }
     .home-hero {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;

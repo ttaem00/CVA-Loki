@@ -79,16 +79,26 @@
     }
     const progress = state.report && state.report.manager_outline_review_progress;
     const questionNotice = questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '';
-    if (progress && progress.pipeline_complete === true) {
+    const partial = String(packet.completion_state || '').startsWith('partial_');
+    if (progress?.pipeline_complete === true
+        && (!partial || progress.completion_disposition === 'context_unverified_preserved')) {
       return progress.completion_disposition === 'context_unverified_preserved' || questions.length
         ? '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.' + questionNotice : '';
+    }
+    const missingSource = outcomes.filter(row => row?.terminal_state === 'source_unavailable').length;
+    if (missingSource) {
+      return `요약 일부 저장됨 · 원문 미확인 ${missingSource}건.`
+        + ` 기존 Highlight ${state.highlights.length}개는 검토·편집·저장할 수 있습니다.` + questionNotice;
     }
     if (progress?.pipeline_complete === false && progress.stop_reason === 'partial_pending_context') {
       const count = outcomes.filter(row => row?.terminal_state === 'context_unresolved').length;
       return '요약 저장됨 · 맥락' + (count ? ` ${count}건` : '')
         + ` 미확정. 기존 Highlight ${state.highlights.length}개는 검토·편집·저장할 수 있습니다.` + questionNotice;
     }
-    if (!String(packet.completion_state || '').startsWith('partial_') && !groups && !proposals && !questions.length) return '';
+    if (packet.completion_state === 'authored' && !groups && !proposals && questions.length) {
+      return `요약 저장됨 · 확인할 내용 ${questions.length}건.` + questionNotice;
+    }
+    if (!partial && !groups && !proposals && !questions.length) return '';
     const pending = [];
     if (groups) pending.push(`미확정 발견 ${groups}건`);
     if (proposals) pending.push(`작성 보완 ${proposals}건`);

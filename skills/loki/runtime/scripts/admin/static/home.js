@@ -345,7 +345,7 @@
         return `<div class="review-inbox-primary blocked"><span>${escapeHtml(adoption.state_label || '추가 보류')}</span><a class="review-inbox-action primary-link" href="/reports">목록 확인</a></div>`;
       }
       if (adoption.confirmation_required === false || adoption.state === 'waiting_for_server_draft') {
-        return `<div class="review-inbox-primary blocked"><span>${escapeHtml(adoption.state_label || row.review_state_label || '확인 중')}</span><a class="review-inbox-action primary-link" href="${escapeHtml(adoption.list_href || '/vod-run-queue')}">실행 큐 보기</a></div>`;
+        return `<div class="review-inbox-primary blocked"><span>${escapeHtml(adoption.state_label || row.review_state_label || '확인 중')}</span><a class="review-inbox-action primary-link" href="${escapeHtml(adoption.list_href || '/vod-run-queue')}">요약 생성 기록 보기</a></div>`;
       }
       return `<div class="review-inbox-primary"><button class="review-inbox-adopt-btn" type="button" data-video-no="${escapeHtml(row.video_no || '')}" data-confirmation-token="${escapeHtml(adoption.confirmation_token || '')}" data-confirmation-action="${escapeHtml(adoption.confirmation_action || '')}" data-confirmation-label="${escapeHtml(adoption.confirmation_label || '요약 목록에 추가')}">요약 목록에 추가</button><span class="review-inbox-primary-note">관리자 확인 필요 · 덮어쓰기 없음</span></div>`;
     }
@@ -380,7 +380,7 @@
             리포트 목록은 계속 사용할 수 있습니다.
             <div class="review-inbox-state-actions">
               <button class="review-inbox-action" type="button" data-review-inbox-retry="true">다시 시도</button>
-              <a class="review-inbox-action" href="/server-role">서버 상태 보기</a>
+              <a class="review-inbox-action" href="/live-monitor#lm-module-inventory">서버 상태 보기</a>
             </div>
           </div>`;
         return;
@@ -394,7 +394,7 @@
             <span class="review-inbox-state-title">지금 검토할 서버 생성 요약은 없습니다.</span>
             새 VOD가 안전하게 요약되면 이곳에 표시됩니다.
             <div class="review-inbox-state-actions">
-              <a class="review-inbox-action" href="/server-role">서버 상태 보기</a>
+              <a class="review-inbox-action" href="/live-monitor#lm-module-inventory">서버 상태 보기</a>
               <a class="review-inbox-action" href="#search">일반 목록에서 찾기</a>
             </div>
           </div>`;

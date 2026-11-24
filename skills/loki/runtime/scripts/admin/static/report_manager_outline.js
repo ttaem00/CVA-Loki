@@ -75,8 +75,7 @@
       if (check) { check.hidden = !reportSaveOutcome; check.disabled = reportSaveChecking || reportSavePending; }
       if (adopt) { adopt.hidden = !reportSaveOutcome?.checked; adopt.disabled = reportSaveChecking || reportSavePending; }
       if (reportSaveOutcome) {
-        [managerOutlineSaveBtn, document.getElementById('saveBtn'), publishBtn,
-          ...managerOutlineHistoryEl.querySelectorAll('[data-outline-restore]')].filter(Boolean)
+        [managerOutlineSaveBtn, document.getElementById('saveBtn'), publishBtn].filter(Boolean)
           .forEach(button => { button.disabled = true; });
       }
     }
@@ -226,8 +225,6 @@
     const managerOutlineAddMenu = document.getElementById('managerOutlineAddMenu');
     const managerOutlineUndoBtn = document.getElementById('managerOutlineUndoBtn');
     const managerOutlineStatusEl = document.getElementById('managerOutlineStatus');
-    const managerOutlineHistoryEl = document.getElementById('managerOutlineHistory');
-    const managerOutlineHistorySummaryEl = document.getElementById('managerOutlineHistorySummary');
 
     let managerOutlineState = null;
     let managerEditorialPacket = null;
@@ -1443,13 +1440,6 @@
       scheduleManagerOutlineDraftSync('outline');
     }
 
-    function outlineVersionSummary(outline) {
-      const rows = (outline && outline.ranges || []).map(item => `${item.level} ${item.start}-${item.end} ${item.title}`).join('\n');
-      const points = (outline && outline.points || []).map(item => `Point ${item.timestamp} ${item.title}`).join('\n');
-      const highlights = (outline && outline.highlights || []).map(item => `Highlight ${item.title}`).join('\n');
-      return [rows, points, highlights].filter(Boolean).join('\n');
-    }
-
     function managerEditorialHighlights(packet, points) {
       if (!packet) return [];
       const pointById = Object.fromEntries((points || []).map(point => [String(point.id || ''), point]));
@@ -1555,7 +1545,9 @@
         if (typeof text === 'string' && text.trim()) questions.push(text);
       }
       const questionNotice = questions.length ? ` 확인할 내용: ${questions.join(' / ')}` : '';
-      if (progress && progress.pipeline_complete === true) {
+      const partialPacket = String(packet?.completion_state || '').startsWith('partial_');
+      if (progress?.pipeline_complete === true
+          && (!partialPacket || progress.completion_disposition === 'context_unverified_preserved')) {
         if (progress.completion_disposition === 'context_unverified_preserved' || questions.length) {
           return '요약 처리가 완료됐습니다. 확인하지 못한 내용은 미확인으로 남겼습니다.' + questionNotice;
         }
@@ -1579,7 +1571,7 @@
         ? new Set(rows.filter(ref => typeof ref === 'string' && ref.trim())).size : null;
       const pending = refsCount(exploration.incomplete_hypothesis_refs);
       const unreviewed = refsCount(exploration.not_reached_hypothesis_refs);
-      const partial = String(packet.completion_state || '').startsWith('partial_')
+      const partial = partialPacket
         || exploration.all_producer_hypotheses_reached === false
         || pending > 0 || unreviewed > 0 || questions.length > 0;
       if (!partial) return exploration.coverage_complete === false
@@ -1610,9 +1602,6 @@
             base: String(data.base || base || ''),
             normalReport: !isOutline,
             editRevision: data.manager_edit_revision || '',
-            revisions: Array.isArray(data.manager_outline_revisions)
-              ? data.manager_outline_revisions
-              : [],
           }
         : null;
       if (isOutline) applyReportPageRole('manager');
@@ -1623,9 +1612,16 @@
       if (hasStructuredOutline) setReportSurface(reportAppEl.dataset.reportSurface || new URLSearchParams(location.search).get('tab'), false);
       managerOutlineEditorEl.hidden = !hasStructuredOutline;
       if (chzzkCommentGroupEl) {
-        if (hasStructuredOutline) managerOutlineEditorEl.append(chzzkCommentGroupEl);
+        // #7279: structured normal reports keep 전체 방송 목차 in the 공개·공유 pane beside Cafe and
+        // YouTube. Only manager-outline drafts, which have no share surface, dock it in the editor.
+        if (isOutline) managerOutlineEditorEl.append(chzzkCommentGroupEl);
+        else if (hasStructuredOutline) {
+          const sandboxEl = document.getElementById('naverCafeClipboardSandbox');
+          if (sandboxEl) sandboxEl.before(chzzkCommentGroupEl);
+          else document.querySelector('[data-testid="naver-cafe-post-panel"]')?.append(chzzkCommentGroupEl);
+        }
         else mdEditor.insertAdjacentElement('afterend', chzzkCommentGroupEl);
-        chzzkCommentGroupEl.classList.toggle('manager-outline-comment-export', hasStructuredOutline);
+        chzzkCommentGroupEl.classList.toggle('manager-outline-comment-export', isOutline);
       }
       mdEditor.hidden = false;
       mdEditor.previousElementSibling.hidden = false;
@@ -1692,11 +1688,6 @@
       managerOutlineReadOnlyEl.querySelectorAll('[data-outline-readonly]').forEach(block => {
         block.querySelector('pre').textContent = String(readOnly[block.dataset.outlineReadonly] || '없음');
       });
-      const revisions = data.manager_outline_revisions || [];
-      managerOutlineHistorySummaryEl.textContent = `로컬 수정 이력 ${revisions.length}개`;
-      managerOutlineHistoryEl.innerHTML = revisions.map(version => {
-        return `<section class="outline-history-entry"><strong>${escapeHtml(window.ReportNavigation.revisionTitle(version))}</strong> <button type="button" data-outline-restore="${escapeHtml(version.revision_id)}">이 저장본 복원…</button><p>${escapeHtml(window.ReportNavigation.revisionSummary(version))}</p><details><summary>기록 ID·저장 내용 보기</summary><code>${escapeHtml(version.revision_id)}</code><pre>${escapeHtml(outlineVersionSummary(version.outline))}</pre></details></section>`;
-      }).join('') || '<p>아직 저장된 수정본이 없습니다.</p>';
       managerOutlineStatusEl.textContent = '목차를 불러왔어요.';
       if (typeof data.chzzk_comment_text === 'string') {
         renderChzzkCommentDraft({text: data.chzzk_comment_text});
@@ -1713,17 +1704,10 @@
 
     let managerOutlineBusy = false;
 
-    function managerOutlineActionButtons() {
-      return [
-        managerOutlineSaveBtn,
-        ...managerOutlineHistoryEl.querySelectorAll('[data-outline-restore]'),
-      ].filter(Boolean);
-    }
-
     function setManagerOutlineActionBusy(active) {
       managerOutlineBusy = active;
       managerOutlineEditorEl.setAttribute('aria-busy', active ? 'true' : 'false');
-      managerOutlineActionButtons().forEach(button => { button.disabled = active; });
+      managerOutlineSaveBtn.disabled = active;
       managerOutlineAddBtn.disabled = active;
       mdEditor.disabled = active;
       managerOutlineUndoBtn.disabled = active || !managerOutlineUndo;
@@ -1882,61 +1866,6 @@
         managerOutlineSaveBtn.focus({preventScroll: true});
       }
     }
-
-    async function restoreManagerOutline(revisionId, reportMarkdownOverride = null) {
-      if (managerOutlineBusy) return;
-      assertReportSaveReady();
-      const pairing = typeof reportMarkdownOverride === 'string'
-        ? '\n선택한 본문과 목차 제목·시각이 맞는 구조 후보입니다. Highlight·근거까지 당시의 정확한 짝이라고 확인한 결과는 아닙니다.' : '';
-      if (!await confirmReportSaveAction('이전 저장본 복원',
-        `복원할 저장본: ${revisionId}\n현재 ${dirty ? '미저장 초안과 ' : ''}편집 되돌리기 기록을 대체합니다. 새 로컬 수정본을 만들며 공개 사이트는 바뀌지 않습니다.${pairing}`, '새 로컬 수정본으로 복원')) return false;
-      managerOutlineStatusEl.textContent = '선택한 이전 버전을 새 수정본으로 복원하는 중입니다.';
-      setManagerOutlineActionBusy(true);
-      reportSavePending = true;
-      const context = managerOutlineContext || {};
-      const attempt = {kind: 'restore', structured: true, base: context.base || base,
-        videoNo: String(context.videoNo || base.split(':', 2)[1]), editRevision: context.editRevision || '',
-        revisionId, packet: managerEditorialPacket};
-      let committed = false;
-      try {
-        const data = await requestReportSaveWithConfirmation('/api/manager-outline/restore', {
-          video_no: context.videoNo || base.split(':', 2)[1], base: context.base || base, revision_id: revisionId,
-          report_markdown: typeof reportMarkdownOverride === 'string' ? reportMarkdownOverride : undefined,
-          expected_edit_revision: context.editRevision || '',
-        });
-        committed = validReportSaveAck(data, attempt);
-        if (!committed) throw Error('restore_revision_ack_missing');
-        reportLastConfirmed = data;
-        renderManagerOutline(data);
-        if (typeof data.manager_markdown === 'string') {
-          mdEditor.value = data.manager_markdown;
-          savedMd = data.manager_markdown;
-          await loadPreviewFrameHtml(`/api/saved-html?base=${encodeFrameParam(context.base || base)}&format=latest&t=${Date.now()}`);
-        }
-        setDirty(false);
-        managerOutlineStatusEl.textContent = '이전 버전을 새 로컬 수정본으로 복원했습니다. 공개 사이트는 바뀌지 않았습니다.';
-        setStatus(managerOutlineStatusEl.textContent, 'ok');
-        return true;
-      } catch (error) {
-        if (committed) {
-          reportSaveOutcome = {...attempt, checked: reportLastConfirmed, confirmed: true};
-          managerOutlineStatusEl.textContent = '복원은 저장됐습니다. 화면 갱신을 마치지 못했으며 같은 복원은 다시 보내지 않습니다.';
-          setStatus(managerOutlineStatusEl.textContent, 'warn');
-        } else if (error.saveCanceled) {
-          managerOutlineStatusEl.textContent = error.message;
-          setStatus(error.message, 'warn');
-        } else holdReportSaveOutcome(attempt, error);
-        throw error;
-      } finally {
-        reportSavePending = false;
-        setManagerOutlineActionBusy(false);
-        syncReportSaveRecovery();
-        const returnButton = managerOutlineHistoryEl.querySelector(`[data-outline-restore="${CSS.escape(revisionId)}"]`);
-        (returnButton || managerOutlineSaveBtn).focus({preventScroll: true});
-      }
-    }
-
-
 
     function openManagerOutlineAddMenu() {
       updateManagerOutlineAddMenu();

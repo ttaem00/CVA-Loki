@@ -37,6 +37,10 @@ _VECTOR_BYTES = 768 * 4
 
 _NAVIGATION_MAX_SLOTS = 4
 
+_DOCUMENT_BUILD_BATCH = 512
+
+_COLD_ENCODER_HEADROOM = 6 * 1024**3
+
 def _navigation_headroom():
     from .editorial_multimodal_navigation import _memory
 
@@ -95,12 +99,14 @@ def document_navigation_admission(source_dir, unit_count, *, max_units, cpu_thre
     working_bytes = 64 * 1024**2 + unit_count * (4 * _VECTOR_BYTES + 4096)
     if cold_index:
 
-        working_bytes += 512 * 1024**2 + unit_count * (8 * _VECTOR_BYTES)
+        working_bytes += 512 * 1024**2 + min(unit_count, _DOCUMENT_BUILD_BATCH) * (8 * _VECTOR_BYTES)
+
+    required_bytes = max(4 * working_bytes, _COLD_ENCODER_HEADROOM if cold_index else 0)
     slots = min(_NAVIGATION_MAX_SLOTS, max(1, cpus // cpu_threads),
-                (available or 0) // (4 * working_bytes))
+                (available or 0) // required_bytes)
     status = dict(unit_count=unit_count, available_bytes=available, cpu_capacity=cpus,
                   batch_rows=batch, slot_capacity=slots, active_slots=None,
-                  estimated_working_bytes=working_bytes,
+                  estimated_working_bytes=working_bytes, required_slot_headroom_bytes=required_bytes,
                   in_flight_pages_per_slot=1, admitted=False)
     reason = unavailable
     if max_units is not None and unit_count > max_units:
@@ -314,23 +320,38 @@ def prepare(service, *, source_dir, runtime, cached_only=False, index_root=None)
             return cfg
         if cached_only:
             return None
-        vectors, stats = encode_cached([r['norm_text'] for r in rows],role='document',root=root,runtime=runtime)
         schema=pa.schema([pa.field('unit_id',pa.string()),pa.field('family',pa.string()),
             pa.field('start_us',pa.int64()),pa.field('end_us',pa.int64()),
             pa.field('members_json',pa.string()),pa.field('vector',pa.list_(pa.float32(),768))])
-        data=[dict(unit_id=r['unit_id'],family=r['family'],start_us=r['start_us'],end_us=r['end_us'],
-            members_json=r['members_json'],vector=v.tolist()) for r,v in zip(rows,vectors)]
-        table=_connect(root/'lance').create_table(name,data=data,schema=schema,mode='overwrite')
+        db=_connect(root/'lance')
+        stats=dict(input_rows=0,encoded_rows=0,reused_rows=0,elapsed_sec=0.,device='not_loaded_cache_hit')
+        for offset in range(0,len(rows),_DOCUMENT_BUILD_BATCH):
+            batch=rows[offset:offset+_DOCUMENT_BUILD_BATCH]
+            vectors,progress=encode_cached([r['norm_text'] for r in batch],role='document',root=root,runtime=runtime)
+            columns=[pa.array([row[field.name] for row in batch],type=field.type) for field in list(schema)[:-1]]
+            columns.append(pa.FixedSizeListArray.from_arrays(pa.array(vectors.reshape(-1),type=pa.float32()),768))
+            data=pa.Table.from_arrays(columns,schema=schema)
+            if offset==0:
+                table=db.create_table(name,data=data,schema=schema,mode='overwrite')
+            else:
+                table.add(data)
+            for key in ('input_rows','encoded_rows','reused_rows','elapsed_sec'):
+                stats[key]+=progress[key]
+            if progress['device']!='not_loaded_cache_hit':
+                stats['device']=progress['device']
+        stats['unique_rows']=len({r['norm_text'] for r in rows})
 
         partitions=max(1,int(len(rows)**.5))
         if len(rows)>=256:
             table.create_index(metric='cosine',index_type='IVF_FLAT',num_partitions=partitions)
+        if table.count_rows()!=len(rows):
+            raise EvidenceError('gemma_index_changed')
+        for asset in service.assets.values():assert_asset_fresh(asset)
         atomic_json(receipt,dict(schema_version=SCHEMA,config=cfg,rows=len(rows),
             table_version=table.version,
             partitions=partitions if len(rows)>=256 else 0,stats=stats,
             join='Evidence World units.unit_id -> members_json -> records.record_id',
             coverage_families=list(FAMILIES),original_read=False))
-        for asset in service.assets.values():assert_asset_fresh(asset)
     return cfg
 
 def prepare_optional(service,*,source_dir,runtime,cached_only=True,index_root=None,status_root=None,

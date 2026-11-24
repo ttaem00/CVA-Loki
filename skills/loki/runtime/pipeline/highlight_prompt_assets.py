@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import hashlib
 
@@ -36,6 +36,7 @@ class HighlightPromptAsset:
     eval_command: str
     body: str
     body_sha256: str
+    supplement_path: str | None = None
 
 def _canonical_asset_path(relative_path: str) -> Path:
     candidate = Path(relative_path)
@@ -141,8 +142,15 @@ def load_highlight_prompt_asset(relative_path: str) -> HighlightPromptAsset:
 
 def load_full_author_prompt(author_prompt_profile: str | None = None) -> HighlightPromptAsset:
     """Share the bounded full-author selection without unrelated stage assets."""
-    if author_prompt_profile is not None and author_prompt_profile != 'evidence_retention_v1':
+    if author_prompt_profile not in (None, 'evidence_retention_v1', 'evidence_retention_d2_v1'):
         raise ValueError('unknown_author_prompt_profile')
     path = ('prompts/highlight/editorial_full_author_302_retention.md' if author_prompt_profile
             else 'prompts/highlight/editorial_full_author_302.md')
-    return load_highlight_prompt_asset(path)
+    asset = load_highlight_prompt_asset(path)
+    if author_prompt_profile != 'evidence_retention_d2_v1':
+        return asset
+    supplement_path = 'prompts/highlight/editorial_full_author_302_d2.md'
+    supplement = _canonical_asset_path(supplement_path).read_text(encoding="utf-8")
+    body = asset.body.rstrip("\n") + "\n\n" + supplement
+    return replace(asset, body=body, body_sha256=hashlib.sha256(body.encode("utf-8")).hexdigest(),
+                   supplement_path=supplement_path)

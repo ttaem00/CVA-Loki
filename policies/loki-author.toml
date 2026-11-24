@@ -1,0 +1,21 @@
+# Workspace-local policy template for Gemini CLI (@google/gemini-cli v0.70+)
+# Keeps Loki authoring strictly inside the owned workspace with network=deny.
+
+[policy]
+name = "cva-loki-3.0.9-author"
+description = "Allow workspace-local Loki read/draft/submit/export commands while preserving network=deny during authoring."
+
+[[rules]]
+tool = "run_shell_command"
+decision = "allow"
+command_prefix = ["python", "skills/loki/runtime/loki.py"]
+
+[[rules]]
+tool = "run_shell_command"
+decision = "ask_user"
+command_prefix = ["python", "skills/loki/runtime/source_acquire.py"]
+
+[[rules]]
+tool = "run_shell_command"
+decision = "ask_user"
+command_prefix = ["gemini-api"]

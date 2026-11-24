@@ -13,6 +13,20 @@ import sys
 sys.dont_write_bytecode = True
 
 SCHEMA = "loki.workspace.v1"
+AUTHOR_MODES = (
+    "current_codex",
+    "current_chatgpt",
+    "current_claude",
+    "current_antigravity",
+    "current_gemini_cli",
+    "current_gemini_web",
+    "current_claude_web",
+    "current_local_llm",
+)
+AUTHOR_MODE_MAP = {
+    mode: "current_conversation_" + mode.removeprefix("current_")
+    for mode in AUTHOR_MODES
+}
 DEFAULTS = {"schema_version": SCHEMA, "language": "ko", "max_input_bytes": 50_000_000,
             "max_media_bytes": 20_000_000_000, "features": "core", "multimodal_runtime": None,
             "network": "deny", "author_mode": "current_codex", "work_dir": "work"}
@@ -73,7 +87,7 @@ def configuration(path):
             or value["multimodal_runtime"] is not None and (
                 not isinstance(value["multimodal_runtime"], dict)
                 or set(value["multimodal_runtime"]) != {"path", "sha256"})
-            or value["network"] != "deny" or value["author_mode"] not in {"current_codex", "current_chatgpt"}
+            or value["network"] != "deny" or value["author_mode"] not in AUTHOR_MODE_MAP
             or not isinstance(value["work_dir"], str) or Path(value["work_dir"]).is_absolute()):
         raise ValueError("loki_configuration_policy")
     root = path.parent
@@ -85,8 +99,9 @@ def configuration(path):
 def validate_author_mode(author, author_mode):
     """Use the current-conversation owner, never infer a platform identity."""
     from pipeline.editorial_production_job import current_conversation_author_mode
-    expected = {"current_codex": "current_conversation_codex",
-                "current_chatgpt": "current_conversation_chatgpt"}[author_mode]
+    if author_mode not in AUTHOR_MODE_MAP:
+        raise ValueError("loki_author_mode_mismatch")
+    expected = AUTHOR_MODE_MAP[author_mode]
     if current_conversation_author_mode(author) != expected:
         raise ValueError("loki_author_mode_mismatch")
 
@@ -156,10 +171,10 @@ def prepare_spec(root, work, policy, path):
     allowed = {"vod_info", "work_root", "source_work_dir", "srt_path", "base_path", "job_id",
                "code_version", "author", "packet_path", "orientation_paths", "hierarchy", "retrieval", "media_path",
                "search_mode", "read_page_policy", "authoring_minutes", "author_prompt_profile", "feature_profile",
-               "signal_priority_profile"}
+               "signal_priority_profile", "execution_mode"}
     if set(spec) - allowed:
         raise ValueError("loki_unavailable_prepare_option")
-    if spec.get("author") is not None or policy["author_mode"] == "current_chatgpt":
+    if spec.get("author") is not None or policy["author_mode"] != "current_codex":
         validate_author_mode(spec.get("author"), policy["author_mode"])
     spec["work_root"] = str(work)
     for key in ("source_work_dir", "srt_path", "base_path", "packet_path", "media_path"):
@@ -223,7 +238,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser("init")
     init.add_argument("--directory", required=True)
-    init.add_argument("--author-mode", choices=("current_codex", "current_chatgpt"), default="current_codex")
+    init.add_argument("--author-mode", choices=AUTHOR_MODES, default="current_codex")
     sub.add_parser("doctor")
     prep = sub.add_parser("prepare")
     prep.add_argument("--spec", required=True)
@@ -234,12 +249,29 @@ def main(argv=None):
         field = {"read": "action", "submit": "response", "remember": "note"}.get(command)
         if field:
             child.add_argument("--" + field, required=True)
+            if command == "submit":
+                child.add_argument("--validate-only", action="store_true")
         elif command == 'memory':
             child.add_argument("--query")
         elif command == 'continuation':
             child.add_argument('--read-id', required=True)
         elif command == 'draft':
             child.add_argument('--fields')
+        elif command == 'status':
+            child.add_argument('--include-read-summary', action='store_true')
+    pack = sub.add_parser("export-pack")
+    pack.add_argument("--job-root", required=True)
+    pack.add_argument("--expected-revision", required=True)
+    pack.add_argument("--output", required=True)
+    imp = sub.add_parser("import-draft")
+    imp.add_argument("--job-root", required=True)
+    imp.add_argument("--expected-revision", required=True)
+    imp.add_argument("--draft", required=True)
+    imp.add_argument("--validate-only", action="store_true")
+    exp = sub.add_parser("export")
+    exp.add_argument("--report", required=True)
+    exp.add_argument("--format", choices=("comment", "markers-csv", "fcpxml"), required=True)
+    exp.add_argument("--output")
     args = parser.parse_args(argv)
     if args.command == "init":
         root = Path(args.directory).absolute()
@@ -289,6 +321,11 @@ def main(argv=None):
         if args.command == "prepare":
             result = current.prepare(prepare_spec(root, work, policy, args.spec))
             result["writer_preferences"] = {"language": policy["language"]}
+        elif args.command == "export":
+            import exporters
+            report_path = contained(root, args.report)
+            out_path = contained(root, args.output) if args.output else None
+            result = exporters.export_report(report_path, fmt=args.format, output_path=out_path)
         else:
             job = contained(root, args.job_root)
             if not job.is_relative_to(work):
@@ -301,7 +338,23 @@ def main(argv=None):
                 except (OSError, ValueError, KeyError, TypeError) as error:
                     raise ValueError("loki_job_author_mode_invalid") from error
                 validate_author_mode(author, policy["author_mode"])
-            if args.command == "memory":
+            if args.command == "export-pack":
+                import exporters
+                out_path = contained(root, args.output)
+                result = exporters.export_web_pack(job, out_path, expected_revision=args.expected_revision)
+            elif args.command == "import-draft":
+                import exporters
+                draft_path = contained(root, args.draft)
+                if draft_path.stat().st_size > policy["max_input_bytes"]:
+                    raise ValueError("loki_input_exceeds_policy")
+                try:
+                    result = exporters.import_web_draft(
+                        job, draft_path, expected_revision=args.expected_revision,
+                        validate_only=args.validate_only)
+                except current.SubmissionRejected as error:
+                    print(json.dumps(error.rejection, ensure_ascii=False, indent=2), file=sys.stderr)
+                    return 2
+            elif args.command == "memory":
                 result = current.memory(job, expected_revision=args.expected_revision, query=args.query)
             elif args.command == 'continuation':
                 result = current.continuation(job, read_id=args.read_id, expected_revision=args.expected_revision)
@@ -312,13 +365,19 @@ def main(argv=None):
                     fields = load_json(path, policy['max_input_bytes'])
                 result = current.draft(job, fields, expected_revision=args.expected_revision)
             elif args.command == 'status':
-                result = current.status(job, expected_revision=args.expected_revision)
+                status_kwargs = {"expected_revision": args.expected_revision}
+                if args.include_read_summary:
+                    status_kwargs["include_read_summary"] = True
+                result = current.status(job, **status_kwargs)
             elif args.command == "submit":
                 response = contained(root, args.response)
                 if response.stat().st_size > policy["max_input_bytes"]:
                     raise ValueError("loki_input_exceeds_policy")
                 try:
-                    result = current.submit(job, response, expected_revision=args.expected_revision)
+                    submit_kwargs = {"expected_revision": args.expected_revision}
+                    if args.validate_only:
+                        submit_kwargs["validate_only"] = True
+                    result = current.submit(job, response, **submit_kwargs)
                 except current.SubmissionRejected as error:
                     print(json.dumps(error.rejection, ensure_ascii=False, indent=2), file=sys.stderr)
                     return 2

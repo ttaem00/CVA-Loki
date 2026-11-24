@@ -547,6 +547,24 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
                 "whole_broadcast_coverage_unconfirmed", "vod_mapping_unconfirmed"])
     return result
 
+def _prepare_author_highlight_images(highlights, media, *, prepare_selected=True, allow_missing_images=False):
+    """Prepare display pixels after validation without changing the authored selection."""
+    selected = tuple(index for index, row in enumerate(highlights)
+                     if row.get("image") is not None) if prepare_selected else ()
+    if not selected and all(row.get("image") is not None for row in highlights):
+        return highlights
+
+    from .editorial_media_request import fill_highlight_images
+    from .highlight_story_window import _editorial_highlight_id
+
+    options = {"selected_image_indexes": selected} if selected else {}
+    if allow_missing_images:
+        options["allow_missing_images"] = True
+    prepared = fill_highlight_images(highlights, media, **options)
+    for row in prepared:
+        row["highlight_id"] = _editorial_highlight_id(row)
+    return prepared
+
 def bind_collaboration_lane(result, *, retained, retained_diagnostics, duration_sec):
     """Merge source-grounded new periods without replacing retained authority."""
     from .chatgpt_export.contract.collaboration_periods import merge_authored_collaboration_periods

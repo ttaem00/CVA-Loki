@@ -26,6 +26,35 @@
     return query;
   }
 
+  // #7318: a search hit hands off its time as t=<seconds>. It only picks a scene when no
+  // valid type/id/span is given, and an invalid or out-of-range value is ignored.
+  function time(source = new URLSearchParams(location.search)) {
+    const raw = source.get('t');
+    return /^\d{1,6}$/.test(raw || '') ? Number(raw) : NaN;
+  }
+
+  function outlineSeconds(value) {
+    if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : NaN;
+    const match = String(value ?? '').match(/^(\d{1,3}):([0-5]\d):([0-5]\d)$/);
+    return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : NaN;
+  }
+
+  // The innermost range containing the time: a D2 beats its D1. Same type/id/span shape as scene().
+  function sceneAtTime(ranges, seconds) {
+    const query = new URLSearchParams();
+    if (!Number.isFinite(seconds) || !Array.isArray(ranges)) return query;
+    for (const level of ['D2', 'D1']) {
+      const row = ranges.find(item => item && item.level === level
+        && outlineSeconds(item.start) <= seconds && seconds < outlineSeconds(item.end));
+      const id = String(row?.id ?? '');
+      if (row && id && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id)) {
+        query.set('type', level); query.set('id', id); query.set('span', '0');
+        return query;
+      }
+    }
+    return query;
+  }
+
   function context(base, selected = scene()) {
     const query = list(new URLSearchParams({base}));
     for (const key of ['type', 'id', 'span']) if (selected.has(key)) query.set(key, selected.get(key));
@@ -104,5 +133,5 @@
     return `${url}?${platform === 'soop' ? 'change_second' : 'currentTime'}=${offset}`;
   }
 
-  window.ReportNavigation = Object.freeze({list, scene, view, report, reader, connectReader, revisionTitle, revisionSummary, sourceUrl});
+  window.ReportNavigation = Object.freeze({list, scene, time, sceneAtTime, view, report, reader, connectReader, revisionTitle, revisionSummary, sourceUrl});
 })();

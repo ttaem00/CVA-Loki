@@ -1,5 +1,14 @@
 # 변경 기록
 
+## 3.0.9
+
+- **다중 LLM 작성자 지원**: 기존 `current_codex`·`current_chatgpt` 외에 `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm`을 작업공간 로컬 신원으로 정식 지원하며, `@google/gemini-cli` 확장(`gemini-extension.json`·`policies/loki-author.toml`)과 Ollama/vLLM용 3-Pass 로컬 실행기(`local_llm_author.py`)를 포함합니다.
+- **3단계 실행 모드 (`LITE` 15분 / `NORMAL` 30분 / `FULL` 60분)**: `LITE`에서는 Warm-Only 벡터 색인으로 콜드 다운로드·CPU 지연을 없애고, `NORMAL`/`FULL`에서는 CHZZK 전체 채팅 체크포인트 수집 및 공개 클립·타임라인 댓글·채널 용어집을 비차단으로 수집합니다. `FULL`은 외부 LLM 없이 결정론적 5분 구간 힌트(`local_chunk_hints`)를 제공합니다.
+- **작성 효율 및 품질 가드**: `author-input.json` 상단 `quick_contract`, `submit --validate-only` 무부작용 사전 검사(`unreconciled_note_reads` 경고 포함), `status --include-read-summary` 중복 읽기 방지 요약을 추가했습니다.
+- **선택적 짧은 영상 검증 (`gemini-api-cli`)**: 정지 프레임과 자막만으로 판단이 어려운 짧은 구간(최대 60초)을 비차단으로 보조 확인하는 `editorial_short_video_check` 모듈을 추가했습니다(미설치·미인증 시 안전하게 건너뜀).
+- **Web AI 및 크리에이터 내보내기**: `export-pack`(EvidenceWorld 클러스터·자막·`verify_result.py` ZIP), `import-draft`, 그리고 치지직/유튜브 타임라인 댓글(`comment`)·Premiere/Resolve 마커(`markers-csv`)·FCPXML(`fcpxml`) 내보내기를 제공합니다.
+- 새 작업의 `latest`는 `3.0.9`(`loki_3_0_9`)를 선택합니다. 기존 `3.0.8.2` 이하 작업의 구체 버전·원문·응답·정산·공개 태그와 배포 파일은 그대로 보존합니다.
+
 ## 3.0.8.2
 
 - 설치한 검토 UI에서 기존 보고서를 최신 결과 화면으로 읽습니다. 현재 저장 revision을 로컬 HTTP에서 투영하며 원본 Markdown·HTML·metadata와 과거 작성 버전을 보존합니다.

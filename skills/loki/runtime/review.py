@@ -24,6 +24,8 @@ def load_runtime():
 
 
 def handler(store, *, assets=HERE):
+    from publish.builder.loki_template import THEME_BOOT_CSP
+
     media_checked = {}
     class ReviewHandler(BaseHTTPRequestHandler):
         server_version = "LokiReview"
@@ -55,7 +57,9 @@ def handler(store, *, assets=HERE):
             self.send_header("Content-Security-Policy", (
                 "default-src 'none'; img-src data: 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; sandbox allow-scripts"
                 if report else
-                "default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+                "default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; "
+                f"script-src 'self' '{THEME_BOOT_CSP}'; font-src 'self'; connect-src 'self'; "
+                "frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
                 if template else
                 "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"))
             self.end_headers()

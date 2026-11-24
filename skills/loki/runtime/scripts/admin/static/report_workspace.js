@@ -78,13 +78,12 @@
   function updateSelectionLinks() {
     if(!state)return;
     const selected=S.selectionParams(state.selection);
-    const link=(path,history=false)=>{
+    const link=path=>{
       const query=new URLSearchParams({base:state.report.base});
       for(const [key,value] of selected)query.set(key,value);
-      if(history)query.set('history','1');return `${path}?${query}`;
+      return `${path}?${query}`;
     };
     el('legacyLink').href=link('/report');el('advancedLink').href=link('/report');
-    el('revisionLink').href=link('/report',true);
     document.querySelectorAll('#reportVersions a').forEach(anchor=>{
       const target=new URL(anchor.href,location.href);
       if(target.origin!==location.origin||!['/report','/report-workspace'].includes(target.pathname))return;
@@ -157,10 +156,7 @@
     }
   });
   el('previewButton').disabled = true;
-  if (detailUrl) {
-    el('revisionLink').href = `${detailUrl}&history=1`;
-    el('revisionLink').removeAttribute('aria-disabled');
-  }
+  el('snapshotHistoryStatus').hidden = true;
 
   function updateSourceLink(seconds) {
     try {
@@ -538,11 +534,26 @@
     (compareOpener?.isConnected ? compareOpener : el('revisionLink'))?.focus({preventScroll:true});
   }
 
+  function renderPreviousRevision(revision) {
+    const groups = [
+      ['큰 흐름', (revision.outline?.ranges || []).filter(row => row.level === 'D1')],
+      ['세부 흐름', (revision.outline?.ranges || []).filter(row => row.level === 'D2')],
+      ['주요 장면', revision.outline?.points || []],
+      ['Highlight', revision.qg1_review_packet?.editorial_highlights || []],
+    ];
+    const structure = groups.filter(([,rows]) => rows.length).map(([label,rows]) =>
+      `<h3>${label}</h3><ul>${rows.map(row => `<li>${escapeHtml([row.start || row.timestamp, row.end, row.title].filter(Boolean).join(' · '))}</li>`).join('')}</ul>`
+    ).join('');
+    const body = typeof revision.md === 'string' && revision.md ? `<h3>저장된 본문</h3><p>${escapeHtml(revision.md)}</p>` : '';
+    el('revisionComparePrevious').innerHTML = structure + body || '<p>읽을 이전 본문이 없습니다.</p>';
+  }
+
   function compareRevision(revisionId) {
     if(savePending)return;
     const revision=(state.report.manager_outline_revisions || []).find(row=>row.revision_id===revisionId);
     if(!revision)return;
     comparedRevision=revisionId;compareOpener=document.activeElement;
+    renderPreviousRevision(revision);
     const differences=S.revisionDiff(state,revision);
     el('revisionCompareSummary').textContent=`이전 저장본 ${revisionId} · 현재 ${state.dirty?'미저장 편집안':'저장본'}과 ${differences.length}곳이 다릅니다.`;
     if(!revision.qg1_review_packet && state.highlights.length)
@@ -562,6 +573,12 @@
     el('historyCount').textContent = String(revisions.length);
     el('historyList').innerHTML = revisions.map(row => `<div><span><strong>${escapeHtml(row.revision_id || '')}</strong><small>${escapeHtml(row.created_at || row.saved_at || '')}</small></span><button type="button" data-compare="${escapeHtml(row.revision_id || '')}">현재와 비교</button></div>`).join('') || '<p>아직 이전 저장본이 없습니다.</p>';
     el('historyList').querySelectorAll('[data-compare]').forEach(button => button.addEventListener('click', () => compareRevision(button.dataset.compare)));
+  }
+
+  function openRevisionHistory() {
+    if (!state) return;
+    el('historyPanel').open = true;
+    el('historyHeading').focus();
   }
 
   function adjacent(delta) {
@@ -829,13 +846,14 @@
     if(!state||savePending||saveOutcome)return;
     const opener=document.activeElement;
     const selection=state.selection;
-    const target=(state.report.manager_outline_revisions || []).find(row=>row.revision_id===revisionId);
+    const viewedReport=state.report;
+    const target=(viewedReport.manager_outline_revisions || []).find(row=>row.revision_id===revisionId);
     const complete=Array.isArray(target?.outline?.ranges) && Array.isArray(target?.outline?.points)
       && (!state.packet || Array.isArray(target.qg1_review_packet?.stories) && Array.isArray(target.qg1_review_packet?.editorial_highlights));
     const signature=complete?editableSignature(S.create({structured_outline:target.outline,qg1_review_packet:target.qg1_review_packet})):null;
-    const attempt={kind:'restore',base:state.report.base,videoNo:String(state.report.video_no),revision:state.report.manager_edit_revision,
+    const attempt={kind:'restore',base:viewedReport.base,videoNo:String(viewedReport.video_no),revision:viewedReport.manager_edit_revision,
       model:state,targetId:revisionId,signature,candidates:target?.outline?.candidates,
-      changed:!signature || signature!==editableSignature(S.create(state.report))};
+      changed:!signature || signature!==editableSignature(S.create(viewedReport))};
     savePending=true;setEditorBusy(true);el('saveButton').disabled=true;el('previewButton').disabled=true;
     updateSaveOutcomeControls();
     let confirmed=false,refused=false;
@@ -843,10 +861,15 @@
       if(!await confirmWorkspaceChange('이전 저장본으로 복원',`선택한 저장본: ${revisionId}\n\n화면의 미저장 수정과 최대 20단계 편집 되돌리기 이력을 선택한 저장본의 내용으로 교체합니다. 현재 장면 선택은 가능한 경우 유지합니다.\n복원하면 새 로컬 수정본이 기록됩니다. 공개 사이트는 바뀌지 않습니다.\n편집 유지를 선택하면 현재 입력·선택·이력과 저장본을 그대로 둡니다.`,'선택한 저장본으로 복원')) {
         refused=true;setStatus('복원을 취소했습니다. 화면의 편집 내용·선택·되돌리기 이력과 저장본은 그대로입니다.');return;
       }
+      if (state !== attempt.model || state.report !== viewedReport || viewedReport.base !== attempt.base
+        || String(viewedReport.video_no) !== attempt.videoNo || viewedReport.manager_edit_revision !== attempt.revision
+        || !savePending || saveOutcome) {
+        refused=true;setStatus('확인 중 편집 기준이 바뀌었습니다. 현재 이력에서 복원할 저장본을 다시 선택하세요.','error');return;
+      }
       setStatus('이전 버전을 복원하는 중…','saving');
       const data = await requestReportWrite('/api/manager-outline/restore', {
-        video_no: state.report.video_no, base: state.report.base, revision_id: revisionId,
-        expected_edit_revision: state.report.manager_edit_revision || '',
+        video_no: attempt.videoNo, base: attempt.base, revision_id: attempt.targetId,
+        expected_edit_revision: attempt.revision || '',
       });
       checkedReportResult(data,attempt,true);confirmed=true;
       acceptSavedReport(data,selection);
@@ -964,6 +987,8 @@
       state.selection = {type: firstType, id: String(first.id || ''), spanIndex: 0};
     }
     renderAll();
+    el('revisionLink').disabled = false;
+    if (params.get('history') === '1') openRevisionHistory();
     setStatus(liveClock ? '관리자 수정본을 불러왔습니다. 장면을 선택한 뒤 원본 버튼으로 영상·전사를 확인하세요.'
       : '관리자 수정본을 불러왔습니다. 장면을 누르면 영상이 해당 시각으로 이동합니다.', 'ok');
     loadPlayback(report.video_no);
@@ -986,6 +1011,7 @@
   el('checkSaveButton').addEventListener('click', checkSaveOutcome);
   el('adoptCurrentSaveButton').addEventListener('click', adoptCurrentSave);
   el('stopBoundaryButton').addEventListener('click',()=>stopBoundary());
+  el('revisionLink').addEventListener('click',openRevisionHistory);
   el('closeRevisionCompareButton').addEventListener('click',closeRevisionComparison);
   el('restoreComparedButton').addEventListener('click',()=>{
     const revision=comparedRevision;if(!revision)return;closeRevisionComparison();restore(revision);

@@ -19,6 +19,8 @@ import os
 
 import re
 
+from .editorial_contract import LIVE_VOD_CODEX_PIN_SCOPE
+
 from .evidence_world.contracts import canonical_json, file_hash, native_path, scoped_path_resolver
 
 KEY = "_editorial_production_job"
@@ -29,10 +31,22 @@ _MINT = object()
 
 CURRENT_CONVERSATION_MODE = "current_conversation_codex"
 
-CURRENT_CONVERSATION_CHATGPT_MODE = "current_conversation_chatgpt"
+ADMITTED_CONVERSATION_HOSTS = (
+    "chatgpt",
+    "claude",
+    "antigravity",
+    "gemini_cli",
+    "gemini_web",
+    "claude_web",
+    "local_llm",
+)
+
+CURRENT_CONVERSATION_HOST_MODES = {
+    host: f"current_conversation_{host}" for host in ADMITTED_CONVERSATION_HOSTS
+}
 
 def current_conversation_author_mode(author):
-    """Validate legacy Codex fields or explicitly local ChatGPT provenance."""
+    """Validate legacy Codex fields or explicitly local host provenance."""
     if not isinstance(author, dict) or not all(
         isinstance(value, str) and value.strip() for value in author.values()
     ):
@@ -40,14 +54,15 @@ def current_conversation_author_mode(author):
     if set(author) == {"thread_id", "turn_id", "actual_model"}:
         return CURRENT_CONVERSATION_MODE
     if (set(author) == {"host", "session_id", "actual_model", "identity_basis"}
-            and author["host"] == "chatgpt" and author["identity_basis"] == "workspace_local"
+            and author["host"] in CURRENT_CONVERSATION_HOST_MODES
+            and author["identity_basis"] == "workspace_local"
             and re.fullmatch(r"[0-9a-f]{32}", author["session_id"])):
-        return CURRENT_CONVERSATION_CHATGPT_MODE
+        return CURRENT_CONVERSATION_HOST_MODES[author["host"]]
     raise ValueError("current_conversation_author_identity_invalid")
 
 def current_conversation_author_owner(author):
     mode = current_conversation_author_mode(author)
-    return author["thread_id"] if mode == CURRENT_CONVERSATION_MODE else "chatgpt:" + author["session_id"]
+    return author["thread_id"] if mode == CURRENT_CONVERSATION_MODE else author["host"] + ":" + author["session_id"]
 
 @dataclass(frozen=True, slots=True)
 class CurrentConversationJob:
@@ -106,6 +121,8 @@ AUTHOR_BUDGET_KEY = "editorial_production_author_budget"
 
 AUTHOR_BUDGET_SCHEMA = "chzz.production-author-budget.v1"
 
+AUTHOR_ACTIVE_BUDGET_SCHEMA = "chzz.production-author-active-budget.v2"
+
 AUTHOR_BUDGET_CAPS = dict(max_attempts=128, max_input_tokens=10_000_000,
                          max_output_tokens=300_000, seconds=7200)
 
@@ -130,6 +147,7 @@ class _NormalTransportRecovery:
     files_json: str
     provenance_json: str
     authority: object
+    verified_files: dict = field(default_factory=dict, repr=False, compare=False)
 
     def __deepcopy__(self, memo):
         return self
@@ -140,12 +158,23 @@ def _source_scope(cfg):
         key for key in _SCOPE_KEYS if key not in {"summary_author_mode", "editorial_full_author"})
     scope = {key:cfg.get(key) for key in keys if key not in {"live_finalize_archive", "live_finalize_source"}
             or cfg.get(key) is not None}
+    from .distribution_vod import distribution_source
+    distributed = distribution_source(cfg)
+    if distributed is not None:
+        scope["distribution_vod"] = distributed
     author_budget = cfg.get(AUTHOR_BUDGET_KEY)
+    from .live_vod_finalize import live_vod_codex_author_pin
+
+    live_writer = live_vod_codex_author_pin(cfg)
+    if live_writer is not None:
+        if author_budget is None:
+            raise ValueError("production_author_budget_invalid")
+        scope[LIVE_VOD_CODEX_PIN_SCOPE] = live_writer.record()
     if author_budget is not None:
         if (cfg.get("summary_pipeline_version") not in FULL_AUTHOR_PIPELINES
                 or not isinstance(author_budget, dict)
                 or set(author_budget) != {"schema_version", *AUTHOR_BUDGET_CAPS}
-                or author_budget.get("schema_version") != AUTHOR_BUDGET_SCHEMA
+                or author_budget.get("schema_version") not in (AUTHOR_BUDGET_SCHEMA, AUTHOR_ACTIVE_BUDGET_SCHEMA)
                 or any(type(author_budget.get(key)) is not int or not 0 < author_budget[key] <= cap
                        for key, cap in AUTHOR_BUDGET_CAPS.items())):
             raise ValueError("production_author_budget_invalid")

@@ -101,6 +101,61 @@
   font-size: 12px;
   font-weight: 500;
 }
+/* #7242: the current-page label pushed the last group onto a second row below 1280px; the active
+   group highlight and the page title already say where the manager is. */
+@media (max-width: 1279px) { .app-shell-current-page { display: none; } }
+/* #7279: two result tabs (댓글 초안, 일정 제안) join the six work areas. Up to 1439px the active
+   tab and page title name the location, and spacing tightens so all entries keep one row. */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .app-shell-current-page { display: none; }
+  .app-shell-nav { gap: 10px; }
+  .app-shell-tab,
+  .app-shell-menu > summary { gap: 6px; padding: 8px 10px; }
+}
+/* #7283: 761-1279px keeps one desktop row. Spacing tightens, and the two utilities and the bell show
+   only their icon; the visually hidden label stays the accessible name, targets stay 44px. */
+@media (min-width: 761px) and (max-width: 1279px) {
+  .app-shell-nav { gap: 8px; padding: 8px 10px; }
+  .app-shell-brand { padding-right: 10px; }
+  .app-shell-groups { gap: 2px; }
+  .app-shell-tab,
+  .app-shell-menu > summary { gap: 5px; padding: 8px 9px; }
+  .app-shell-utilities { gap: 2px; padding-left: 6px; }
+  .app-shell-utilities .app-shell-tab,
+  .app-shell-utilities .app-shell-menu > summary,
+  .app-shell-notifications > summary { justify-content: center; min-width: 44px; padding: 8px 10px; }
+  .app-shell-utilities .app-shell-label,
+  .app-shell-notifications > summary > .app-shell-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+/* Below 1000px the group names alone carry the meaning; their decorative icons give way. */
+@media (min-width: 761px) and (max-width: 999px) {
+  .app-shell-groups .app-shell-tab > span[aria-hidden="true"],
+  .app-shell-groups .app-shell-menu > summary > span[aria-hidden="true"] { display: none; }
+}
+/* Below 820px a three-digit bell count and narrower page containers still need room. */
+@media (min-width: 761px) and (max-width: 819px) {
+  .app-shell-nav { gap: 6px; padding-inline: 8px; }
+  .app-shell-brand { padding-right: 8px; }
+  .app-shell-tab,
+  .app-shell-menu > summary { justify-content: center; min-width: 44px; padding-inline: 6px; }
+  .app-shell-notifications > summary { gap: 3px; padding-inline: 6px; }
+  #app-shell-notice-count { padding-inline: 4px; }
+}
+/* #7279: the two result tabs need the same room up to 1099px once a page scrollbar takes its width. */
+@media (min-width: 1000px) and (max-width: 1099px) {
+  .app-shell-groups .app-shell-tab > span[aria-hidden="true"],
+  .app-shell-groups .app-shell-menu > summary > span[aria-hidden="true"] { display: none; }
+}
+/* #7279: with the two result tabs, 761-999px also needs the group text slightly smaller;
+   the open/close state stays in each native disclosure, so the decorative arrow gives way. */
+@media (min-width: 761px) and (max-width: 999px) {
+  .app-shell-groups .app-shell-tab,
+  .app-shell-groups .app-shell-menu > summary { font-size: 13px; padding-inline: 5px; }
+  .app-shell-groups .app-shell-menu > summary::after { content: none; }
+}
 .app-shell-tab:hover,
 .app-shell-menu > summary:hover,
 .app-shell-menu[open] > summary {
@@ -238,52 +293,121 @@
 .app-shell-notifications > summary { min-height: 44px; }
 #app-shell-notice-count { border-radius: 20px; background: #f2cc8f; color: #171c2c; padding: 3px 6px; font-variant-numeric: tabular-nums; }
 #app-shell-notice-count[hidden] { display: none; }
-.app-shell-notice-panel { right: 0; left: auto; width: min(500px, calc(100vw - 36px)); padding: 16px; gap: 12px; }
-.app-shell-notice-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.app-shell-notice-actions > a { display:inline-flex;align-items:center;width:auto;white-space:nowrap;gap:6px;padding:8px; }
+/* #7242 bell popup: brand v4 dark tokens (navy surface, paper text, brass action; brand-v4.tokens.json
+   contrast pairs) so text never sits blue-on-blue. Brass is reserved for the manager's own action,
+   results are quiet rows and system-handled groups stay folded. */
+.app-shell-notice-panel {
+  --notice-surface: #141D2B; --notice-raised: #202D3C; --notice-line: #2B394A;
+  --notice-strong: #F5ECDA; --notice-text: #C0C8D1; --notice-muted: #98A2AE;
+  --notice-act: #F4BE70; --notice-act-ink: #141D2B; --notice-error: #FF9EAE;
+  right: 0; left: auto; width: min(460px, calc(100vw - 36px)); max-height: min(78vh, 720px); overflow: auto;
+  padding: 0; gap: 0; background: var(--notice-surface); border-color: var(--notice-line); color: var(--notice-text);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
+}
+.app-shell-notice-actions { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 18px; background: var(--notice-surface); border-bottom: 1px solid var(--notice-line); }
+.app-shell-notice-actions > strong { flex: 1 1 auto; color: var(--notice-strong); font-size: 15px; font-weight: 700; }
+.app-shell-notice-actions > a { display: inline-flex; align-items: center; min-height: 44px; width: auto; padding: 0 10px; white-space: nowrap; color: var(--notice-muted); font-size: 13px; font-weight: 500; }
+.app-shell-notice-actions > a:hover { color: var(--notice-strong); }
+.app-shell-notice-panel .app-shell-notice-actions button { min-height: 44px; padding: 0 10px; border: 0; background: none; color: var(--notice-muted); font-size: 13px; }
+.app-shell-notice-panel .app-shell-notice-actions button:hover { color: var(--notice-strong); }
 .app-shell-notice-preferences { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 16px; margin-block: 8px; }
 .app-shell-notice-preferences label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; cursor: pointer; }
-.app-shell-notice-preferences input { width: 18px; height: 18px; margin: 0; accent-color: var(--shell-accent); }
-.app-shell-notice-preferences input:focus-visible { outline: 2px solid var(--shell-accent); outline-offset: 3px; }
-.app-shell-notice-preferences label:has(input:disabled) { cursor: default; color: var(--shell-muted); }
-#app-shell-notice-preferences-status { margin: 0 0 8px; color: var(--shell-muted); font-size: 12px; line-height: 1.5; }
-.app-shell-notice-panel button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--shell-border); border-radius: 8px; background: var(--shell-bg); color: var(--shell-text); cursor: pointer; }
-.app-shell-notice-panel button:disabled { cursor: default; color: var(--shell-muted); }
-.app-shell-notice-panel button:focus-visible { outline: 2px solid var(--shell-accent); outline-offset: 2px; }
-#app-shell-notice-status, .app-shell-notice-panel > small { margin: 8px; font-size: 12px; color: var(--shell-muted); line-height: 1.5; }
-#app-shell-notice-list { display: grid; list-style: none; padding: 0; margin: 0 0 12px; }
-#app-shell-notice-list li + li { border-top: 1px solid var(--shell-border); }
-#app-shell-notice-list a { display: block; overflow-wrap: anywhere; }
-#app-shell-notice-list small { display: block; margin-top: 6px; font-size: 12px; color: var(--shell-muted); }
-#app-shell-notice-list [data-level="warning"] strong { color: #f2cc8f; }
-#app-shell-notice-list [data-level="error"] strong,
+.app-shell-notice-preferences input { width: 18px; height: 18px; margin: 0; accent-color: var(--notice-act); }
+.app-shell-notice-preferences input:focus-visible { outline: 2px solid var(--notice-strong); outline-offset: 3px; }
+.app-shell-notice-preferences label:has(input:disabled) { cursor: default; color: var(--notice-muted); }
+#app-shell-notice-preferences-status { margin: 0 0 8px; color: var(--notice-muted); font-size: 12px; line-height: 1.5; }
+.app-shell-notice-panel button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--notice-line); border-radius: 8px; background: var(--notice-raised); color: var(--notice-text); cursor: pointer; }
+.app-shell-notice-panel button:disabled { cursor: default; color: var(--notice-muted); }
+.app-shell-notice-panel button:focus-visible,
+.app-shell-notice-panel a:focus-visible,
+.app-shell-notice-panel summary:focus-visible { outline: 2px solid var(--notice-strong); outline-offset: -2px; border-radius: 6px; }
+#app-shell-notice-status { margin: 10px 18px 0; padding: 8px 10px; border-radius: 8px; background: var(--notice-raised); color: var(--notice-text); font-size: 12px; line-height: 1.5; }
+#app-shell-notice-status[data-quiet="true"], .app-shell-notice-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.app-shell-notice-panel > small { margin: 8px 18px; font-size: 12px; color: var(--notice-muted); line-height: 1.5; }
 .app-shell-notifications[data-level="error"] > summary { color: #ffafbd; }
 .app-shell-notifications[data-level="error"] #app-shell-notice-count { background: #f7768e; color: #26151e; }
-.app-shell-notice-settings { padding: 10px 12px; border: 1px solid var(--shell-border); border-radius: 8px; }
-.app-shell-notice-settings > summary { min-height: 32px; cursor: pointer; font-size: 13px; color: var(--shell-muted); }
+#app-shell-notice-list { display: grid; gap: 0; margin: 0; padding: 4px 0 8px; }
+#app-shell-notice-list > section, #app-shell-notice-list > details { padding: 10px 18px 6px; }
+#app-shell-notice-list > * + * { border-top: 1px solid var(--notice-line); }
+#app-shell-notice-list h3, #app-shell-notice-list > details > summary { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; color: var(--notice-muted); font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--notice-text); }
+#app-shell-notice-list > details > summary { min-height: 40px; margin: -6px 0 0; cursor: pointer; list-style: none; }
+#app-shell-notice-list > details > summary::-webkit-details-marker { display: none; }
+#app-shell-notice-list > details > summary::after { content: "▸"; margin-inline-start: auto; font-size: 11px; }
+#app-shell-notice-list > details[open] > summary::after { content: "▾"; }
+#app-shell-notice-list > details > summary:hover { color: var(--notice-text); }
+.app-shell-notice-group-count { min-width: 20px; padding: 1px 6px; border-radius: 10px; background: color-mix(in srgb, var(--state, #98A2AE) 18%, transparent); color: var(--state, var(--notice-text)); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
+#app-shell-notice-list > [data-group="attention"] h3 { color: var(--notice-act); }
+#app-shell-notice-list > [data-group="attention"] .app-shell-notice-group-count { background: var(--notice-act); color: var(--notice-act-ink); }
+.app-shell-notice-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.app-shell-notice-items li + li { border-top: 1px solid var(--notice-line); }
+#app-shell-notice-list .app-shell-notice-items a { padding: 10px 0; color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.app-shell-notice-item-heading { display: block; }
+.app-shell-notice-items strong { color: var(--notice-strong); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.app-shell-notice-items p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 3px 0 6px; color: var(--notice-muted); font-size: 13px; line-height: 1.5; }
+#app-shell-notice-list small { display: block; margin: 0 0 6px; font-size: 12px; color: var(--notice-muted); }
+.app-shell-notice-item-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.app-shell-notice-meta { display: inline-flex; align-items: center; gap: 8px; color: var(--notice-muted); }
+.app-shell-notice-meta time { font-variant-numeric: tabular-nums; }
+.app-shell-notice-action { color: var(--notice-text); font-weight: 600; }
+.app-shell-notice-action::after { content: " →"; }
+#app-shell-notice-list .app-shell-notice-items a:hover .app-shell-notice-action { color: var(--notice-strong); text-decoration: underline; text-underline-offset: 3px; }
+#app-shell-notice-list .app-shell-notice-items a:hover strong { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--notice-muted); }
+/* The manager's own action: the only raised card and the only filled button in the panel. */
+#app-shell-notice-list > [data-group="attention"] .app-shell-notice-items { gap: 8px; padding-top: 4px; }
+#app-shell-notice-list > [data-group="attention"] li { border: 0; border-left: 3px solid var(--notice-act); border-radius: 8px; background: var(--notice-raised); }
+#app-shell-notice-list > [data-group="attention"] li[data-level="error"] { border-left-color: var(--notice-error); }
+#app-shell-notice-list > [data-group="attention"] .app-shell-notice-items a { padding: 12px 14px; }
+#app-shell-notice-list > [data-group="attention"] strong { font-size: 15px; font-weight: 700; }
+#app-shell-notice-list > [data-group="attention"] p { -webkit-line-clamp: 3; color: var(--notice-text); }
+#app-shell-notice-list > [data-group="attention"] .app-shell-notice-action { padding: 6px 12px; border-radius: 6px; background: var(--notice-act); color: var(--notice-act-ink); }
+#app-shell-notice-list > [data-group="attention"] li[data-level="error"] .app-shell-notice-action { background: var(--notice-error); color: #2a0f15; }
+#app-shell-notice-list > [data-group="attention"] .app-shell-notice-action::after { content: ""; }
+#app-shell-notice-list > [data-group="attention"] a:hover .app-shell-notice-action { color: var(--notice-act-ink); text-decoration: none; filter: brightness(1.08); }
+/* Folded, system-handled groups read one step quieter than new results. */
+#app-shell-notice-list > details .app-shell-notice-items strong { color: var(--notice-text); font-size: 13px; }
+#app-shell-notice-list > details .app-shell-notice-items p { -webkit-line-clamp: 1; }
+#app-shell-notice-list > details .app-shell-notice-action { color: var(--notice-muted); font-weight: 500; }
+#app-shell-notice-list .app-shell-notice-more { display: inline-block; padding: 8px 0; color: var(--notice-text); font-size: 13px; font-weight: 600; }
+#app-shell-notice-list .app-shell-notice-more::after { content: " →"; }
+#app-shell-notice-list .app-shell-notice-more:hover { color: var(--notice-strong); }
+.app-shell-notice-settings { margin: 0; padding: 4px 18px 12px; border: 0; border-top: 1px solid var(--notice-line); border-radius: 0; }
+.app-shell-notice-settings > summary { display: flex; align-items: center; min-height: 40px; cursor: pointer; font-size: 12px; color: var(--notice-muted); }
 .app-shell-notice-settings p { font-size: 12px; line-height: 1.5; margin: 10px 0; }
-#app-shell-notice-status { margin: 0; }
-#app-shell-notice-list { gap: 16px; margin: 0; }
-#app-shell-notice-list h3, #app-shell-notice-list > details > summary { font-size: 13px; color: var(--shell-muted); margin: 0 0 8px; }
-#app-shell-notice-list > details > summary { padding: 8px 0; cursor: pointer; }
-.app-shell-notice-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.app-shell-notice-item-heading { display: grid; gap: 7px; }
-.app-shell-notice-kind { color: var(--shell-muted); font-size: 11px; font-weight: 600; }
-.app-shell-notice-items [data-level="warning"] .app-shell-notice-kind { color: #f2cc8f; }
-.app-shell-notice-items [data-level="error"] .app-shell-notice-kind { color: #ffafbd; }
-#app-shell-notice-list .app-shell-notice-items a { display: block; padding: 12px; }
-#app-shell-notice-list .app-shell-notice-more { display: inline-flex; padding: 6px 0; color: var(--shell-accent); font-size: 13px; }
-.app-shell-notice-items p { margin: 8px 0 12px; color: var(--shell-text); font-size: 13px; line-height: 1.55; }
-.app-shell-notice-item-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 12px; }
-.app-shell-notice-item-foot time { color: var(--shell-muted); font-variant-numeric: tabular-nums; }
-.app-shell-notice-item-foot span { color: var(--shell-accent); }
-.app-shell-notice-item-foot span { padding: 5px 9px; border: 1px solid var(--shell-border); border-radius: 6px; font-weight: 600; }
-.app-shell-notice-items li { margin-block: 5px; border: 1px solid var(--shell-border); border-radius: 10px; background: var(--shell-bg); }
-.app-shell-notice-items .app-shell-notice-kind { display: inline-flex; align-items: center; gap: 7px; }
+.app-shell-notice-kind { display: inline-flex; align-items: center; gap: 5px; color: var(--state, var(--notice-muted)); font-size: 12px; font-weight: 600; }
 /* Reuse the pinned Elio/Lucide check and x geometry; visible words carry the meaning. */
-.app-shell-notice-kind::before { content:''; display:inline-block; width:16px; height:16px; flex:0 0 auto; background:currentColor; mask:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+.app-shell-notice-kind::before { content:''; display:inline-block; width:12px; height:12px; flex:0 0 auto; background:currentColor; mask:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
 [data-category="attention"] .app-shell-notice-kind::before { mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E"); }
 [data-category="result"] .app-shell-notice-kind::before { mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E"); }
+[data-category="operations"] .app-shell-notice-kind::before { mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3C/svg%3E"); }
 [data-category="progress"] .app-shell-notice-kind::before { background:none; mask:none; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; box-sizing:border-box; }
-.app-shell-notice-items [data-unread="true"] strong::after { content:'';display:inline-block;width:6px;height:6px;margin-inline-start:8px;border-radius:50%;background:var(--shell-accent);vertical-align:middle; }
+/* Group state uses the pinned Lucide geometry; product rows use the brand v4 micro marks (build_identity.py). */
+/* #7242: each state owns one hue and one shape (a round chip); product marks are tinted square tiles. */
+.app-shell-notice-state { display: inline-grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, var(--state, #98A2AE) 20%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--state, #98A2AE) 45%, transparent); }
+.app-shell-notice-state::before { content: ""; width: 13px; height: 13px; background: var(--state, #98A2AE); mask: center/contain no-repeat; }
+#app-shell-notice-list > [data-group="attention"] { --state: #F4BE70; }
+#app-shell-notice-list > [data-group="attention"] .app-shell-notice-state::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E"); }
+#app-shell-notice-list > [data-group="result"] { --state: #92D8D3; }
+#app-shell-notice-list > [data-group="result"] .app-shell-notice-state::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E"); }
+#app-shell-notice-list > [data-group="operations"] { --state: #C4B3ED; }
+#app-shell-notice-list > [data-group="operations"] .app-shell-notice-state::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3C/svg%3E"); }
+#app-shell-notice-list > [data-group="progress"] { --state: #9FB4C7; }
+#app-shell-notice-list > [data-group="progress"] .app-shell-notice-state::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E"); }
+#app-shell-notice-list > [data-group="completed"] { --state: #98A2AE; }
+#app-shell-notice-list > [data-group="completed"] .app-shell-notice-state::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+#app-shell-notice-list > [data-group="active"] { --state: #FF9EAE; }
+#app-shell-notice-list > [data-group="active"] .app-shell-notice-state::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v4'/%3E%3Cpath d='m4.93 4.93 2.83 2.83'/%3E%3Cpath d='M2 12h4'/%3E%3Cpath d='M12 22v-4'/%3E%3Cpath d='M22 12h-4'/%3E%3Cpath d='m19.07 4.93-2.83 2.83'/%3E%3C/svg%3E"); }
+#app-shell-notice-list .app-shell-notice-items a { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
+.app-shell-notice-mark { position: relative; width: 30px; height: 30px; margin-top: 1px; border-radius: 8px; background: color-mix(in srgb, var(--mark-color, #F5ECDA) 16%, #141D2B); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mark-color, #F5ECDA) 42%, transparent); }
+.app-shell-notice-mark::before { content: ""; position: absolute; inset: 4px; background: var(--mark-color, var(--notice-strong, #F5ECDA)); mask: center/contain no-repeat; }
+.app-shell-notice-mark[data-product="loki"] { --mark-color: #F4BE70; }
+.app-shell-notice-mark[data-product="dayline"] { --mark-color: #F1AC95; }
+.app-shell-notice-mark[data-product="temporal-loom"] { --mark-color: #A7D6AE; }
+.app-shell-notice-mark[data-product="manager-cue"] { --mark-color: #E4CCA2; }
+.app-shell-notice-mark[data-product="cva"] { --mark-color: #F5ECDA; }
+.app-shell-notice-mark[data-product="loki"]::before { --mark-color: #F4BE70; mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22none%22 stroke=%22black%22 stroke-width=%223.8%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M14 18c14 0 8 14 24 14M14 46c14 0 8-14 24-14%22/%3E%3Cpath d=%22m38 23 12 9-12 9Z%22/%3E%3C/g%3E%3C/svg%3E%0A"); }
+.app-shell-notice-mark[data-product="dayline"]::before { --mark-color: #F1AC95; mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22none%22 stroke=%22black%22 stroke-width=%223.8%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%2214%22 y=%2219%22 width=%2236%22 height=%2232%22 rx=%226%22/%3E%3Cpath d=%22M23 14v10M41 14v10M14 30h36%22/%3E%3Ccircle cx=%2232%22 cy=%2240%22 r=%223.5%22 fill=%22black%22 stroke=%22none%22/%3E%3C/g%3E%3C/svg%3E%0A"); }
+.app-shell-notice-mark[data-product="temporal-loom"]::before { --mark-color: #A7D6AE; mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22none%22 stroke=%22black%22 stroke-width=%223.8%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cdefs%3E%3Cmask id=%22cva-loom-weave-micro%22 maskUnits=%22userSpaceOnUse%22 maskContentUnits=%22userSpaceOnUse%22 x=%220%22 y=%220%22 width=%2264%22 height=%2264%22%3E%3Crect width=%2264%22 height=%2264%22 fill=%22%23fff%22 stroke=%22none%22/%3E%3Cpath d=%22M11 35c12-14 30 14 42 0%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%228%22/%3E%3C/mask%3E%3C/defs%3E%3Cg mask=%22url(%23cva-loom-weave-micro)%22%3E%3Cpath d=%22M15 49V24a7 7 0 0 1 14 0v25M35 49V24a7 7 0 0 1 14 0v25%22/%3E%3C/g%3E%3Cpath d=%22M11 35c12-14 30 14 42 0%22/%3E%3C/g%3E%3C/svg%3E%0A"); }
+.app-shell-notice-mark[data-product="manager-cue"]::before { --mark-color: #E4CCA2; mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22none%22 stroke=%22black%22 stroke-width=%223.8%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M19 16h26a6 6 0 0 1 6 6v19a6 6 0 0 1-6 6H29L17 54v-7a6 6 0 0 1-4-6V22a6 6 0 0 1 6-6Z%22/%3E%3Cpath d=%22M22 25h16M26 35l6 6 11-11%22/%3E%3C/g%3E%3C/svg%3E%0A"); }
+.app-shell-notice-mark[data-product="cva"]::before { --mark-color: #F5ECDA; mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22none%22 stroke=%22black%22 stroke-width=%223.8%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M46 19a19 19 0 1 0 0 26%22/%3E%3Cpath d=%22m25 32 7-7 7 7-7 7Z%22 fill=%22black%22 stroke=%22none%22/%3E%3Ccircle cx=%2246%22 cy=%2219%22 r=%223%22 fill=%22black%22 stroke=%22none%22/%3E%3C/g%3E%3C/svg%3E%0A"); }
+.app-shell-notice-items [data-unread="true"] strong::after { content:''; display:inline-block; width:7px; height:7px; margin-inline-start:8px; border-radius:50%; background:var(--notice-strong); vertical-align:middle; }
 @media (max-width: 760px) { .app-shell-notice-panel { width: auto; right: 10px; left: 10px; } }

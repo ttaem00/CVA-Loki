@@ -21,6 +21,8 @@
     const metaEl = document.getElementById('meta');
     const canonicalConflictBannerEl = document.getElementById('canonicalConflictBanner');
     const publicLinkEl = document.getElementById('publicLink');
+    const reportHistoryLink = document.getElementById('reportHistoryLink');
+    if (reportHistoryLink && base) reportHistoryLink.href = workspaceRevisionHistoryUrl();
     const reportWorkspaceLinkEl = document.getElementById('reportWorkspaceLink');
     if (reportWorkspaceLinkEl) {
       reportWorkspaceLinkEl.href = base
@@ -46,9 +48,10 @@
       const query=detailSceneParams({type,id:selection.id,spanIndex:Number(selection.spanIndex || 0)});
       if(!query.has('id'))return;
       const current=new URLSearchParams(location.search);
-      for(const key of ['type','id','span'])current.delete(key);
+      for(const key of ['type','id','span','t'])current.delete(key);
       for(const [key,value] of query)current.set(key,value);
       window.history?.replaceState(null,'',`${location.pathname}?${current}${location.hash || ''}`);
+      if(reportHistoryLink)reportHistoryLink.href=workspaceRevisionHistoryUrl();
       if(reportWorkspaceLinkEl){const target=window.ReportNavigation.list(new URLSearchParams({base}));
         window.ReportNavigation.view(target);
         for(const [key,value] of query)target.set(key,value);
@@ -71,7 +74,11 @@
       }
     }
     function restoreDetailSceneSelection() {
-      const query=new URLSearchParams(location.search),type=query.get('type'),id=query.get('id'),rawSpan=query.get('span') || '0';
+      let query=new URLSearchParams(location.search);
+      // #7318: without a valid scene, a search hand-off time (t=) picks the range containing it.
+      if(!/^\d{1,6}$/.test(query.get('span') || '0')||!detailSceneParams({type:query.get('type'),id:query.get('id'),spanIndex:Number(query.get('span') || 0)}).has('id'))
+        query=window.ReportNavigation.sceneAtTime(managerOutlineCollection('range'),window.ReportNavigation.time(query));
+      const type=query.get('type'),id=query.get('id'),rawSpan=query.get('span') || '0';
       if(!/^\d{1,6}$/.test(rawSpan))return;
       const spanIndex=Number(rawSpan);
       if(!detailSceneParams({type,id,spanIndex}).has('id'))return;
@@ -169,11 +176,6 @@
     const chzzkCommentDraftListEl = document.getElementById('chzzkCommentDraftList');
     const chzzkCommentStatusEl = document.getElementById('chzzkCommentStatus');
     const chzzkCommentGroupEl = document.querySelector('[data-testid="chzzk-comment-group"]');
-    const revisionHistoryBtn = document.getElementById('revisionHistoryBtn');
-    const revisionPanelEl = document.getElementById('revisionPanel');
-    const revisionCloseBtn = document.getElementById('revisionCloseBtn');
-    const revisionListEl = document.getElementById('revisionList');
-
     ctEnabledCheckbox.addEventListener('change', () => {
       ctToggleRowEl.classList.toggle('disabled', !ctEnabledCheckbox.checked);
     });
@@ -304,13 +306,6 @@
       }
       loadReport().catch((err) => setStatus(err.message, 'err'));
     });
-    if (revisionHistoryBtn) revisionHistoryBtn.addEventListener('click', () => setRevisionPanelOpen(true));
-    if (revisionCloseBtn) revisionCloseBtn.addEventListener('click', () => setRevisionPanelOpen(false));
-    if (revisionPanelEl) {
-      revisionPanelEl.addEventListener('click', (event) => {
-        if (event.target === revisionPanelEl) setRevisionPanelOpen(false);
-      });
-    }
     document.getElementById('previewBtn').addEventListener('click', () => {
       previewCurrent().catch((err) => setStatus(err.message, 'err'));
     });
@@ -730,10 +725,6 @@
       items.forEach(item => { item.tabIndex = item === items[next] ? 0 : -1; });
       items[next].focus();
     });
-    managerOutlineHistoryEl.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-outline-restore]');
-      if (button) restoreManagerOutline(button.dataset.outlineRestore).catch(() => {});
-    });
     if (naverCafePostBtn) {
       naverCafePostBtn.addEventListener('click', () => {
         postToNaverCafe().catch((err) => setNaverCafeStatus(err.message, 'err'));
@@ -785,10 +776,6 @@
     // Ctrl/Cmd+S → 저장.
     document.addEventListener('keydown', (e) => {
       if(isReportComposing(e))return;
-      if (e.key === 'Escape' && revisionPanelEl && revisionPanelEl.classList.contains('open')) {
-        setRevisionPanelOpen(false);
-        return;
-      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         saveCurrent().catch((err) => setStatus(err.message, 'err'));
@@ -1042,7 +1029,8 @@
       if(isReportComposing(event)&&['Enter','Escape'].includes(event.key))event.stopPropagation();
     },true);
     initCockpitDisclosures();
-    loadReport().then(() => {
+    loadReport().then(loaded => {
+      if (loaded === false) return;
       applyReportPageRole(reportPageRole);
       document.body.classList.remove('report-loading');
       return resumeActivePublishOperation();

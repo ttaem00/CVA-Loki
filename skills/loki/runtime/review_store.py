@@ -18,7 +18,11 @@ from pipeline.evidence_world.contracts import digest, native_path
 from pipeline.manager_outline import validate_structured_manager_outline
 from pipeline.models import VODInfo
 from pipeline.outline.schema import hms_to_seconds
-from pipeline.report_artifact_family import commit_report_artifact_family, validate_report_artifact_family
+from pipeline.report_artifact_family import (
+    commit_report_artifact_family,
+    present_saved_report_html,
+    validate_report_artifact_family,
+)
 from pipeline.editorial_visual_input import validate_frame_references
 from pipeline.summary.report_html import ReportHtmlRenderRequest, render_summary_report_html
 from pipeline.summary.render import _merge_editorial_review_markdown
@@ -277,7 +281,7 @@ class ReviewStore:
         meta.update({key: value for key, value in rendered.metadata_sec.items() if key not in VOD_IDENTITY_FIELDS})
         meta.update(structured_outline=outline, manager_markdown=markdown, editorial_review_packet=packet,
                     manager_edited=True)
-        return dict(md=markdown, html=rendered.html_content, meta=meta)
+        return dict(md=markdown, html=present_saved_report_html(rendered.html_content, meta), meta=meta)
 
     def preview(self, report_id, payload):
         job = self._job(report_id)
@@ -500,10 +504,17 @@ class ReviewStore:
             if original:
                 provenance = context["meta"].get("llm_provider_provenance") or {}
                 author = provenance.get("author") if isinstance(provenance, dict) else None
-                mode = "current_conversation_chatgpt"
-                if isinstance(provenance, dict) and (
-                        provenance.get("actual_provider") == mode or provenance.get("selected_mode") == mode
-                        or isinstance(author, dict) and author.get("host") == "chatgpt"):
+                from pipeline.editorial_production_job import ADMITTED_CONVERSATION_HOSTS, CURRENT_CONVERSATION_HOST_MODES
+                host = author.get("host") if isinstance(author, dict) else None
+                matched_host = host if host in ADMITTED_CONVERSATION_HOSTS else None
+                if matched_host is None and isinstance(provenance, dict):
+                    for candidate_host, candidate_mode in CURRENT_CONVERSATION_HOST_MODES.items():
+                        if (provenance.get("actual_provider") == candidate_mode
+                                or provenance.get("selected_mode") == candidate_mode):
+                            matched_host = candidate_host
+                            break
+                if matched_host is not None:
+                    mode = CURRENT_CONVERSATION_HOST_MODES[matched_host]
                     try:
                         valid = (provenance.get("actual_provider") == provenance.get("selected_mode") == mode
                             and current_conversation_author_mode(author) == mode)
@@ -511,7 +522,7 @@ class ReviewStore:
                         valid = False
                     if not valid:
                         raise ValueError("review_original_author_invalid")
-                    actor_kind = "current_chatgpt"
+                    actor_kind = "current_" + matched_host
             records.append(dict(row, source="ai_original" if original else "admin_save_local",
                 actor_kind=actor_kind, test_mode=False,
                 publish_state="local_draft", approval={},

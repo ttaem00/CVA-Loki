@@ -10,7 +10,11 @@ import base64
 
 from dataclasses import dataclass, field
 
+from functools import lru_cache
+
 import hashlib
+
+from html import escape
 
 from html.parser import HTMLParser
 
@@ -28,7 +32,7 @@ from urllib.parse import urlsplit
 
 from PIL import Image
 
-from publish.builder.loki_runtime import RUNTIME_PREFIX, SOURCE
+from publish.builder.loki_runtime import RUNTIME_PREFIX, SOURCE, runtime_asset
 
 PAGE_NAME = "loki-page.json"
 
@@ -37,6 +41,69 @@ _RASTER = {"image/png": ("png", "PNG"), "image/jpeg": ("jpg", "JPEG"),
            "image/avif": ("avif", "AVIF")}
 
 _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+_THEME_BOOT = """
+(() => {
+  const root = document.documentElement;
+  let theme = 'dark';
+  try {
+    const saved = localStorage.getItem('loki-design-theme-v1');
+    if (saved === 'light' || saved === 'dark') theme = saved;
+    else localStorage.setItem('loki-design-theme-v1', theme);
+  } catch (_) {}
+  root.dataset.theme = theme;
+  const syncColor = () => {
+    document.querySelector('meta[name="theme-color"]').content = root.dataset.theme === 'dark' ? '#141D2B' : '#FAF5EB';
+  };
+  syncColor();
+  document.addEventListener('loki:report-ready', () => {
+    if (root.dataset.theme !== theme) document.getElementById('themeButton')?.click();
+    syncColor();
+    document.getElementById('themeButton')?.addEventListener('click', syncColor);
+  }, {once: true});
+})();
+"""
+
+THEME_BOOT_CSP = "sha256-" + base64.b64encode(hashlib.sha256(_THEME_BOOT.encode("utf-8")).digest()).decode("ascii")
+
+_SAVED_SOURCE_START = '<template id="lokiSavedReportSource">\n'
+
+_SAVED_SOURCE_END = '\n</template><!-- loki-saved-report-source -->'
+
+_SAVED_REPORT_BOOT = """
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.documentElement;
+  const main = document.getElementById('top');
+  const status = document.getElementById('reportStatus');
+  try {
+    const packet = JSON.parse(document.getElementById('lokiSavedPageData').textContent);
+    const source = window.LokiReportSource;
+    // The packet and its assets are embedded. The VOD URL identifies links and
+    // bookmarks when the document has no HTTP origin.
+    const environment = source.normalize(packet, {
+      reportURL: source.sourceURLAt(packet, 0)
+    });
+    const view = window.LokiReportAdapter.create(packet, environment);
+    root.dataset.lokiStatus = 'rendering';
+    // The standalone viewer has no editor server. Its original VOD links
+    // still come from the verified source in the adapter.
+    window.LokiApp.mount({...view, videoNo: ''}, environment);
+    document.getElementById('viewEditor').title = '편집 도구는 Report Admin에서 열 수 있습니다.';
+    document.getElementById('shareButton').hidden = true;
+    root.dataset.lokiStatus = 'ready';
+    status.hidden = true;
+    document.dispatchEvent(new CustomEvent('loki:report-ready', {detail:{reportURL:environment.reportURL}}));
+  } catch (error) {
+    root.dataset.lokiStatus = 'error';
+    status.hidden = false;
+    status.setAttribute('role', 'alert');
+    document.getElementById('reportStatusTitle').textContent = '저장된 보고서를 표시할 수 없습니다.';
+    document.getElementById('reportStatusMessage').textContent = error.message;
+  } finally {
+    main.setAttribute('aria-busy', 'false');
+  }
+}, {once:true});
+"""
 
 @dataclass
 class _Node:
@@ -122,9 +189,88 @@ def entry_html() -> str:
     if hashlib.sha256(original_bytes).hexdigest() != identity["sha256"]:
         raise ValueError("loki_template_source_changed")
     original = original_bytes.decode("utf-8")
-    return original.replace('data-default-report="reports/default.json"',
+    html = original.replace('data-default-report="reports/default.json"',
                             f'data-default-report="./{PAGE_NAME}"', 1).replace(
                                 "shared/loki/v1/", RUNTIME_PREFIX)
+    html = html.replace('data-theme="light"', 'data-theme="dark"', 1)
+    return html.replace('<meta name="theme-color" content="#FAF5EB">',
+                        '<meta name="theme-color" content="#141D2B">\n'
+                        f'<script id="loki-public-theme">{_THEME_BOOT}</script>', 1)
+
+def saved_report_source_html(html_text: str) -> str:
+    """Read the original presentation input without changing its saved identity."""
+    start = html_text.find(_SAVED_SOURCE_START)
+    if start == -1:
+        return html_text
+    end = html_text.rfind(_SAVED_SOURCE_END)
+    if end < start:
+        raise ValueError("loki_saved_report_source_incomplete")
+    return html_text[start + len(_SAVED_SOURCE_START):end]
+
+def _data_url(raw: bytes, mime: str) -> str:
+    return "data:" + mime + ";base64," + base64.b64encode(raw).decode("ascii")
+
+@lru_cache(maxsize=1)
+def _saved_report_entry() -> str:
+    """Use the supplied viewer assets in a document that can be opened from disk."""
+    def replace_link(match: re.Match) -> str:
+        tag, name = match[0], match["name"]
+        if name.endswith(".woff2"):
+            return ""
+        if name.endswith(".css"):
+            css = runtime_asset(name).decode("utf-8")
+            if "'assets/PretendardVariable.woff2'" in css:
+                font = _data_url(runtime_asset("assets/PretendardVariable.woff2"), "font/woff2")
+                css = css.replace("'assets/PretendardVariable.woff2'", "'" + font + "'")
+            return "<style>" + css + "</style>"
+        return tag
+
+    entry = re.sub(
+        rf'<link\b[^>]*href="(?P<url>{re.escape(RUNTIME_PREFIX)}(?P<name>[^"?]+)(?:\?[^"]*)?)"[^>]*>',
+        replace_link, entry_html(),
+    )
+    entry = re.sub(
+        rf'{re.escape(RUNTIME_PREFIX)}(assets/[^"\s]+\.svg)',
+        lambda match: _data_url(runtime_asset(match[1]), "image/svg+xml"),
+        entry,
+    )
+
+    def replace_script(match: re.Match) -> str:
+        name = match["name"]
+        body = _SAVED_REPORT_BOOT if name == "bootstrap.js" else runtime_asset(name).decode("utf-8")
+        return "<script>" + re.sub(r"</script", r"<\\/script", body, flags=re.IGNORECASE) + "</script>"
+
+    return re.sub(
+        rf'<script\s+src="{re.escape(RUNTIME_PREFIX)}(?P<name>[^"?]+)\?[^"]+"\s+defer></script>',
+        replace_script, entry,
+    )
+
+def saved_report_html(source_html: str, viewer: dict, record: dict) -> str:
+    """Write the latest reader with inline data and an inert source for existing readers."""
+    source = saved_report_source_html(source_html)
+    prepared = prepare_report(source, viewer, record)
+    if prepared is None:
+        return source_html
+    packet, images = prepared
+    mime = {extension: kind for kind, (extension, _) in _RASTER.items()}
+    rendered = packet["renderedOriginal"]
+    for attributes in [
+        *(scene["image"]["imageAttributes"] for scene in rendered["highlights"] if scene.get("image")),
+        *(clip["imageAttributes"] for clip in rendered["clips"]),
+    ]:
+        path = attributes.get("src")
+        if path in images:
+            attributes["src"] = _data_url(images[path], mime[Path(path).suffix[1:]])
+    data = json.dumps(packet, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    content = (
+        '<script id="lokiSavedPageData" type="application/json">'
+        + data.replace("<", "\\u003c") + "</script>\n"
+        + _SAVED_SOURCE_START + source + _SAVED_SOURCE_END + "\n"
+    )
+    title = escape(packet["metadata"]["title"] or "Loki")
+    entry = re.sub(r"<title>[^<]*</title>", lambda _: f"<title>{title}</title>", _saved_report_entry(), count=1)
+    head, closing_body, tail = entry.rpartition("</body>")
+    return head + content + closing_body + tail
 
 def supports_report(viewer: dict) -> bool:
     """Historical reports lacking the common reader contract retain their reader."""
@@ -142,7 +288,7 @@ def prepare_report(html_text: str, viewer: dict, record: dict) -> tuple[dict, di
     duration = viewer["duration_sec"]
     if str(viewer.get("video_no") or "") != str(record["video_no"]):
         raise ValueError("loki_report_identity_mismatch")
-    root = _PublicHTML(html_text).root
+    root = _PublicHTML(saved_report_source_html(html_text)).root
     by_id = {node.attrs["id"]: node for node in root.nodes() if node.attrs.get("id")}
     overview = root.first(cls="broadcast-summary")
     paragraphs = [node.text() for node in overview.nodes(tag="p")] if overview else []

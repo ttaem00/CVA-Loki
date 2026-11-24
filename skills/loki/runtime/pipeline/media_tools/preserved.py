@@ -8,6 +8,12 @@ from pathlib import Path
 
 from copy import deepcopy
 
+import math
+
+import re
+
+import subprocess
+
 from .contracts import MediaToolError, ToolRequest
 
 from ..evidence_world.contracts import digest, native_path
@@ -89,21 +95,58 @@ def extract_preserved_frames(request: ToolRequest, *, media: dict, output_root: 
                 **(dict(effective_media=effective) if effective else {}),
                 audio_listened=False)
 
+def _extract_display_frame(path, folder, ffmpeg, *, start, duration, offset, position, height, collected):
+    """Decode the first real frame at the existing mark, keeping it in the cut."""
+    if collected:
+        args = []
+        base = 0.0
+        normalize = "setpts=PTS-STARTPTS,"
+    else:
+
+        base = math.floor(offset * 1_000_000) / 1_000_000
+        args = ["-ss", f"{base:.6f}"]
+        normalize = ""
+    target = offset - base + position - start
+    end = min(offset - base + duration, target + 0.125)
+    output = folder / "display.jpg"
+    filters = (f"{normalize}select='gte(t,{target:.9f})*lt(t,{end:.9f})',showinfo,"
+               f"scale=-2:min(ih\\,{height})")
+    command = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "info", "-y", "-noautorotate",
+               *args, "-t", f"{end + 0.05:.6f}", "-i", str(path),
+               "-map", "0:v:0", "-vf", filters, "-frames:v", "1", "-q:v", "3",
+               "-threads:v", "1", str(output)]
+    try:
+        completed = subprocess.run(command, capture_output=True, timeout=20, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise MediaToolError("display_frame_unavailable", "the exact saved frame could not be read") from exc
+    stamp = re.search(rb"\bn:\s*0\s+pts:\s*-?\d+\s+pts_time:([0-9.eE+-]+).*?\bs:\d+x(\d+)\b", completed.stderr)
+    if completed.returncode != 0 or not stamp or not output.is_file():
+        raise MediaToolError("display_frame_unavailable", "no decoded frame was proven at the saved mark")
+    observed, source_height = float(stamp[1]), int(stamp[2])
+    if not target - 1e-6 <= observed < end or source_height < height:
+        raise MediaToolError("display_frame_unavailable", "no native-resolution frame was proven in the cut")
+    return output, position + observed - target, source_height
+
 def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path,
-                                   output_height: int | None = None):
+                                   output_height: int | None = None, display_positions=None):
     """Decode one owned local source batch, verifying unique bytes before/after."""
     if output_height is not None and (type(output_height) is not int or output_height < 2):
         raise MediaToolError("invalid_request", "output height must be an integer of at least two pixels")
     requests = tuple(requests)
     if not requests:
         return []
+    positions = (None,) * len(requests) if display_positions is None else tuple(display_positions)
+    if len(positions) != len(requests) or display_positions is not None and output_height is None:
+        raise MediaToolError("invalid_request", "display positions must match the saved frame requests")
     media = deepcopy(media)
     start, end = float(media["start"]), float(media["end"])
-    for request in requests:
+    for request, position in zip(requests, positions):
         if request.action != "frames" or request.duration_sec is None:
             raise MediaToolError("invalid_request", "preserved inspection accepts frames only")
         if not start <= request.start_sec < request.start_sec + request.duration_sec <= end:
             raise MediaToolError("window_out_of_range", "preserved media does not cover the request")
+        if position is not None and not request.start_sec <= position < request.start_sec + request.duration_sec:
+            raise MediaToolError("window_out_of_range", "the requested display frame is outside its cut")
 
 
 
@@ -126,9 +169,13 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path,
     root = output_root.resolve()
     from ..collected_vod_media import assert_collected_media_fresh
     plans = {}
-    for request in requests:
-        key = digest(request.canonical_payload() if output_height is None else
-                     [request.canonical_payload(), output_height])
+    keys = []
+    for request, position in zip(requests, positions):
+        identity = request.canonical_payload() if output_height is None else [request.canonical_payload(), output_height]
+        if position is not None:
+            identity.append(position)
+        key = digest(identity)
+        keys.append(key)
         if key in plans:
             continue
         folder = root / key
@@ -140,11 +187,11 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path,
             path, selected_sha = bind_source(selected)
             effective = dict(path=str(path), sha256=selected_sha,
                 source_playlist=dict(path=str(source_path), sha256=media["sha"]))
-        plans[key] = (request, folder, path, offset, effective)
+        plans[key] = (request, folder, path, offset, effective, position)
 
     receipts = {}
     try:
-        for key, (request, folder, path, offset, effective) in plans.items():
+        for key, (request, folder, path, offset, effective, position) in plans.items():
             observed = _probe_duration(path, ffprobe)
             if offset + request.duration_sec > observed + 0.05:
                 raise MediaToolError("media_truncated", "requested window exceeds the saved media")
@@ -152,19 +199,32 @@ def extract_preserved_frames_batch(requests, *, media: dict, output_root: Path,
                          else output_height, int(media["saved_height"]))
             if height < 2:
                 raise MediaToolError("invalid_request", "source height is missing")
-            paths, times = _extract_frames(path, folder, ffmpeg, request.duration_sec,
-                request.start_sec, height, local_start_sec=offset, decode_from_start=effective is not None)
+            display_proof = {}
+            if position is None:
+                paths, times = _extract_frames(path, folder, ffmpeg, request.duration_sec,
+                    request.start_sec, height, local_start_sec=offset, decode_from_start=effective is not None)
+                time_binding = "requested decode positions in preserved window; not precision matching"
+            else:
+                try:
+                    frame, observed_sec, source_height = _extract_display_frame(path, folder, ffmpeg,
+                        start=request.start_sec, duration=request.duration_sec, offset=offset, position=position,
+                        height=output_height, collected=effective is not None)
+                except MediaToolError as exc:
+                    receipts[key] = dict(display_frame_error=exc.code)
+                    continue
+                paths, times = [frame], [position]
+                time_binding = "verified saved-source frame at the requested display position, within the cut"
+                display_proof = dict(display_source_height=source_height, decoded_source_sec=observed_sec)
             if effective:
                 assert_collected_media_fresh(path)
             receipts[key] = dict(schema_version="media.preserved-frames.v1",
                 request=request.canonical_payload(), media_sha256=media["sha"],
                 frame_timestamps_sec=times, artifacts=_artifact_rows(paths, folder, ["frame"] * len(paths)),
                 source_height=media["saved_height"], output_frame_height=height,
-                time_binding="requested decode positions in preserved window; not precision matching",
+                time_binding=time_binding, **display_proof,
                 **(dict(effective_media=effective) if effective else {}), audio_listened=False)
     finally:
         for locator, expected in sources.values():
             if _sha256(locator) != expected:
                 raise MediaToolError("source_revision_changed", "preserved source changed during batch decode")
-    return [deepcopy(receipts[digest(request.canonical_payload() if output_height is None else
-                                    [request.canonical_payload(), output_height])]) for request in requests]
+    return [deepcopy(receipts[key]) for key in keys]
