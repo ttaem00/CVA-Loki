@@ -44,6 +44,21 @@ def _version_contract(root, manifest, plugin):
     source = json.loads((runtime / "source-manifest.json").read_text(encoding="utf-8"))
     if any(value != version for value in (manifest.get("version"), plugin.get("version"), source.get("version"))):
         raise ValueError("release_version_contract_changed")
+    for manifest_name in (".claude-plugin/plugin.json", "gemini-extension.json", "plugin.json"):
+        manifest_path = root / manifest_name
+        if manifest_path.is_file():
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if payload.get("version") != version:
+                raise ValueError("release_version_contract_changed")
+    claude_marketplace = root / ".claude-plugin/marketplace.json"
+    if claude_marketplace.is_file():
+        marketplace = json.loads(claude_marketplace.read_text(encoding="utf-8"))
+        meta_version = (marketplace.get("metadata") or {}).get("version")
+        if meta_version is not None and meta_version != version:
+            raise ValueError("release_version_contract_changed")
+        for entry in marketplace.get("plugins", ()):
+            if isinstance(entry, dict) and entry.get("version") != version:
+                raise ValueError("release_version_contract_changed")
     declarations = {
         "README.md": [f'alt="CVA-Loki {version}', f'alt="버전 {version}"', f'<h1 align="center">CVA-Loki {version}</h1>',
             f"정식 요약 메커니즘 Loki {version}", f"| 기능 | 요약 메커니즘 {version} 동작 |",
@@ -150,7 +165,7 @@ def validate(root):
                      "runtime/device_setup.py", "runtime/multimodal_setup.py", "runtime/multimodal_worker.py",
                      "runtime/media_selftest.py", "runtime/review.py", "runtime/review_store.py",
                      "runtime/public_ui.py", "runtime/report_ui.py", "runtime/speech_setup.py", "runtime/transcribe_source.py", "runtime/source_acquire.py",
-                     "runtime/exporters.py", "runtime/local_llm_author.py",
+                     "runtime/exporters.py", "runtime/local_llm_author.py", "runtime/short_video_check.py",
                      "runtime/publish/builder/loki_template.py", "runtime/publish/builder/loki_runtime.py",
                      "runtime/publish/builder/report_sanitizers.py",
                      "runtime/scripts/admin/static/report_workspace_state.js", "runtime/scripts/admin/static/report_workspace_history.js",

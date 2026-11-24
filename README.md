@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.9 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 도구" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.9.1 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 LLM 플러그인·스킬" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.9</h1>
-<p align="center">정식 요약 메커니즘 Loki 3.0.9</p>
-<p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 도구</strong></p>
+<h1 align="center">CVA-Loki 3.0.9.1</h1>
+<p align="center">정식 요약 메커니즘 Loki 3.0.9.1</p>
+<p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 멀티 LLM 플러그인·스킬</strong></p>
 
 <p align="center">
   <a href="https://ttaem.com"><img src="docs/assets/cva-logo.svg" width="320" alt="TTaem CVA 원본 로고" /></a><br />
@@ -12,9 +12,10 @@
 </p>
 
 <p align="center">
-  <a href=".codex-plugin/plugin.json"><img alt="버전 3.0.9" src="https://img.shields.io/badge/버전-3.0.9-8B5CF6?style=flat-square" /></a>
+  <a href="plugin.json"><img alt="버전 3.0.9.1" src="https://img.shields.io/badge/버전-3.0.9.1-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
-  <a href="#codex-integration"><img alt="코덱스 플러그인과 스킬" src="https://img.shields.io/badge/코덱스-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
+  <a href="#multi-llm-workflows"><img alt="멀티 LLM 지원" src="https://img.shields.io/badge/멀티%20LLM-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
+  <a href="#execution-modes"><img alt="실행 모드 LITE NORMAL FULL" src="https://img.shields.io/badge/실행%20모드-LITE%20·%20NORMAL%20·%20FULL-0891B2?style=flat-square" /></a>
   <a href="#docker-install"><img alt="도커 한 명령 설치" src="https://img.shields.io/badge/도커-한%20명령%20설치-2496ED?style=flat-square" /></a>
   <a href="#images"><img alt="하이라이트 이미지 추출 지원" src="https://img.shields.io/badge/하이라이트-이미지%20추출%20지원-8B5CF6?style=flat-square" /></a>
   <a href="LICENSE"><img alt="이용허락: 소스 공개형 1.1" src="https://img.shields.io/badge/이용허락-소스%20공개형%201.1-64748B?style=flat-square" /></a>
@@ -22,7 +23,9 @@
 
 <p align="center">
   <a href="#quickstart"><strong>바로 설치</strong></a> ·
-  <a href="#codex-integration">플러그인·스킬</a> ·
+  <a href="#execution-modes">3단계 모드</a> ·
+  <a href="#multi-llm-workflows">멀티 AI 사용법</a> ·
+  <a href="#codex-integration">플러그인·스킬·확장</a> ·
   <a href="#verification">설치 확인·업데이트</a> ·
   <a href="#policy">정책 확인</a>
 </p>
@@ -45,42 +48,27 @@
 
 YouTube·SOOP 로고도 공식 원본의 형태·색상·비율을 유지합니다. 로고의 권리와 사용 조건은 각 권리자에게 있으며, [원본 출처와 제3자 고지](THIRD_PARTY_NOTICES.md#플랫폼-로고)를 확인하세요.
 
-정식 배포본에서는 공개 치지직 VOD 번호, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·편집**으로 이어집니다. 현재 대화의 Codex 또는 명시적으로 선택한 ChatGPT가 내용을 판단하고, Loki는 원자료 준비·근거 검사·보고서 저장을 맡습니다.
+정식 배포본에서는 공개 치지직 VOD 번호, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL 또는 기존 자막·영상으로 시작해 **요약 → D1/D2 타임라인 → Point·Story·Highlight → 검토·내보내기**로 이어집니다. **Codex뿐 아니라 Claude Code, Antigravity, Gemini CLI, ChatGPT 자체 Linux, Web AI(ChatGPT·Claude·Gemini), 로컬 LLM(Ollama/vLLM/LM Studio)** 중 선택한 AI 호스트가 내용을 판단하고, Loki는 원자료 준비·근거 검사·최신 HTML 결과 저장을 맡습니다.
 
-### ChatGPT 자체 Linux에서 사용
-
-ChatGPT 호환성(`current_chatgpt`)은 이 배포본에 포함되어 있습니다. 실제 셸·패키지 설치·영상 CDN 접근·메모리와 디스크가 있는 환경인지 먼저 확인합니다. GitHub 연결만 있는 일반 채팅에 실행 도구를 추가하는 기능은 아닙니다.
-
-```sh
-python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode current_chatgpt
-# 이후 설치 결과의 실제 Python/runtime 경로를 사용한다.
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <VOD번호-또는-단일-다시보기URL>
-<workspace-python> <runtime>/loki.py --config <workspace>/loki.json prepare --spec <반환된-prepare_spec_path>
-```
-
-설치 기본값은 전체 multimodal 도구와 로컬 전사 자산을 준비합니다. 텍스트 자료만 제공받은 작은 실험은 `--features core`를 선택할 수 있으며, core 설치가 영상 다운로드·전사 준비까지 증명하지는 않습니다. ChatGPT 모드는 로컬 세션 UUID를 기존 준비 템플릿에 한 번 기록합니다. Codex 설치·로그인·thread/turn ID가 필요하지 않고, 실제 모델이 노출되지 않으면 `unknown`으로 유지합니다. 이는 플랫폼 계정 인증이 아니라 로컬 작업 출처입니다.
-
-이후 현재 ChatGPT가 `author-input.json`의 계약을 읽고 기존 `read`·`remember`·`memory`·`submit`으로 직접 작성합니다. 다른 CLI/API 작성자는 호출하지 않습니다. [실험 계획](docs/chatgpt-linux-experiment-plan.md)과 [복사 입력문](docs/chatgpt-linux-experiment-prompt.md)을 따르세요.
-
-| 원문에서 시작 | 장면을 근거로 선택 | 기존 UI로 마무리 |
+| 원문에서 시작 | AI 환경에 맞춘 모드·탐색 | standalone HTML & 편집기 |
 | :--- | :--- | :--- |
-| 공개 VOD 준비와 로컬 Whisper 전사 | 실제 프레임 추출과 EmbeddingGemma 2 탐색 | 보고서 읽기·편집·미리보기 |
-| 출처·시계·읽기 기록을 보존 | **현재 Codex가 반환 이미지를 직접 확인** | 명시적 저장·재열기·이력 복원 |
+| 공개 VOD 준비와 로컬 Whisper 전사 | 3단계 모드(`LITE`·`NORMAL`·`FULL`) 지원 | 생성 `.html` 단독 최신 뷰어 즉시 열람 |
+| 출처·시계·읽기 기록과 클립/댓글 보존 | **선택한 AI 호스트가 직접 원문·이미지 확인** | 타임라인 댓글·NLE 마커·웹 AI 팩 내보내기 |
 
 > [!TIP]
-> **설치는 한 명령, 작성은 현재 Codex와 함께.** 기본 설치는 전체 기능과 GPU 자동 선택을 사용합니다. 플러그인과 스킬은 같은 런타임을 사용하며, 다른 모델에 보고서 작성을 넘기지 않습니다.
+> **특정 AI나 고정 모델에 묶이지 않습니다.** 작업공간을 한 번 설치하면 Codex, Claude Code, Antigravity, Gemini CLI, ChatGPT/Web AI, 로컬 LLM 중 원하는 환경에서 같은 `SKILL.md`와 오프라인 검사 규약을 공유하며, 각 호스트가 제공하는 최신 상위 추론·멀티모달 모델을 자유롭게 활용할 수 있습니다.
 
 <details>
-<summary><strong>목차 펼치기 — 설치·사용·설정·문제 해결</strong></summary>
+<summary><strong>목차 펼치기 — 설치·멀티 AI 사용·모드·설정·문제 해결</strong></summary>
 
-| 시작·설치 | 작성·편집 | 설정·운영 |
+| 시작·설치 | 멀티 AI · 작성 · 모드 | 설정·운영 |
 | :--- | :--- | :--- |
-| [빠른 시작](#quickstart) | [공개 VOD 준비](#source-preparation) | [설정](#configuration) |
-| [주요 기능](#features) | [현재 Codex가 직접 작성](#authoring) | [설치 확인](#verification) |
-| [구조와 네트워크](#architecture) | [이미지·멀티모달](#images) | [작업공간과 결과](#outputs) |
-| [준비 사항과 GPU](#requirements) | [검토·편집 UI](#review-ui) | [문제 해결](#troubleshooting) |
-| [로컬 설치](#native-install) | [플러그인·스킬](#codex-integration) | [정책·개인정보·비용](#policy) |
-| [Docker 설치](#docker-install) | [FAQ](#faq) | [라이선스·공식 자료](#references) |
+| [빠른 시작](#quickstart) | [3단계 실행 모드 (LITE·NORMAL·FULL)](#execution-modes) | [설정](#configuration) |
+| [주요 기능](#features) | [지원 AI 환경·모델 권장 기준](#multi-llm-workflows) | [설치 확인·업데이트](#verification) |
+| [작동 구조와 네트워크](#architecture) | [공개 VOD 준비](#source-preparation) | [작업공간과 결과](#outputs) |
+| [준비 사항과 GPU](#requirements) | [작성자 AI의 직접 작성](#authoring) | [문제 해결](#troubleshooting) |
+| [로컬 설치](#native-install) | [이미지·멀티모달](#images) | [정책·개인정보·비용](#policy) |
+| [Docker 설치](#docker-install) | [플러그인·스킬·확장 · 검토 UI](#codex-integration) | [FAQ](#faq) |
 
 </details>
 
@@ -91,28 +79,28 @@ python3 install.py --workspace ../loki-chatgpt --mode skill --author-mode curren
 
 ### 1. 배포 폴더를 준비하세요
 
-[CVA-Loki-3.0.9.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9/CVA-Loki-3.0.9.zip) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+[CVA-Loki-3.0.9.1.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9.1/CVA-Loki-3.0.9.1.zip) ([SHA256SUMS](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9.1/SHA256SUMS.txt)) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
 
-이 배포본의 배포·플러그인·스킬·요약 메커니즘은 **3.0.9**이며, 새 작업의 `latest`도 **Loki 3.0.9**을 선택합니다. 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
+이 배포본의 배포·플러그인·스킬·요약 메커니즘은 **3.0.9.1**이며, 새 작업의 `latest`도 **Loki 3.0.9.1**을 선택합니다. (`3.0.9`의 작성 프롬프트와 근거 세계 메커니즘을 그대로 유지한 다크모드·4대 CLI·멀티 LLM 보완판입니다.) 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
 
-### 3.0.9 다중 LLM·3단계 모드·크리에이터 내보내기
+### 2. 사용 환경에 맞게 설치하세요
 
-- **지원 작성자 호스트 (`--author-mode`)**: `current_codex`, `current_chatgpt`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm` (`@google/gemini-cli` 확장 `gemini-extension.json` 및 Ollama/vLLM 3-Pass `local_llm_author.py` 포함).
-- **3단계 실행 모드 (`--mode lite|normal|full`)**: `lite`(15분·Warm-Only 벡터 색인), `normal`(30분·전체 채팅·공개 클립·댓글), `full`(60분·전체 사전 수집·결정론적 5분 구간 힌트).
-- **웹 AI 및 편집자 내보내기**: `export-pack`/`import-draft`와 치지직·YouTube 타임라인 댓글(`comment`), Premiere/Resolve 마커(`markers-csv`), `fcpxml` 내보내기, 그리고 비차단 선택형 짧은 영상 검증(`gemini-api`)을 지원합니다.
+**범용 스킬 설치 (Codex · Claude Code · Antigravity · Gemini CLI · Web AI · 로컬 LLM 공통)**
 
-### 2. 설치할 곳을 선택하세요
+```sh
+python install.py --workspace ../loki-workspace --mode skill --author-mode <작성자-호스트>
+```
 
-**호스트 Codex에 플러그인으로 설치**
+`<작성자-호스트>`에는 사용하는 환경에 맞춰 아래 8가지 중 하나를 지정합니다 (`--author-mode` 생략 시 기본값 `current_codex`).
+
+- 에이전트/CLI: `current_codex`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`
+- 웹 AI 브리지: `current_gemini_web`, `current_claude_web` (`ChatGPT Web`은 `current_chatgpt` 또는 웹 팩 사용)
+- 로컬 오픈웨이트 LLM: `current_local_llm`
+
+**Codex 네이티브 플러그인으로 설치**
 
 ```sh
 python install.py --workspace ../loki-plugin-workspace --mode plugin
-```
-
-**특정 작업공간에 스킬로 설치** · 해당 폴더에서 `$loki`로 사용
-
-```sh
-python install.py --workspace ../loki-workspace --mode skill
 ```
 
 **Docker에 설치** · 호스트와 분리된 환경에서 사용
@@ -123,48 +111,136 @@ docker compose run --build --rm loki
 
 | 직접 준비할 것 | 설치기가 자동 준비할 것 |
 | :--- | :--- |
-| 로컬: Python 3.11+와 venv/ensurepip | 전용 환경, Node/npm, FFmpeg, Python 라이브러리 |
-| Docker: 실행 중인 Docker와 Compose 2.30+ | 컨테이너 Python, 선택 모드의 Codex CLI·플러그인/스킬 |
+| 로컬: Python 3.11+와 venv/ensurepip | 전용 `.venv`, Node/npm, FFmpeg, Python 라이브러리 |
+| Docker: 실행 중인 Docker와 Compose 2.30+ | 컨테이너 Python, 선택 모드의 스킬·플러그인 |
 | GPU: 지원 드라이버, Docker 사용 시 GPU 노출 | GPU 감지·장치별 PyTorch·실제 실행 확인 |
 | 최초 다운로드를 위한 인터넷·저장공간 | EmbeddingGemma 2·Whisper·Silero VAD·F2 자산 |
 
 **기본값: 전체 기능(`multimodal`) · GPU 자동 선택(`auto`)**. 감지된 GPU의 실행 실패를 CPU 성공으로 숨기지 않습니다. GPU가 없는 Docker 호스트는 [CPU override](#docker-install)를 사용하세요. 호스트 드라이버는 설치기가 변경하지 않습니다.
 
-### 3. 설치 결과를 확인하고 현재 Codex에서 시작하세요
+### 3. 설치 결과를 확인하고 사용 중인 AI에서 시작하세요
 
-작업공간의 `installation-result.json`에서 전체 결과와 실제 실행 장치를 확인합니다. 설치한 작업공간을 Codex에서 열고, 새 채팅에서 `$loki`와 VOD URL 또는 기존 자료를 전달하세요.
+작업공간의 `installation-result.json`에서 실제 Python(`python`)과 런타임(`installed_runtime`) 경로, 실행 장치를 확인합니다. 이후 사용 중인 AI 도구(Codex, Claude Code, Antigravity, Gemini CLI 등)에서 작업공간 폴더를 열고 아래 복사용 지시문이나 `skills/loki/SKILL.md`를 전달하세요.
 
 > [!IMPORTANT]
-> **설치 위치를 확인하세요.** Docker 명령은 컨테이너에 설치합니다. 호스트의 Codex Desktop에서 바로 쓸 때는 위의 플러그인 또는 스킬 설치를 선택하세요. 플러그인 설치는 동봉 설치기를 사용하며, 공개 스토어 자동 등재를 뜻하지 않습니다.
+> **설치 위치를 확인하세요.** Docker 명령은 컨테이너에 설치합니다. 호스트의 Codex CLI · Antigravity · Claude Code · Gemini CLI에서 바로 쓸 때는 번들 루트 매니페스트(`.codex-plugin/plugin.json`, `plugin.json`, `.claude-plugin/`, `gemini-extension.json`) 등록 또는 로컬 `install.py --mode skill --author-mode <호스트>` 설치를 선택하세요. 공개 스토어 자동 등재를 뜻하지 않습니다.
+
+<a id="execution-modes"></a>
+## 3단계 실행 모드 (`LITE` · `NORMAL` · `FULL`)와 시간 기준
+
+긴 다시보기(예: 6~10시간 이상)를 목적과 예산에 맞게 처리할 수 있도록 3가지 실행 모드를 제공합니다.
+
+> **시간 표기 원칙:** 전체 소요 시간은 **원자료 준비 시간**(VOD 다운로드 + 최초 로컬 Whisper/F2 전사; 이미 SRT 자막이 있으면 생략 가능)과 **작성 목표 시간**(`15분` / `30분` / `60분`)으로 구분됩니다.
+
+| 구분 | `LITE` (15분 목표 · 빠른 핵심 정리) | `NORMAL` (30분 목표 · 기본 권장) | `FULL` (60분 목표 · 심층·편집자용) |
+| :--- | :--- | :--- | :--- |
+| **추천 용도** | 빠른 방송 요약, 토큰·시간 절약 탐색 | 시청자 요약 + 타임라인 + 대표 장면 표준 품질 | 장편 방송 정밀 분석, 편집자용 다수 구간·근거 정리 |
+| **임베딩 벡터 색인** | **Warm-Only**: 기존 캐시 재사용 중심으로 생략해 속도 우선 | 로컬 EmbeddingGemma 2 텍스트/멀티모달 색인 | 전체 사전 색인 + **결정론적 5분 구간 힌트(`local_chunk_hints`)** 생성 |
+| **채팅 수집** | 최대 500페이지 / 90초 빠른 스캔 (`lite`) | 전체 공개 채팅 수집 (`normal` 기본 예산) | 전체 공개 채팅 수집 (`full`) |
+| **선택형 짧은 영상 보조 확인 (`gemini-api`)** | 최대 `2회` | 최대 `5회` | 최대 `10회` |
+| **핵심 품질 원칙** | 피크·티키타카·흐름 전환·반례 근거 추적 유지 | 같음 | 같음 |
+
+`source_acquire.py --mode lite|normal|full`로 원자료를 준비하거나 `prepare` spec의 `execution_mode`에 지정할 수 있습니다.
+
+<a id="multi-llm-workflows"></a>
+## 지원 AI 환경·권장 모델 기준·실행 예시
+
+### 1. AI 호스트별 권장 실행 경로
+
+| 환경 (`--author-mode`) | 설치 및 준비 | 실제 작성·제출 방식 |
+| :--- | :--- | :--- |
+| **Codex** (`current_codex`) | `--mode plugin` 또는 `--mode skill` | 새 채팅에서 `$loki`와 VOD URL/자료 전달 → 직접 `prepare`/`read`/`submit` |
+| **Claude Code** (`current_claude`) | `--mode skill --author-mode current_claude` | 작업공간에서 `.agents/skills/loki/SKILL.md` 읽고 CLI 도구로 직접 작성·제출 |
+| **Antigravity** (`current_antigravity`) | `--mode skill --author-mode current_antigravity` | 작업공간에서 `SKILL.md` 참조해 원문/프레임 직접 읽고 작성·제출 |
+| **Gemini CLI** (`current_gemini_cli`) | `--mode skill --author-mode current_gemini_cli` (`gemini-extension.json`·`policies/loki-author.toml` 동봉) | 확장/스킬 로드 후 작업공간 오프라인 규칙 아래 직접 작성·제출 |
+| **ChatGPT 자체 Linux** (`current_chatgpt`) | `--mode skill --author-mode current_chatgpt` | 코드 인터프리터/리눅스 셸에서 `source_acquire.py` → `loki.py` 직접 실행 ([상세 계획](docs/chatgpt-linux-experiment-plan.md)) |
+| **Web AI** (`current_gemini_web` / `current_claude_web` / `current_chatgpt`) | 로컬에서 `source_acquire.py` + `loki.py prepare` 후 **`loki.py export-pack`** | 생성된 `.zip`을 웹 채팅에 올려 JSON 초안 생성 → 로컬 **`loki.py import-draft`**로 검증·제출 |
+| **로컬 LLM** (`current_local_llm`) | `--mode skill --author-mode current_local_llm` + Ollama / vLLM / LM Studio | **`local_llm_author.py`** 3-Pass 오프라인 파이프라인으로 자동 읽기·구조화 작성·검증·제출 |
+
+### 2. 모델 권장 기준 (가변형 최신 티어 안내 · 상세 가이드)
+
+CVA-Loki 3.0.9.1은 특정 모델 버전을 코드나 매니페스트에 고정하지 않고 **역할별 권장 능력 티어**로 안내합니다. 각 호스트에서 **현재 제공되는 최신 상위 추론 모델**을 선택하세요. (세부 가이드는 [모델 권장 기준](docs/llm-guides/MODEL_RECOMMENDATIONS.md) · [웹 AI 팩 가이드](docs/llm-guides/WEB_PACK_WORKFLOW.md) · [로컬 LLM 가이드](docs/llm-guides/LOCAL_LLM_GUIDE.md) · [Gemini CLI 설정](docs/llm-guides/GEMINI_CLI_SETUP.md)을 참고하세요.)
+
+- **에이전트 / CLI (`Codex`, `Claude Code`, `Antigravity`, `Gemini CLI`)**:
+  - 최종 D1/D2 구조화·인과/반례 검토·Highlight 선정: 각 호스트의 **최신 상위 추론/플래그십 모델**(장문맥·도구 호출·이미지 직접 판독 지원) 권장.
+  - 반복 원문 탐색·메모 정리 보조(서브에이전트 활용 시): 비용·속도가 빠른 경량/중형 티어 또는 `inherit` 사용. 항상 이 VOD 전담 새 대화에서 시작해 맥락 오염을 방지하세요.
+- **Web AI (`ChatGPT Web`, `Claude Web`, `Gemini Web`)**:
+  - `export-pack`이 만든 `web-pack.zip` 및 `web-pack_files/`(최대 8개 파일, 초대형 자막 최대 5파트 자동 분할)를 읽고 JSON 스키마를 정확히 따를 수 있는 **장문맥·파일 분석 지원 상위 추론 모드**를 권장합니다. `import-draft`는 미열람 인용 근거(`e<N>`)를 오프라인에서 보완한 뒤 제출합니다.
+- **로컬 LLM (`Ollama`, `vLLM`, `LM Studio`)**:
+  - 최소 **32K 이상 컨텍스트 창**(`Ollama /api/chat` `num_ctx=32768` 자동 전달)과 **엄격한 JSON Schema (`response_format`) 출력**을 안정 지원하는 최신 오픈웨이트 인스트럭트/추론 모델을 권장합니다. `--model auto`(기본값)로 단일 채팅 모델을 자동 선택합니다.
+- **선택형 짧은 영상 보조 확인 (`gemini-api`)**:
+  - 텍스트·정지 프레임만으로 움직임이나 음향 단서를 판단하기 어려운 `<=60`초 구간만 `short_video_check.py`(`editorial_short_video_check`, 기본 모델 `None`/비차단, `<=14 MiB`)가 보조 확인을 지원합니다.
 
 <details>
-<summary><strong>복사해서 지시하기 — 현재 Codex에게 설치부터 보고서 작성까지 한 번에 요청</strong></summary>
+<summary><strong>복사해서 지시하기 — 어떤 CLI AI(Codex·Claude·Antigravity·Gemini CLI)에서도 쓰는 설치·작성 요청문</strong></summary>
 
-### 현재 Codex에게 한 번 지시하기
+### 사용 중인 AI에게 한 번에 지시하기
 
-이 저장소를 다운로드하거나 clone한 뒤, 해당 폴더를 열어 둔 현재 Codex에 다음처럼 요청하세요.
+이 배포 폴더 경로와 작업공간을 열어 둔 AI 세션(Codex·Claude Code·Antigravity·Gemini CLI)에 다음처럼 요청하세요.
 
-> README와 Loki 스킬을 읽고, 이 컴퓨터에 맞는 기본 전체 기능을 설치해줘. 배포 폴더 밖의 새 작업공간을 사용하고 GPU 감지·실행 결과를 확인해줘. 설치가 끝나면 내가 준 VOD를 준비하고, 네가 Loki의 원문과 반환 이미지를 직접 읽어 새 보고서를 작성·제출해줘. 마지막으로 검토 UI를 열어줘. 외부 게시는 하지 마.
+> 이 폴더의 `README.md`와 `skills/loki/SKILL.md`를 읽고, 내 환경(`--author-mode`)에 맞는 기본 전체 기능을 배포 폴더 밖의 새 작업공간에 설치해줘. GPU 감지·실행 결과를 확인한 뒤, 내가 준 VOD를 준비하고 네가 Loki의 원문과 반환 이미지를 직접 읽어 새 3.0.9.1 보고서를 작성·제출해줘. 마지막으로 결과 HTML 또는 검토 UI를 열어줘. 외부 게시는 하지 마.
 
-실제 요청할 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD의 단일 URL을 함께 전달하세요. 기존 SRT로 시작하려면 URL 대신 해당 파일과 확인된 VOD 정보를 알려주면 됩니다.
+실제 요청할 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD의 단일 URL(또는 기존 SRT 경로와 확인된 VOD 정보)을 함께 전달하세요.
+
+</details>
+
+<details>
+<summary><strong>Web AI · 로컬 LLM · 타임라인 댓글/마커 내보내기 실행 예시</strong></summary>
+
+#### Web AI (`export-pack` → 웹 채팅 JSON 작성 → `import-draft`)
+
+```sh
+# 1) 로컬에서 원자료 준비 및 작업 생성
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod <VOD_URL> --mode normal
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json prepare --spec <prepare_spec_path>
+
+# 2) Web AI 업로드용 팩 내보내기 (web-pack.zip + web-pack_files/ <=8파일·자막 최대 5파트 분할 동시 생성)
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json export-pack --job-root <job-root> --expected-revision <revision> --output ../web-pack.zip
+
+# 3) (선택) 업로드 폴더의 verify_result.py로 로컬 사전 검사 후 import-draft 제출 (미열람 근거 자동 보완)
+python ../web-pack_files/verify_result.py ../web-reply.json ../web-pack_files/evidence_clusters.json
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json import-draft --job-root <job-root> --expected-revision <revision> --draft ../web-reply.json --validate-only
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json import-draft --job-root <job-root> --expected-revision <revision> --draft ../web-reply.json
+```
+
+> 참고: `import-draft`는 제출 전 누락된 인용 `e<N>` 근거를 로컬 `read_evidence`로 보완해 `full_read_sha256` 원문 열람 계약을 충족하며, 준비된 로컬 영상(`<=720p`)이 있으면 오프라인에서 하이라이트 이미지까지 연결합니다.
+
+#### 로컬 LLM 3-Pass 오프라인 실행 (`Ollama` / `vLLM` / `LM Studio`)
+
+```sh
+# 실행 계획만 사전 확인 (--dry-run)
+<workspace-python> <runtime>/local_llm_author.py --job-root <job-root> --expected-revision <revision> --endpoint http://127.0.0.1:11434/v1 --model auto --dry-run
+
+# 실제 3-Pass 작성 및 isolate() 오프라인 제출 (--config 생략 시 --job-root 상위 loki.json 자동 탐색)
+<workspace-python> <runtime>/local_llm_author.py --job-root <job-root> --expected-revision <revision> --endpoint http://127.0.0.1:11434/v1 --model auto
+```
+
+#### 크리에이터·편집자용 내보내기 (`comment` / `markers-csv` / `fcpxml`)
+
+```sh
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json export --report <report-dir-or-json> --format comment --output ./timeline-comment.txt
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json export --report <report-dir-or-json> --format markers-csv --output ./markers.csv
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json export --report <report-dir-or-json> --format fcpxml --output ./timeline.fcpxml
+```
 
 </details>
 
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 요약 메커니즘 3.0.9 동작 |
+| 기능 | 요약 메커니즘 3.0.9.1 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
+| 3단계 실행 모드 | `lite`(15분 목표·Warm-Only 색인·빠른 채팅 스캔), `normal`(30분 목표·표준), `full`(60분 목표·결정론적 5분 구간 힌트)을 선택합니다. |
 | 로컬 STT | 고정 Whisper large-v3-turbo와 Silero VAD로 전사하고 기존 자막 후처리·단어 정렬·익명 F2 전환 분리를 사용합니다. |
-| 원문 읽기와 메모 | 출처·시계·revision에 연결된 원문을 읽고 유용한 판단 메모를 보존합니다. |
-| 피크·채팅 신호 | 반응·채팅 밀도·클립 등의 시각과 근거를 따라 원문 위치를 찾습니다. 같은 발생의 여러 표시를 구분해 후보를 고릅니다. |
-| 검색·관련 군집 | 단어·문장 검색과 관련된 군집에서 member 원문으로 이동합니다. 필요한 원문이나 프레임을 조회할 때 기존 검증을 재사용합니다. |
-| Point 중요도 | 작성자가 판단한 중요도와 이유를 표시합니다. 중요도 색·라벨은 피크 강도, 선택 표시와 구분하고 저장·재열기에 보존합니다. |
-| 보고서 작성 | 현재 Codex가 요약·D1/D2·Point·Story·Highlight를 직접 작성합니다. |
-| 이미지 추출 | 같은 VOD의 로컬 영상에서 제한된 구간의 실제 프레임을 추출하고 선택 이미지를 보고서에 연결합니다. |
-| 멀티모달 탐색 | 로컬 EmbeddingGemma 2가 text/image/audio/video 근거 후보를 찾고 캐시합니다. |
-| 검토 UI | 기존 목록·영상 작업실·상세 편집 UI에서 확인·편집·미리보기·저장·재열기·이력 복원을 수행합니다. |
+| 원문 읽기와 메모 | 출처·시계·revision에 연결된 원문을 읽고 유용한 판단 메모를 보존하며, `status --include-read-summary`로 이미 읽은 구간을 조회합니다. |
+| 피크·채팅 신호 | 반응·채팅 밀도·클립·댓글 등의 시각과 근거를 따라 원문 위치를 찾고, 같은 발생의 여러 표시를 구분해 후보를 고릅니다. |
+| 검색·관련 군집 | 단어·문장 검색과 EmbeddingGemma 2 관련 군집에서 member 원문으로 이동하며, 필요한 조회 시 기존 검증을 재사용합니다. |
+| Point 중요도 & D2 흐름 | 중요도 색·라벨과 함께 D2 설명에 주요 답변·판단이 바뀐 이유·실제 결과를 남기고 발화 전환 경계에 맞춥니다. |
+| 멀티 LLM 보고서 작성 | 선택한 AI 호스트(Codex·Claude·Antigravity·Gemini CLI·ChatGPT·Web AI·로컬 LLM)가 요약·D1/D2·Point·Story·Highlight를 작성합니다. |
+| 이미지 추출 · 짧은 영상 보조 | 같은 VOD의 로컬 영상에서 제한된 구간의 실제 프레임을 추출하고, 필요 시 선택적 `gemini-api` 짧은 영상 보조 확인을 연결합니다. |
+| 최신 HTML 저장 & 검토 UI | 새 3.0.9.1 보고서를 단독으로 바로 열 수 있는 **다크모드 기본 적용** `.html`로 저장하고, 검토 UI에서 편집·미리보기·저장·이력 복원을 수행합니다. |
+| 웹 팩 · 편집자 내보내기 | `export-pack`/`import-draft`와 타임라인 댓글(`comment`), Premiere/Resolve 마커(`markers-csv`), `fcpxml` 내보내기를 제공합니다. |
 | 결과 보존 | 원자료·읽기 기록·응답·Markdown/HTML·메타데이터·수동 수정 이력을 작업공간에 보존합니다. |
 
 <details>
@@ -189,24 +265,24 @@ docker compose run --build --rm loki
 
 ```mermaid
 flowchart TD
-    URL["공개 치지직 VOD · YouTube Live 다시보기 · SOOP VOD"] --> ACQ["온라인 원자료 준비"]
+    URL["공개 치지직 VOD · YouTube Live 다시보기 · SOOP VOD"] --> ACQ["온라인 원자료 준비 (--mode lite|normal|full)"]
     LOCAL["기존 SRT와 같은 VOD 영상"] --> PREP["출처와 시계를 묶어 준비"]
-    ACQ --> AV["로컬 영상·메타데이터·채팅"]
+    ACQ --> AV["로컬 영상·메타데이터·채팅·클립·댓글"]
     AV --> STT["로컬 Whisper · Silero · 익명 F2"]
     STT --> PREP
-    PREP --> READ["원문 읽기 · 메모 · 이미지 추출"]
+    PREP --> READ["원문 읽기 · 메모 · 이미지 추출 · 선택적 영상 확인"]
     PREP --> SEARCH["로컬 EmbeddingGemma 2 탐색"]
     SEARCH --> READ
-    READ --> CODEX["현재 Codex가 직접 판단·작성"]
-    CODEX --> CHECK["응답·근거 검사와 정상 렌더"]
-    CHECK --> REPORT["Markdown · HTML · 메타데이터"]
-    REPORT --> UI["기존 검토 UI"]
+    READ --> AUTHOR["선택한 작성자 AI가 직접 판단·작성 (CLI · Web AI · 로컬 LLM)"]
+    AUTHOR --> CHECK["응답·근거 검사와 최신 HTML/마크다운 렌더"]
+    CHECK --> REPORT["Standalone HTML · Markdown · 메타데이터 · 내보내기"]
+    REPORT --> UI["단독 HTML 열람 · 검토 UI"]
     UI --> REV["미리보기 · 명시적 저장 · 이력 복원"]
     classDef source fill:#e6f8fb,stroke:#0891b2,color:#164e63
     classDef author fill:#f0eaff,stroke:#8b5cf6,color:#4c1d95
     classDef result fill:#e9f8ee,stroke:#16a34a,color:#14532d
     class URL,LOCAL,AV,STT,PREP source
-    class READ,SEARCH,CODEX author
+    class READ,SEARCH,AUTHOR author
     class CHECK,REPORT,UI,REV result
 ```
 
@@ -218,11 +294,11 @@ flowchart TD
 | 설치 | 공개 패키지와 고정 모델을 내려받습니다. 작업공간의 환경과 캐시에 보존합니다. |
 | 공개 VOD 준비 | 요청한 단일 VOD의 허용된 공개 API·미디어 연결을 사용합니다. 인증을 가져오지 않습니다. |
 | 로컬 STT·임베딩 | 작업공간의 고정 모델과 로컬 자료를 사용합니다. 원격 ASR나 원격 임베딩 API로 자료를 보내지 않습니다. |
-| 작성 도구 | `network=deny`, `author_mode=current_codex`로 고정합니다. 임의 셸·별도 작성자 실행을 허용하지 않습니다. |
-| 현재 Codex 대화 | 실제로 읽어 전달한 원문·이미지는 현재 Codex 서비스의 입력입니다. 해당 계정·조직 정책이 적용됩니다. |
+| 작성 도구 | `network=deny`와 선택한 단일 `author_mode`(8종 중 1개)로 고정합니다. 임의 셸·별도 작성자 우회를 허용하지 않습니다. |
+| 선택한 AI 호스트 대화 | 실제로 읽어 전달한 원문·이미지는 선택한 AI 서비스(또는 로컬 LLM 서버)의 입력입니다. 해당 서비스/호스트의 데이터 정책이 적용됩니다. |
 | 검토 UI | loopback의 로컬 서버에서 기존 보고서와 수정 이력을 다룹니다. 외부 게시를 실행하지 않습니다. |
 
-**오프라인 작성 도구라는 말이 Codex 서비스 자체까지 오프라인이라는 뜻은 아닙니다.** Loki의 로컬 모델은 전사와 탐색을 맡고, 현재 Codex가 의미 판단과 최종 작성을 맡습니다.
+**오프라인 작성 도구라는 말이 클라우드 AI 서비스 자체까지 오프라인이라는 뜻은 아닙니다.** Loki의 로컬 모델은 전사와 탐색을 맡고, 사용자가 선택한 작성자 AI(클라우드 CLI/Web AI 또는 로컬 LLM)가 의미 판단과 최종 작성을 맡습니다.
 
 </details>
 
@@ -268,13 +344,13 @@ AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지�
 <a id="native-install"></a>
 ## 로컬 설치
 
-3.0.9 배포 폴더를 준비해 설치합니다. 공개 배포 파일은 위 빠른 시작의 다운로드 링크에서 확인합니다.
+3.0.9.1 배포 폴더를 준비해 설치합니다. 공개 배포 파일은 위 빠른 시작의 다운로드 링크에서 확인합니다.
 
 ```sh
-python install.py --workspace ../loki-workspace --mode skill
+python install.py --workspace ../loki-workspace --mode skill --author-mode current_codex
 ```
 
-Windows에서는 실행 환경에 따라 `py -3`, macOS/Linux에서는 `python3`로 실행 이름을 바꿀 수 있습니다. 아래의 `<workspace-python>`, `<runtime>`, `<workspace>`는 설치 결과에서 확인한 실제 값으로 바꾸고, 공백이 있는 경로는 사용하는 셸에 맞게 인용하세요.
+사용 환경에 따라 `--author-mode`를 `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`, `current_gemini_web`, `current_claude_web`, `current_local_llm`으로 지정할 수 있습니다. Windows에서는 실행 환경에 따라 `py -3`, macOS/Linux에서는 `python3`로 실행 이름을 바꿀 수 있습니다. 아래의 `<workspace-python>`, `<runtime>`, `<workspace>`는 설치 결과에서 확인한 실제 값으로 바꾸고, 공백이 있는 경로는 사용하는 셸에 맞게 인용하세요.
 
 설치 도구가 수행하는 작업은 다음과 같습니다.
 
@@ -286,10 +362,10 @@ Windows에서는 실행 환경에 따라 `py -3`, macOS/Linux에서는 `python3`
 6. doctor, 합성 원문/보고서 검사, 해당 프로필의 미디어·임베딩 실행 검사를 수행합니다.
 7. `installation-result.json`과 시도별 로그를 보존합니다.
 
-시스템 Python 패키지를 설치 대상으로 사용하지 않으며 호스트 인증 파일을 가져오지 않습니다. `plugin` 모드는 선택된 Codex 환경에 marketplace·plugin 등록을 수행합니다. 일반 의존성·추가 CLI는 작업공간 안에 준비합니다.
+시스템 Python 패키지를 설치 대상으로 사용하지 않으며 호스트 인증 파일을 가져오지 않습니다. `plugin` 모드는 Codex 환경에 marketplace·plugin 등록을 수행하고, `skill` 모드는 작업공간의 `.agents/skills/loki`에 모든 AI 호스트가 공유할 수 있는 완전한 스킬을 설치합니다. 일반 의존성·추가 CLI는 작업공간 안에 준비합니다.
 
 <details>
-<summary><strong>설치 프로필·CPU·모델 경로 옵션 보기</strong></summary>
+<summary><strong>설치 프로필·작성자 호스트·CPU·모델 경로 옵션 보기</strong></summary>
 
 ### 설치 프로필과 옵션
 
@@ -298,14 +374,18 @@ Windows에서는 실행 환경에 따라 `py -3`, macOS/Linux에서는 `python3`
 | `--features multimodal` | 기본 전체 설치. 원문/보고서/UI, 이미지 추출, text/image/audio/video 검색, 공개 VOD 준비, Whisper/Silero/F2. |
 | `--features media` | 원문/보고서/UI와 로컬 이미지 추출. STT·임베딩 모델 다운로드는 포함하지 않습니다. |
 | `--features core` | 원문 읽기·메모·검사·보고서와 검토 UI. 미디어 처리·모델 준비는 포함하지 않습니다. |
+| `--author-mode <mode>` | `current_codex`(기본), `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`, `current_gemini_web`, `current_claude_web`, `current_local_llm`. |
 | `--device auto` | 기본 GPU 자동 선택. 전체 프로필에 적용합니다. |
 | `--device cpu` | GPU가 있어도 CPU를 명시적으로 선택합니다. |
 | `--model-source <directory>` | 고정 revision의 EmbeddingGemma 2 파일 13개를 명시한 폴더에서 해시 확인 후 복사합니다. Whisper/F2 다운로드를 대신하지 않습니다. |
-| `--mode skill` | 작업공간의 `.agents/skills/loki`에 완전한 스킬을 설치합니다. |
-| `--mode plugin` | marketplace 등록·native plugin 설치·설치된 캐시 확인을 수행합니다. |
+| `--mode skill` | 작업공간의 `.agents/skills/loki`에 완전한 스킬을 설치합니다 (모든 호스트 공통). |
+| `--mode plugin` | Codex marketplace 등록·native plugin 설치·설치된 캐시 확인을 수행합니다. |
 | `--mode setup` | 이미 받은 완전한 스킬의 런타임으로 전용 환경을 준비할 때 사용합니다. |
 
 ```sh
+python install.py --workspace ../loki-claude --mode skill --author-mode current_claude
+python install.py --workspace ../loki-antigravity --mode skill --author-mode current_antigravity
+python install.py --workspace ../loki-gemini --mode skill --author-mode current_gemini_cli
 python install.py --workspace ../loki-cpu --mode skill --device cpu
 python install.py --workspace ../loki-media --mode skill --features media
 ```
@@ -315,11 +395,11 @@ python install.py --workspace ../loki-media --mode skill --features media
 </details>
 
 <a id="codex-integration"></a>
-## Codex 플러그인·스킬 사용
+## 플러그인·스킬·확장 사용 (Codex · Claude · Antigravity · Gemini CLI)
 
-### 스킬
+### 범용 스킬 (모든 AI 호스트 공통)
 
-로컬 설치가 끝나면 `loki-workspace`를 Codex의 작업 폴더로 열고 새 채팅에서 `$loki`를 사용합니다. `SKILL.md`만 복사하지 말고 `runtime/`, references와 라이선스를 포함한 전체 `loki/` 폴더를 보존하세요.
+`--mode skill --author-mode <mode>`로 설치한 작업공간(`../loki-workspace`)을 사용 중인 AI 도구(Codex, Claude Code, Antigravity, Gemini CLI 등)에서 열면 `.agents/skills/loki/SKILL.md`를 공통 진입점으로 사용합니다. `SKILL.md`만 복사하지 말고 `runtime/`, references와 라이선스를 포함한 전체 `loki/` 폴더를 보존하세요.
 
 스킬 폴더만 받은 경우:
 
@@ -329,30 +409,36 @@ python /absolute/path/to/loki/runtime/install.py --workspace /absolute/path/to/n
 
 스킬의 정본은 [SKILL.md](skills/loki/SKILL.md), 상세 동작은 [작성 절차](skills/loki/references/workflow.md)와 [설정 안내](skills/loki/references/configuration.md)입니다.
 
-### 플러그인
+### 4대 CLI 네이티브 플러그인·확장 등록 (Codex · Antigravity · Claude Code · Gemini CLI)
 
-전체 배포 폴더에서 실행합니다.
+전체 배포 폴더에는 4대 에이전트 CLI의 네이티브 매니페스트와 규칙 파일이 모두 포함되어 있습니다.
+- **Antigravity**: `plugin.json` · `docs/assets/cva-icon-512.png` (`agy plugin validate . --strict`) + `install.py --mode skill --author-mode current_antigravity`
+- **Claude Code**: `.claude-plugin/plugin.json` · `.claude-plugin/marketplace.json` — Claude Code 세션에서 `/plugin marketplace add ttaem00/CVA-Loki` → `/plugin install loki@cva-loki` (또는 로컬 `--mode skill --author-mode current_claude`)
+- **Gemini CLI**: `gemini-extension.json` · `rules/GEMINI.md` · `policies/loki-author.toml` — `gemini extensions install https://github.com/ttaem00/CVA-Loki --consent --skip-settings` (또는 로컬 `install.py --mode skill --author-mode current_gemini_cli`, [상세 설정](docs/llm-guides/GEMINI_CLI_SETUP.md))
+- **Codex CLI**: `.codex-plugin/plugin.json` · `.agents/plugins/marketplace.json` · `rules/AGENTS.md`
+
+Codex 네이티브 플러그인으로 설치하려면:
 
 ```sh
 python install.py --workspace ../loki-plugin-workspace --mode plugin
 ```
 
-사용 가능한 Codex CLI가 있으면 사용합니다. 없으면 작업공간의 Node/npm과 전용 npm prefix에 고정 Codex CLI를 준비합니다. CLI는 marketplace 등록·설치·조회에만 사용하며 보고서 작성용 하위 모델을 실행하지 않습니다.
+Codex `plugin` 모드에서는 사용 가능한 Codex CLI가 있으면 사용하고, 없으면 작업공간의 Node/npm과 전용 npm prefix에 고정 Codex CLI를 준비합니다. CLI는 marketplace 등록·설치·조회에만 사용하며 보고서 작성용 하위 모델을 실행하지 않습니다.
 
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.9` |
-| 요약 메커니즘 | `3.0.9` · `latest`는 `loki_3_0_9` 선택 |
+| 배포 버전 | `3.0.9.1` |
+| 요약 메커니즘 | `3.0.9.1` · `latest`는 `loki_3_0_9_1` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
-| skill | `loki` / 명시 호출 `$loki` |
+| skill / extension | `loki` (`$loki` / Gemini CLI `cva-loki`) |
 
-설치 결과의 `native_plugin`과 `installed_runtime`을 확인하고, 플러그인을 설치한 Codex 환경의 새 로컬 채팅에서 사용하세요. 실제 읽기·작성은 그 채팅의 Codex가 수행합니다. 설치 캐시의 코드를 수정해서 작업하지 않고 별도 workspace에 입력·출력을 만듭니다.
+Codex `plugin` 모드로 설치했다면 `installation-result.json`의 `native_plugin`과 `installed_runtime`을 확인하고, 새 로컬 채팅에서 사용하세요. Claude Code·Antigravity·Gemini CLI·로컬 LLM 환경은 번들 루트의 네이티브 플러그인/확장 매니페스트 또는 `--mode skill --author-mode <호스트>`로 준비한 작업공간의 `<workspace>/.agents/skills/loki/SKILL.md`를 그대로 따릅니다. 설치 캐시 코드를 직접 수정하지 말고 별도 workspace에 입력·출력을 만듭니다.
 
 OpenAI의 [플러그인 패키징 안내](https://developers.openai.com/plugins/build/plugins)는 marketplace를 통한 배포와 설치된 사본의 사용을 설명합니다. 이 저장소의 installer는 동봉한 배포본과 함께 고정한 CLI 흐름을 제공합니다. 플러그인이 universal public directory에 자동 등록됐다고 가정하지 마세요.
 
-**Docker 내부 설치와 호스트 Desktop 설치는 별개입니다.** 컨테이너에서 만든 `loki_home`은 컨테이너용 설정입니다. 호스트 Codex에서 바로 사용하려면 호스트 경로로 설치하거나, 호스트에 보이는 작업공간과 실행 경로를 현재 Codex에 명시하세요. 호스트 인증 폴더를 컨테이너에 복사할 필요는 없습니다.
+**Docker 내부 설치와 호스트 AI 도구 설치는 별개입니다.** 컨테이너에서 만든 `loki_home`은 컨테이너용 설정입니다. 호스트의 Codex Desktop·Claude Code·Antigravity·Gemini CLI에서 바로 사용하려면 호스트 경로로 설치하거나, 호스트에 보이는 작업공간과 실행 경로를 현재 AI 세션에 명시하세요. 호스트 인증 폴더를 컨테이너에 복사할 필요는 없습니다.
 
 <a id="docker-install"></a>
 ## Docker 설치
@@ -372,7 +458,7 @@ docker compose run --build --rm loki --mode plugin
 ```
 
 <details>
-<summary><strong>CPU 설치·볼륨·결과 확인·호스트 Codex 연결 자세히 보기</strong></summary>
+<summary><strong>CPU 설치·볼륨·결과 확인·호스트 AI 연결 자세히 보기</strong></summary>
 
 ### CPU 경로
 
@@ -418,9 +504,9 @@ docker compose -p my-loki run --rm --entrypoint cat loki /workspace/installation
 
 호스트 폴더를 직접 사용하려면 `LOKI_WORKSPACE`를 **이미 존재하고 UID 10001이 쓸 수 있는 절대 경로**로 지정합니다. 원자료·결과가 든 볼륨을 문제 해결 목적으로 삭제하지 마세요.
 
-### 호스트 Codex에서 Docker 자료를 직접 읽기
+### 호스트 AI 세션에서 Docker 자료를 직접 읽기
 
-호스트에서 열린 현재 Codex가 Docker 런타임을 조작하는 경우에도 별도 작성자 CLI를 시작하지 않습니다. 현재 Codex가 컨테이너 Python으로 Loki 명령을 실행하고, 반환된 원문과 이미지를 직접 읽어 응답을 작성합니다.
+호스트에서 열린 현재 AI 세션(Codex·Claude Code·Antigravity·Gemini CLI)이 Docker 런타임을 조작하는 경우에도 별도 작성자 CLI를 시작하지 않습니다. 현재 AI 세션이 컨테이너 Python으로 Loki 명령을 실행하고, 반환된 원문과 이미지를 직접 읽어 응답을 작성합니다.
 
 이미지를 호스트의 이미지 보기 도구로 확인하려면 호스트에 보이는 작업 폴더를 연결하는 편이 쉽습니다. 예를 들어 PowerShell에서는 다음처럼 준비합니다.
 
@@ -432,35 +518,36 @@ docker compose -p my-loki run --build --rm loki
 
 이 경우 컨테이너의 `/workspace`가 지정한 호스트 폴더에 대응합니다. 반환된 `/workspace/work/...` 이미지는 호스트의 `loki-docker-workspace/work/...`에서 확인합니다. 실행은 계속 컨테이너의 `/workspace/.venv/bin/python`으로 수행하며, Linux용 가상환경을 호스트 Python으로 실행하지 않습니다. 컨테이너용 spec에는 `/workspace/...` 경로를 사용하고 원자료의 시간·해시는 바꾸지 않습니다.
 
-기본 named volume을 유지한다면 현재 Codex가 선택한 원문·이미지 파일만 명시적으로 호스트 작업 폴더에 꺼내 확인해야 합니다. 인증 폴더를 연결하거나 컨테이너의 모든 파일을 가져올 필요는 없습니다. Linux bind mount는 해당 경로에 UID 10001의 쓰기 권한이 필요합니다.
+기본 named volume을 유지한다면 선택한 원문·이미지 파일만 명시적으로 호스트 작업 폴더에 꺼내 확인해야 합니다. 인증 폴더를 연결하거나 컨테이너의 모든 파일을 가져올 필요는 없습니다. Linux bind mount는 해당 경로에 UID 10001의 쓰기 권한이 필요합니다.
 
 </details>
 
 <a id="source-preparation"></a>
 ## 공개 VOD로 원자료 준비
 
-현재 소스 설치에서는 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기 또는 SOOP VOD 한 개를 영상·메타데이터·자막으로 준비한 뒤 같은 현재 Codex 작성 흐름에 연결합니다.
+현재 소스 설치에서는 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기 또는 SOOP VOD 한 개를 영상·메타데이터·자막(및 공개 채팅·클립·타임라인 댓글)으로 준비한 뒤 선택한 작성자 AI 흐름에 연결합니다.
 
 <details>
-<summary><strong>공개 VOD 준비 명령·옵션·prepare spec 보기</strong></summary>
+<summary><strong>공개 VOD 준비 명령·모드 옵션·prepare spec 보기</strong></summary>
 
-기본 전체 설치 뒤 실제 반환된 Python과 runtime 경로로 실행합니다.
+기본 전체 설치 뒤 실제 반환된 Python과 runtime 경로로 실행합니다. `--mode`로 `lite`(15분 목표)·`normal`(30분 기본)·`full`(60분 목표)을 고를 수 있습니다.
 
 ```sh
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://chzzk.naver.com/video/<video-number>
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://chzzk.naver.com/video/<video-number> --mode normal
 ```
 
 YouTube·SOOP도 같은 명령의 `--vod` 값만 바꿉니다.
 
 ```sh
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod "https://www.youtube.com/watch?v=<video-id>"
-<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://vod.sooplive.com/player/<vod-number>
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod "https://www.youtube.com/watch?v=<video-id>" --mode normal
+<workspace-python> <runtime>/source_acquire.py --workspace <workspace> --vod https://vod.sooplive.com/player/<vod-number> --mode normal
 ```
 
 | 인수 | 범위 |
 | --- | --- |
 | `--workspace` | 설치한 작업공간. |
 | `--vod` | 치지직 VOD 번호 또는 단일 치지직·YouTube·SOOP VOD URL. SOOP의 기존 AfreecaTV VOD URL도 같은 SOOP 원본으로 연결합니다. |
+| `--mode` | `lite`, `normal`, `full` 중 하나. 작성 목표 시간·채팅 예산·벡터/5분 힌트 사전 준비 범위를 결정합니다. |
 | `--height` | 144, 360, 480, 720, 1080 중 하나. 기본 480. |
 | `--max-download-seconds` | 다운로드 단계 제한. 기본 21600초, 허용 60–21600초. STT 전체 시간 제한이 아닙니다. |
 
@@ -471,7 +558,7 @@ YouTube·SOOP도 같은 명령의 `--vod` 값만 바꿉니다.
 Docker에 설치했다면 같은 볼륨을 연결한 서비스에서 런타임을 실행할 수 있습니다.
 
 ```sh
-docker compose run --rm --entrypoint /workspace/.venv/bin/python loki -B /opt/loki/skills/loki/runtime/source_acquire.py --workspace /workspace --vod https://chzzk.naver.com/video/<video-number>
+docker compose run --rm --entrypoint /workspace/.venv/bin/python loki -B /opt/loki/skills/loki/runtime/source_acquire.py --workspace /workspace --vod https://chzzk.naver.com/video/<video-number> --mode normal
 ```
 
 CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml`을 사용하세요.
@@ -480,13 +567,13 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 
 결과의 `prepare_spec_path`는 **보고서가 아니라 작성 준비 템플릿**입니다. 다음 단계가 남아 있습니다.
 
-1. 현재 Codex가 반환된 실제 영상·SRT·VOD 정보와 clock 기록을 읽습니다.
-2. 템플릿에 실제 현재 채팅의 `author` 정보를 채웁니다. 확인하지 못한 모델명은 `unknown`으로 유지합니다.
-3. 그 spec으로 `loki.py prepare`를 실행합니다.
+1. 선택한 작성자 AI(또는 Web AI 팩·로컬 LLM 실행기)가 반환된 실제 영상·SRT·VOD 정보와 clock 기록을 읽습니다.
+2. 템플릿에 실제 현재 세션의 `author` 정보를 채웁니다. 확인하지 못한 모델명은 `unknown`으로 유지합니다 (`workspace_local` 기반 32자리 16진수 ID 규격 준수).
+3. 그 spec으로 `loki.py prepare`를 실행합니다. (`--mode`에 따라 `lite`/`normal`/`full` 기본 예산 및 `FULL` 5분 구간 힌트·`LITE` Warm-Only 벡터 정책 적용)
 4. 반환된 `author-input.json`과 원문·이미지를 실제로 읽습니다.
-5. 현재 Codex가 응답을 작성하고 제출합니다.
+5. 작성자 AI가 응답을 작성하고 검증 후 제출합니다.
 
-`author_required=true`는 이 작성 과정이 남아 있다는 뜻입니다. 다운로드·STT 성공은 보고서 완성이나 현재 Codex의 시청·청취를 뜻하지 않습니다.
+`author_required=true`는 이 작성 과정이 남아 있다는 뜻입니다. 다운로드·STT 성공은 보고서 완성이나 AI의 시청·청취를 뜻하지 않습니다.
 
 기존 workspace-owned 영상만 전사할 때는 다음 경로를 사용할 수 있습니다.
 
@@ -499,12 +586,12 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 </details>
 
 <a id="authoring"></a>
-## 현재 Codex가 직접 작성
+## 작성자 AI가 직접 작성
 
-**현재 대화의 Codex가 원문과 실제 반환 이미지를 직접 읽고 판단합니다.** Loki는 원자료·읽기 기록·응답을 검사하고 새 정상 보고서로 저장합니다.
+**선택한 작성자 AI(Codex·Claude·Antigravity·Gemini CLI·ChatGPT·Web AI·로컬 LLM)가 원문과 실제 반환 이미지를 직접 읽고 판단합니다.** Loki는 원자료·읽기 기록·응답을 검사하고 최신 결과 화면을 포함한 새 정상 보고서로 저장합니다.
 
 <details>
-<summary><strong>prepare → 원문 읽기 → 판단·작성 → submit 상세 명령 보기</strong></summary>
+<summary><strong>prepare → 원문 읽기 → 판단·작성 → validate-only → submit 상세 명령 보기</strong></summary>
 
 원문 읽기의 기본 정책은 `balanced_compact_v1`입니다. `balanced_compact_v1`은 원문 문자·시각·원본 해시와 남은 cursor를 보존하면서 반복 부가정보를 줄입니다. 정책 필드가 없는 작업은 저장 당시의 serial 정책으로 재개합니다.
 
@@ -522,12 +609,13 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 
 `--config`는 subcommand 앞에 둡니다. 경로·작성자·필드는 [전체 spec 예시](skills/loki/references/workflow.md)를 따르세요. 공개 VOD 준비에서 받은 템플릿을 쓰는 경우에는 관측된 source 값과 경로를 유지하고 실제 author만 채웁니다.
 
-`prepare`가 반환한 `job_root`, `prepared_revision`, `source_id`, `world_revision`, `author_input_path`를 보존합니다. **현재 Codex가** `author_input_path`를 열어 author prompt·응답 필드·원문 읽기 계약을 확인합니다.
+`prepare`가 반환한 `job_root`, `prepared_revision`, `source_id`, `world_revision`, `author_input_path`를 보존합니다. **작성자 AI가** `author_input_path`를 열어 author prompt·응답 필드·원문 읽기 계약을 확인합니다.
 
-원문 도구 action을 workspace의 JSON으로 저장한 뒤 실행합니다.
+원문 도구 action을 workspace의 JSON으로 저장한 뒤 실행합니다. 이미 읽은 STT/채팅 구간과 메모를 다시 확인하려면 `status --include-read-summary`를 사용하세요.
 
 ```sh
 <workspace-python> <runtime>/loki.py --config <workspace>/loki.json read --job-root <job-root> --expected-revision <revision> --action <workspace>/read-action.json
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json status --job-root <job-root> --expected-revision <revision> --include-read-summary
 ```
 
 검색·반응량·임베딩·이전 요약은 읽을 위치를 찾는 단서입니다. 인용할 완전한 자막 cue와 필요한 앞뒤 맥락을 실제로 읽어야 합니다. 메모는 `remember`, 재조회는 `memory`로 같은 source/revision에 연결합니다.
@@ -537,9 +625,10 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 <workspace-python> <runtime>/loki.py --config <workspace>/loki.json memory --job-root <job-root> --expected-revision <revision> --query <query>
 ```
 
-현재 Codex가 이 job의 실제 응답 계약에 맞는 새 JSON을 작성한 뒤 제출합니다.
+작성자 AI가 이 job의 실제 응답 계약에 맞는 새 JSON을 작성한 뒤 `--validate-only`로 스키마·근거·미반영 메모를 사전 점검하고, 이상이 없으면 최종 제출합니다. Web AI는 `export-pack`/`import-draft`, 로컬 오픈웨이트 모델은 `local_llm_author.py` 경로를 사용할 수 있습니다.
 
 ```sh
+<workspace-python> <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-root> --expected-revision <revision> --response <workspace>/response.json --validate-only
 <workspace-python> <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-root> --expected-revision <revision> --response <workspace>/response.json
 ```
 
@@ -550,7 +639,7 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 <a id="images"></a>
 ## 이미지 추출과 멀티모달 검색
 
-**3.0.3은 실제 하이라이트 프레임 추출을 지원합니다.** 로컬 EmbeddingGemma 2는 text/image/audio/video 근거 후보를 찾고, 최종 장면 선택과 보고서 작성은 현재 Codex가 맡습니다.
+**3.0.9.1은 실제 하이라이트 프레임 추출·멀티모달 탐색과 선택적 짧은 영상 확인을 지원합니다.** 로컬 EmbeddingGemma 2는 text/image/audio/video 근거 후보를 찾고, 움직임·음향 단서가 부족한 60초 이내 구간만 `short_video_check.py`(`editorial_short_video_check`, 기본 모델 `None` · 미설치/미인증 비차단)가 보조 확인을 제공하며, 최종 장면 선택과 보고서 작성은 선택한 작성자 AI가 맡습니다.
 
 <details>
 <summary><strong>이미지 추출·선택·멀티모달 탐색 명령과 역할 보기</strong></summary>
@@ -561,7 +650,7 @@ media 또는 기본 전체 프로필에서 같은 VOD의 로컬 영상을 prepar
 
 이 목록은 이미지 추출 입력 형식입니다. 검토 UI의 내장 로컬 플레이어는 MP4를 사용하며 브라우저가 해당 영상·음성 codec을 지원해야 합니다. 공개 VOD 준비가 만든 MP4를 우선 사용하세요.
 
-현재 Codex는 `read`를 통해 source-bound `read_frames`를 요청하고, 이어지는 `read_frame_page`를 필요에 맞게 읽습니다. 반환된 로컬 이미지를 현재 Codex의 이미지 보기 도구로 **실제로 확인**한 뒤 선택합니다.
+작성자 AI는 `read`를 통해 source-bound `read_frames`를 요청하고, 이어지는 `read_frame_page`를 필요에 맞게 읽습니다. 반환된 로컬 이미지를 AI 세션의 이미지 보기 기능(또는 멀티모달 시각 인식)으로 **실제로 확인**한 뒤 선택합니다.
 
 ```text
 read_frames → 실제 반환 이미지 확인 → 필요한 다음 페이지 확인 → 응답에서 frame_ref 선택 → submit
@@ -592,9 +681,9 @@ read_frames → 실제 반환 이미지 확인 → 필요한 다음 페이지 �
 </details>
 
 <a id="review-ui"></a>
-## 보고서 검토·편집·복원
+## 보고서 열람·검토·편집·복원
 
-Loki는 기존 Report Admin의 **목록·영상 작업실·상세 편집 템플릿과 CSS/JS**를 재사용합니다. 별도 간이 편집 화면으로 대체하지 않습니다. local API·미디어 재생·revision·기능 범위 연결에 필요한 작은 adapter를 둡니다.
+**Loki 3.0.9.1이 생성한 새 보고서 `.html` 파일은 다크모드 기본 적용과 최신 결과 화면을 내장해 브라우저에서 단독으로 바로 열 수 있습니다.** 이전 세션의 자동 저장 라이트 키나 로컬 스토리지 제한 환경에서도 다크모드로 먼저 시작하며(사용자가 직접 바꾼 테마 선택은 기억), 파일만 열어도 원본 시각, 대표 장면, 요약, 타임라인과 클립을 확인할 수 있습니다. 수정·미리보기·이력 복원은 동봉 Report Admin의 **목록·영상 작업실·상세 편집 UI**를 사용합니다. 별도 간이 편집 화면으로 대체하지 않습니다.
 
 설치 결과의 `review.command`를 사용하거나 다음을 실행합니다.
 
@@ -604,7 +693,7 @@ Loki는 기존 Report Admin의 **목록·영상 작업실·상세 편집 템플�
 
 기본 주소는 [http://127.0.0.1:8787/](http://127.0.0.1:8787/)입니다. 설치 결과의 `review.status=available_not_started`는 명령이 준비됐으며 서버가 아직 실행되지 않았다는 뜻입니다.
 
-보고서를 열면 현재 저장 revision을 최신 결과 화면으로 표시합니다. 로컬 HTTP 서버가 화면의 스크립트·스타일·글꼴·이미지·JSON을 함께 제공합니다. 저장 후 다시 열기도 같은 화면을 사용하며, 원본 Markdown·HTML·metadata와 기존 작성 버전·관리자 수정 이력은 보존합니다. 이 읽기에는 새 요약이나 모델 호출이 필요하지 않습니다.
+검토 UI에서 보고서를 열면 현재 저장 revision을 최신 결과 화면으로 표시합니다. 로컬 HTTP 서버가 화면의 스크립트·스타일·글꼴·이미지·JSON을 함께 제공합니다. 저장 후 다시 열기도 같은 화면을 사용하며, 원본 Markdown·HTML·metadata와 기존 작성 버전·관리자 수정 이력은 보존합니다. 이 읽기에는 새 요약이나 모델 호출이 필요하지 않습니다.
 
 일반적인 검토 흐름은 다음과 같습니다.
 
@@ -628,7 +717,7 @@ docker compose -f compose.yaml -f compose.review.yaml up --build review
 <a id="configuration"></a>
 ## 설정
 
-설정 파일은 작업공간의 `loki.json`입니다. 언어·입력/미디어 크기·기능 프로필과 작업 경로를 확인할 수 있습니다. 작성자는 `current_codex`, 작성 도구 네트워크는 `deny`로 고정됩니다.
+설정 파일은 작업공간의 `loki.json`입니다. 언어·입력/미디어 크기·기능 프로필과 작업 경로를 확인할 수 있습니다. 작성자는 지원하는 8개 `author_mode` 중 설치 시 선택한 하나로 고정되며(기본값 `current_codex`), 작성 도구 네트워크는 `deny`로 고정됩니다.
 
 <details>
 <summary><strong>9개 설정 키·초기값·타입·허용 범위 보기</strong></summary>
@@ -658,7 +747,7 @@ docker compose -f compose.yaml -f compose.review.yaml up --build review
 | `features` | 문자열 `core`, `media`, `multimodal`. 실제 설치 프로필과 맞아야 합니다. |
 | `multimodal_runtime` | `null` 또는 정확히 `{path, sha256}`인 해시 참조. 설치 도구가 기록한 실제 ref를 유지합니다. |
 | `network` | 문자열, 고정 `deny`. 작성 런타임에 적용합니다. |
-| `author_mode` | 문자열, 고정 `current_codex`. 다른 모델/provider 선택 키가 아닙니다. |
+| `author_mode` | 문자열, 허용값 8종(`current_codex`, `current_chatgpt`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm`). 작업공간 초기화 시 선택하며 임의 외부 API 키로 전환하지 않습니다. |
 | `work_dir` | 작업공간 안의 상대 경로 문자열. 절대 경로·탈출·링크 경로를 사용하지 않습니다. |
 
 Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합니다. 모델 manifest나 도구 receipt를 수동으로 만들어 readiness를 가장하지 마세요.
@@ -677,7 +766,23 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 <a id="release-version-policy"></a>
 ### 버전 정책
 
-현재 배포본은 **3.0.9**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 이 배포본의 버전을 씁니다. 공개 다운로드는 **v3.0.9**의 ZIP을 가리킵니다. 공개한 태그·ZIP과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
+현재 배포본은 **3.0.9.1**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 이 배포본의 버전을 씁니다. 공개 다운로드는 **v3.0.9.1**의 ZIP을 가리킵니다. 공개한 태그·ZIP(`v3.0.9` 포함)과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
+
+### 3.0.9.1의 주요 변경 (3.0.9 보완 패치)
+
+- **HTML 다크모드 기본 표시**: 단독 저장 `.html`·공용 웹 화면·검토 UI가 이전 자동 저장 라이트 키나 로컬 스토리지 차단 환경에서도 항상 다크모드로 먼저 열리고, 사용자가 `#themeButton`으로 바꾼 선택만 기억하도록 보정했습니다. 내장 글꼴/썸네일을 위한 `review.py` CSP도 함께 보강했습니다.
+- **4대 CLI 네이티브 매니페스트 & 멀티 LLM 가이드·배너 정비**: `plugin.json`(Antigravity), `.claude-plugin/`(Claude Code), `gemini-extension.json` + `rules/GEMINI.md`(Gemini CLI), `.codex-plugin/`(Codex), `rules/AGENTS.md` 및 `docs/llm-guides/` 4종 가이드를 번들에 정식 포함하고 히어로 배너와 README를 LLM 플러그인 기준으로 개선했습니다.
+- **Web AI 분할 팩 · 무열람 보완 제출 · 로컬 LLM `--model auto` · 짧은 영상 확인 보강**: `export-pack`의 `<stem>_files/`(<=8파일/최대 5파트 분할), `import-draft` 미열람 근거 자동 보완, `local_llm_author.py`(`--model auto`, `--config` 자동 탐색, `<think>` 제거, Ollama `num_ctx=32768`), `short_video_check.py`, `<720p` Windows `PermissionError` 처리를 포함하며, `3.0.9`의 작성 프롬프트와 근거 세계 메커니즘은 그대로 유지합니다.
+
+### 3.0.9의 주요 변경
+
+- 새 보고서 `.html` 파일에 최신 Loki 결과 뷰어를 내장해 브라우저에서 단독으로 바로 열 수 있고, Report Admin에서도 동일하게 편집·재저장합니다.
+- D2 세부 흐름에 주요 질문의 답변·판단이 바뀐 이유·실제 결과를 남기고 발화 전환 경계에 맞추도록 작성 지침을 보완했습니다.
+- 8종 작성자 호스트(`Codex`·`Claude`·`Antigravity`·`Gemini CLI`·`ChatGPT`·`Web AI`·`로컬 LLM`), 3단계 실행 모드(`LITE`/`NORMAL`/`FULL`), `submit --validate-only`, `status --include-read-summary`, Web AI `export-pack`/`import-draft`, 타임라인 댓글·NLE 마커 내보내기를 추가했습니다.
+
+### 3.0.8 ~ 3.0.8.2의 주요 변경
+
+- 검토 UI에서 현재 저장본을 최신 결과 뷰어로 열어 확인·편집·재열기를 수행하고, Highlight 표시용 프레임 추출 경로를 보완했습니다.
 
 ### 3.0.7.2의 주요 변경
 
@@ -714,7 +819,7 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 
 `speech.verification=assets_only_not_transcription`은 **자산 준비**입니다. 실제 STT 성공은 `transcribe_source.py`의 결과와 SRT·전사 receipt로 별도로 확인합니다. F2가 enabled라는 설정과 실제 감지 상태도 구분합니다.
 
-selftest는 `kind=synthetic_contract_selftest`, `semantic_author=synthetic_fixture_not_a_model`로 식별합니다. 합성 원문과 고정 응답으로 설치 계약을 점검합니다. 실제 보고서는 현재 Codex가 실제 자료를 읽어 작성합니다.
+selftest는 `kind=synthetic_contract_selftest`, `semantic_author=synthetic_fixture_not_a_model`로 식별합니다. 합성 원문과 고정 응답으로 설치 계약을 점검합니다. 실제 보고서는 선택한 작성자 AI(또는 Web AI 팩·로컬 LLM)가 실제 자료를 읽어 작성합니다.
 
 패키지 자체를 확인하려면 전체 배포 폴더에서 실행할 수 있습니다.
 
@@ -783,16 +888,16 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 | `gpu_backend_not_supported_by_this_installer` | 자동 지원하지 않는 backend 안내를 읽고 지원 환경이나 명시 CPU 경로를 선택합니다. |
 | 모델 다운로드 실패·checksum 불일치 | 최초 실패 단계·네트워크·여유 디스크를 확인합니다. hash 검사를 끄지 않습니다. 원자료와 성공한 캐시는 보존합니다. |
 | `runtime_doctor_not_ready` | 반환된 `missing_dependencies`와 실제 interpreter를 확인합니다. 다른 Python으로 실행하지 않았는지 확인합니다. |
-| `register_marketplace` / `install_plugin` 실패 | 설치 로그에 기록된 Codex CLI와 `codex --version`, `codex plugin --help`를 확인합니다. PATH에 있는 CLI를 먼저 사용하므로 플러그인 명령을 지원하는 버전이 필요합니다. 오류를 해결한 뒤 같은 설치 명령을 다시 실행하세요. |
-| `loki_configuration_shape` / `loki_configuration_policy` | 9개 필드·타입·범위·고정 정책을 확인합니다. provider/API key 등 추가 키를 제거합니다. |
+| `register_marketplace` / `install_plugin` 실패 | Codex `--mode plugin`에서 설치 로그의 Codex CLI와 `codex --version`, `codex plugin --help`를 확인하세요. 다른 AI 호스트(Claude Code·Antigravity·Gemini CLI·로컬 LLM 등)는 `--mode skill --author-mode <호스트>`를 사용합니다. |
+| `loki_configuration_shape` / `loki_configuration_policy` | 9개 필드·타입·범위·고정 정책을 확인합니다. 허용된 8종 외 `author_mode`나 provider/API key 등 추가 키를 제거합니다. |
 | `loki_source_installed_public_adapter_required` | 이 배포본의 실제 runtime을 사용하는지 확인합니다. 다른 프로젝트의 모듈을 섞지 않습니다. |
 | 공개 VOD 접근 실패 | 익명 공개 접근 가능 여부를 확인합니다. 로그인·구독·연령 제한은 우회하지 않고 허용된 로컬 자료를 사용합니다. |
 | `loki_source_media_audio_tail_invalid` | 영상·오디오 끝 부분이 온전하지 않습니다. download/probe 로그를 확인하고 검증된 시도 기록에서 재개합니다. |
 | STT 중단 | 최초 STT 오류와 전사 receipt를 확인합니다. 다운로드 체크포인트가 유효하면 이를 보존해 재사용합니다. |
 | 기존 SRT 출력이 이미 존재 | 원본은 덮어쓰지 않습니다. 기존 시도의 결과를 확인하고 새 명시적 출력 경로를 사용합니다. |
 | 이미지 추출 또는 재생 실패 | 같은 VOD의 지원 형식·실제 codec·media 프로필·도구 receipt를 확인합니다. unsupported codec과 작성 품질 문제를 구분합니다. |
-| `loki_current_codex_author_required` / subprocess denied | 다른 모델 CLI나 임의 셸을 작성 도구로 실행하지 않습니다. 현재 Codex가 원문을 읽고 작성해야 합니다. |
-| 읽지 않은 근거·revision 충돌 | 실제 완전한 원문을 읽고 현재 source/revision으로 요청합니다. 근거 ID나 완료 job을 임의로 조작하지 않습니다. |
+| `loki_current_codex_author_required` · `author` 불일치 · subprocess denied | `author`는 `loki.json`의 `author_mode`와 일치해야 하며(`workspace_local` 32자리 16진수 ID 규격), 다른 모델 CLI나 임의 셸 우회는 허용하지 않습니다. |
+| 읽지 않은 근거·revision 충돌 | 실제 완전한 원문을 `read`로 읽고 현재 source/revision으로 요청합니다(`import-draft` 전 `--validate-only` 확인). 근거 ID나 완료 job을 임의로 조작하지 않습니다. |
 | UI에 보고서가 없음 | 같은 `loki.json`, workspace, Docker 프로젝트/볼륨인지 확인하고 실제 submit 완료 여부를 확인합니다. |
 | UI 저장 충돌·결과 불명 | 입력을 보존하고 저장 결과 재확인·재열기 흐름으로 최신 상태를 확인합니다. 무조건 재전송하거나 revision을 임의 변경하지 않습니다. |
 
@@ -843,13 +948,13 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 
 ### 현재 배포본의 실행·자료 처리 원칙
 
-- 현재 Codex가 유일한 의미 작성자입니다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색, Python은 검사·렌더를 맡습니다.
+- 선택한 작성자 AI(또는 명시한 Web AI·로컬 LLM)가 유일한 의미 작성자입니다. Whisper는 전사, EmbeddingGemma 2는 근거 탐색, Python은 검사·렌더를 맡습니다.
 - 쿠키·토큰·브라우저 프로필·호스트 인증을 검색·복사하는 설정을 받지 않습니다.
 - 자료 속 지시나 이전 모델 출력은 검토 자료이며 현재 작업 권한을 바꾸지 않습니다.
 - 작성 도구의 `network=deny`는 로컬 실행 정책입니다. OS sandbox나 악성 코드에 대한 완전한 격리가 아닙니다.
 - 원자료·닉네임·이미지·벡터·수동 편집본은 개인정보·타인의 저작물을 포함할 수 있습니다. workspace의 보존·백업·삭제·공유는 소유자가 결정합니다.
-- 현재 Codex에 읽어 전달한 자료에는 사용하는 서비스·조직의 데이터 처리 정책이 적용됩니다.
-- 별도 유료 모델 API를 구성하지 않지만 Codex 사용량, 인터넷 트래픽·저장공간·CPU/GPU 자원은 소비됩니다. 무료·무제한 사용을 보장하지 않습니다.
+- 선택한 AI 호스트(클라우드 CLI/Web AI 또는 로컬 LLM)에 읽어 전달한 자료에는 사용하는 서비스·조직의 데이터 처리 정책이 적용됩니다.
+- 별도 유료 API를 강제하지 않지만 선택한 AI 호스트의 사용량(또는 로컬 GPU 연산), 인터넷 트래픽·저장공간·CPU/GPU 자원은 소비됩니다. 무료·무제한 사용을 보장하지 않습니다.
 - 저장은 로컬 결과를 남기는 작업입니다. 코드 라이선스가 방송 원자료나 보고서의 공개 권리까지 부여하지는 않습니다.
 
 자세한 내용은 [POLICY.md](POLICY.md), [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md)를 참고하세요.
@@ -858,28 +963,37 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 ## FAQ
 
 <details>
-<summary><strong>이미지·GPU·VOD·플러그인·자동 실행에 관한 자주 묻는 질문</strong></summary>
+<summary><strong>다중 AI·모델 선택·모드·이미지·GPU·VOD·검토 UI에 관한 자주 묻는 질문</strong></summary>
+
+**Codex 없이 Claude Code, Antigravity, Gemini CLI, ChatGPT, Web AI, 로컬 LLM에서도 쓸 수 있나요?**  
+네. 3.0.9.1은 번들 루트의 4대 CLI 네이티브 매니페스트(`.codex-plugin`, `plugin.json`, `.claude-plugin`, `gemini-extension.json`)와 `install.py --mode skill --author-mode <호스트>`를 통해 8종 `author_mode`(`current_codex`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`, `current_gemini_web`, `current_claude_web`, `current_local_llm`)를 지원합니다. Web AI는 `export-pack`/`import-draft`로, Ollama/vLLM/LM Studio 로컬 모델은 `local_llm_author.py --model auto`로 실행할 수 있습니다.
+
+**어떤 모델 버전을 써야 하나요?**  
+특정 모델 버전을 고정하지 않습니다. 각 AI 호스트가 현재 제공하는 **최신 상위 추론·장문맥·멀티모달 지원 모델**을 사용하시고, 로컬 LLM은 **32K 이상 컨텍스트와 JSON Schema 출력**을 안정 지원하는 모델을 권장합니다. (세부 티어는 [MODEL_RECOMMENDATIONS.md](docs/llm-guides/MODEL_RECOMMENDATIONS.md) 참고)
+
+**`LITE`, `NORMAL`, `FULL` 모드의 차이는 무엇인가요?**  
+작성 목표 시간(`15분`·`30분`·`60분`)과 사전 탐색 범위의 차이입니다. `LITE`는 기존 캐시 중심 Warm-Only 벡터 색인과 빠른 채팅 스캔으로 속도를 높이고, `NORMAL`은 기본 전체 수집, `FULL`은 전체 사전 수집과 결정론적 5분 구간 힌트까지 준비합니다. 원자료 다운로드·로컬 전사 시간은 별도입니다.
 
 **하이라이트 이미지 추출을 지원하나요?**  
-네. 3.0.3의 media/full 프로필에서 같은 VOD 로컬 영상으로 프레임을 추출하고, 현재 Codex가 실제 이미지를 확인해 선택하면 보고서에 연결합니다. Highlight 영상 컷 편집이나 UI에서 선택 이미지·캡션을 교체하는 기능과는 다릅니다.
+네. 3.0.9.1의 `media`·`multimodal` 프로필에서 같은 VOD 로컬 영상으로 프레임을 추출하고, 작성자 AI가 실제 이미지를 확인해 선택하면 보고서에 연결합니다. Highlight 영상 컷 편집이나 UI에서 선택 이미지·캡션을 교체하는 기능과는 다릅니다.
 
 **EmbeddingGemma 2가 보고서를 쓰나요?**  
-아닙니다. 로컬 검색 encoder입니다. 현재 대화의 Codex가 원문·이미지를 직접 읽고 판단·작성합니다.
+아닙니다. 로컬 검색 encoder입니다. 선택한 작성자 AI가 원문·이미지를 직접 읽고 판단·작성합니다.
 
 **VOD URL만 주면 되나요?**  
-정식 배포본의 전체 설치에서는 익명 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL로 source 준비부터 시작할 수 있습니다. 준비 이후 현재 Codex의 실제 읽기·작성·제출이 필요하며 인증이 필요한 VOD는 수집하지 않습니다.
+정식 배포본의 전체 설치에서는 익명 공개 치지직 VOD, 방송이 끝난 YouTube Live 다시보기·SOOP VOD의 URL로 source 준비부터 시작할 수 있습니다. 준비 이후 작성자 AI의 실제 읽기·작성·제출이 필요하며 인증이 필요한 VOD는 수집하지 않습니다.
 
 **GPU 없이 사용할 수 있나요?**  
 네. 호환 GPU가 없거나 명시 CPU를 선택하면 가능합니다. Docker에서는 CPU override도 함께 사용하세요. 긴 STT 작업은 처리 시간과 메모리 요구를 고려해야 합니다.
 
 **플러그인 설치와 스킬 설치 중 무엇을 선택하나요?**  
-사용하는 Codex의 native plugin 관리에 연결하려면 plugin 모드, 특정 workspace의 `.agents/skills/loki`에서 시작하려면 skill 모드를 사용합니다. 둘 다 같은 현재-Codex 작성 런타임입니다.
+Codex CLI의 native plugin 관리에 연결하려면 `--mode plugin`, Claude Code/Gemini CLI는 각각의 마켓플레이스/확장 등록을 사용하고, 모든 호스트(Codex·Claude Code·Antigravity·Gemini CLI·ChatGPT·Web AI·로컬 LLM)에서 작업공간의 `.agents/skills/loki`를 공통 진입점으로 쓰려면 `--mode skill --author-mode <호스트>`를 사용합니다.
 
 **설치만 하면 방송 종료 후 자동으로 작동하나요?**  
 아닙니다. 상시 종료 감지·자동 수집 스케줄러는 포함하지 않습니다. 요청한 VOD 또는 준비된 자료에서 실행합니다.
 
 **보고서를 수정하고 이전 버전으로 돌아갈 수 있나요?**  
-네. 기존 Report Admin UI의 편집·미리보기·로컬 저장·재열기·이력 비교/복원을 사용합니다. 최초 작성 제출과 원문·이미지 근거는 보존합니다.
+네. 생성된 3.0.9.1 `.html` 파일 자체를 브라우저에서 바로 **다크모드 기본 화면**으로 열어 볼 수 있으며(테마 버튼으로 라이트/다크 전환 기억), 수정은 동봉 Report Admin UI(`review.py`)의 편집·미리보기·로컬 저장·재열기·이력 비교/복원을 사용합니다. 최초 작성 제출과 원문·이미지 근거는 보존합니다.
 
 
 </details>

@@ -165,6 +165,7 @@ python <runtime>/loki.py --config <workspace>/loki.json prepare --spec <workspac
 
 ```text
 python <runtime>/loki.py --config <workspace>/loki.json status --job-root <job-root> --expected-revision <revision>
+python <runtime>/loki.py --config <workspace>/loki.json status --job-root <job-root> --expected-revision <revision> --include-read-summary
 ```
 
 `not_submitted`, `accepted_render_pending`, `terminal_record_present`를 구분한다. 제출이
@@ -283,7 +284,39 @@ Story에는 별도 중요도를 넣지 않는다. 작성자는 manager/display_r
 바꾸지 않는다. 이 선택 필드가 없으면 기존 작성·검토 흐름을 그대로 사용한다.
 
 ```text
+# 1단계: 무부작용 사전 검사 (스키마·근거·미반영 메모 점검)
+python <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-root> --expected-revision <revision> --response <workspace>/response.json --validate-only
+# 2단계: 최종 제출
 python <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-root> --expected-revision <revision> --response <workspace>/response.json
+```
+
+### 선택적 짧은 영상 검증 (`short_video_check.py`), Web Pack, 로컬 LLM, 크리에이터 내보내기
+
+- **짧은 영상 검증 (`gemini-api`, 비차단 보조)**: 정지 프레임과 자막만으로 판단이 어려운 `<=60`초 구간만 확인한다. 기본 모델은 `None`(CLI 기본값 사용)이며 `--model` 또는 `LOKI_SHORT_VIDEO_MODEL`로 지정할 수 있다. 미설치·미인증(exit 3)·14MiB 초과 시 차단하지 않고 건너뛴다.
+
+```text
+python <runtime>/short_video_check.py --video <workspace>/work/<video_no>/source.mp4 --start-sec 120 --end-sec 145 --question "장면에서 발생한 행동을 확인해줘"
+```
+
+- **웹 AI Pack (`current_chatgpt` / `current_claude_web` / `current_gemini_web`)**: `export-pack`은 `<stem>.zip`과 `<stem>_files/`(최대 8개 파일, 초대형 자막 최대 5파트 분할, `verify_result.py`)를 생성하고, 작성 완료 JSON은 `import-draft`가 미열람 원문 보완 후 `submit`한다.
+
+```text
+python <runtime>/loki.py --config <workspace>/loki.json export-pack --job-root <job-root> --expected-revision <revision> --output <workspace>/pack/vod_pack.zip
+python <runtime>/loki.py --config <workspace>/loki.json import-draft --job-root <job-root> --expected-revision <revision> --draft <workspace>/web_draft.json
+```
+
+- **로컬 LLM 3-Pass (`current_local_llm`)**: Ollama(`/api/chat`, `num_ctx=32768`) 또는 OpenAI 호환 엔드포인트(`/v1/chat/completions`)에서 `--model auto`로 단일 채팅 모델을 자동 선택해 초안을 작성하고 `isolate()` 후 오프라인 제출한다(`--config` 생략 시 `--job-root` 상위 `loki.json` 자동 탐색).
+
+```text
+python <runtime>/local_llm_author.py --config <workspace>/loki.json --job-root <job-root> --expected-revision <revision> --endpoint http://127.0.0.1:11434/v1 --model auto
+```
+
+- **크리에이터 내보내기 (`export`)**:
+
+```text
+python <runtime>/loki.py --config <workspace>/loki.json export --report <report-metadata.json> --format comment
+python <runtime>/loki.py --config <workspace>/loki.json export --report <report-metadata.json> --format markers-csv --output <workspace>/markers.csv
+python <runtime>/loki.py --config <workspace>/loki.json export --report <report-metadata.json> --format fcpxml --output <workspace>/timeline.fcpxml
 ```
 
 반환된 Markdown·HTML·메타데이터와 내용의 연결을 확인한다. 응답 검사가 실패하면 실제
@@ -317,4 +350,4 @@ python <runtime>/loki.py --config <workspace>/loki.json submit --job-root <job-r
 오래된 revision이나 저장 오류가 나면 편집안을 보존하고 최신 저장 상태를 확인한 뒤
 재시도한다. 원본 SRT, 선택 이미지·캡션과 근거 시계는 이 편집기에서 읽기 전용이다.
 최초 작성 제출은 보존하며 수동 저장은 다른 모델을 호출하거나 외부에 게시하지 않는다.
-Markdown·HTML은 작업공간에 남는다. 외부 게시·카페·댓글 내보내기 연결은 비활성화돼 있다.
+Markdown·HTML은 작업공간에 남는다. 외부 게시·카페 연결은 비활성화돼 있으며, 오프라인 댓글·마커·FCPXML 내보내기는 `loki.py export`를 사용한다.

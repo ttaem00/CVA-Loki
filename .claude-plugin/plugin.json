@@ -1,0 +1,21 @@
+{
+  "name": "loki",
+  "version": "3.0.9.1",
+  "description": "Evidence-grounded CHZZK, YouTube Live, and SOOP VOD summary, timeline, Point/Story/Highlight authoring, and creator exporter plugin.",
+  "icon": "./docs/assets/cva-icon-512.png",
+  "author": {
+    "name": "CVA contributors",
+    "url": "https://ttaem.com"
+  },
+  "homepage": "https://ttaem.com",
+  "repository": "https://github.com/ttaem00/CVA-Loki",
+  "license": "LicenseRef-TTaem-CVA-Source-Available-1.1",
+  "keywords": [
+    "vod",
+    "chzzk",
+    "youtube",
+    "editorial",
+    "evidence",
+    "loki"
+  ]
+}

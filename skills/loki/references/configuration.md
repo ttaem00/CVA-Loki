@@ -20,8 +20,7 @@ python <skill>/runtime/install.py --workspace <new-workspace> --mode setup
 | `--features multimodal` | 기본 전체 프로필. core/UI, Node/npm, FFmpeg/ffprobe, text/image/audio/video 임베딩, 공개 VOD 준비와 로컬 Whisper/Silero/F2 STT |
 | `--features media` | core/UI, Node/npm과 로컬 프레임 추출. 임베딩 모델은 내려받지 않음 |
 | `--features core` | 텍스트 원문 읽기·메모·응답 검사·보고서와 검토 UI |
-| `--author-mode current_chatgpt` | 현재 ChatGPT가 직접 작성. 원자료 준비가 로컬 세션 UUID를 기존 템플릿에 한 번 보존하며 Codex thread/turn ID를 요구하지 않음 |
-| `--author-mode current_codex` | 기존 기본값. 확인한 Codex 작성자 정보와 과거 작업의 identity를 보존 |
+| `--author-mode <mode>` | `current_codex`(기본값), `current_chatgpt`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_gemini_web`, `current_claude_web`, `current_local_llm` 선택. 웹·non-Codex 호스트는 로컬 세션 ID(`workspace_local` 또는 `host_env`)를 보존하며 Codex thread/turn ID를 요구하지 않음 |
 | `--model-source <directory>` | 고정 revision의 EmbeddingGemma 2 파일을 명시적으로 제공. 13개 해시가 모두 일치해야 하며 Whisper/F2는 별도의 고정 자산을 준비 |
 | `--device auto` | 지원되는 NVIDIA CUDA 또는 Apple Silicon MPS를 선택. 호환 GPU가 없으면 CPU 선택 |
 | `--device cpu` | GPU가 있는 호스트를 포함해 CPU 실행을 명시적으로 선택 |
@@ -127,7 +126,7 @@ python -m pip install -r <skill>/runtime/requirements.txt
 | `features` | 설치 프로필과 맞는 `core`, `media`, `multimodal`. 값만 바꿔도 의존성이 설치되는 것은 아님 |
 | `multimodal_runtime` | 설치기가 기록하는 `.models/multimodal-runtime.json`의 `{path, sha256}` 참조. core/media는 `null`. 관찰한 경로·해시를 보존 |
 | `network` | 작성과 로컬 도구의 고정 `deny`. 설치·명시적으로 요청한 공개 VOD 준비는 별도 단계 |
-| `author_mode` | 고정 `current_codex`. 다른 작성 모델·provider를 선택하지 않음 |
+| `author_mode` | 지원 작성자 호스트 8종 중 선택된 값(기본 `current_codex`). 작업공간 초기화 시 고정 |
 | `work_dir` | 작업공간 안의 상대 디렉터리. 절대 경로·탈출·링크 경로를 사용하지 않음 |
 
 설정 키는 정확히 이 아홉 개다. 토큰·provider endpoint·브라우저 프로필·비공개 배포

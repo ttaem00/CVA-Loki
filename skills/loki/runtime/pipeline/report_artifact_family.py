@@ -135,9 +135,11 @@ def _viewer_payload(html_text: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 def present_saved_report_html(html_text: str, metadata: dict[str, Any]) -> str:
-    """Use the common saved presentation for a new Loki 3.0.9 report revision."""
+    """Use the common saved presentation for a new Loki 3.0.9+ report revision."""
+    from pipeline.loki_version_policy import uses_loki_saved_html_presentation
+
     pipeline = metadata.get("summary_pipeline")
-    if not isinstance(pipeline, dict) or pipeline.get("actual_version") != "loki_3_0_9":
+    if not isinstance(pipeline, dict) or not uses_loki_saved_html_presentation(pipeline.get("actual_version")):
         return html_text
     try:
         from publish.builder.loki_template import saved_report_html, saved_report_source_html

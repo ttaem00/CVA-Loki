@@ -59,6 +59,7 @@
       "check_gemini_api_available",
       "check_short_video",
       "main",
+      "resolve_model",
       "validate_clip_window"
     ],
     "pipeline.editorial_embedding_index": [
@@ -1800,7 +1801,7 @@
     {
       "module": "pipeline.editorial_current_conversation",
       "source_path": "pipeline/editorial_current_conversation.py",
-      "source_sha256": "5c45fcb7ab05585633228ce8cb5f5ecc19a8521a08cfbb56e6210e770bfcf906",
+      "source_sha256": "ed4e76c30dc6184a184a8d837fc94714da226abc74100d70c9273e92b227804d",
       "symbols": [
         "cli_result_json",
         "continuation",
@@ -1876,7 +1877,7 @@
         "time",
         "uses_loki_308_profile"
       ],
-      "export_sha256": "4223de789f74aaa6cf9f6ba20eca6a954a0532c6a5ca82884c5956581cbbf3bb",
+      "export_sha256": "df535c8197ba434aa428712f4b2798a97d924c8d2b1f98da9c16a8e109697abf",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -2238,7 +2239,7 @@
     {
       "module": "pipeline.editorial_media_request",
       "source_path": "pipeline/editorial_media_request.py",
-      "source_sha256": "0257de487d60d862adaa5b9b36688f29301315b70d9dbfed0ec48c2b3c998415",
+      "source_sha256": "c78b8a78c29408141e8365513fa9228093d00cb0d52da166c3c3d0e685b32f3d",
       "symbols": [
         "current_conversation_media_session",
         "fill_highlight_images"
@@ -2289,7 +2290,7 @@
         "same_media_clock",
         "scoped_path_resolver"
       ],
-      "export_sha256": "045934becdd3889e4bb5895ad8d0472fc11232879249c285c51ef774967f0119",
+      "export_sha256": "866632929265b81a8f36dbba3893f3b111a2adbbc77ef083d0767f33e95017af",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -2582,11 +2583,12 @@
     {
       "module": "pipeline.editorial_short_video_check",
       "source_path": "pipeline/editorial_short_video_check.py",
-      "source_sha256": "446ce564106ed6564193ebd3af6609c0d504704ea9ffca0e8a0e7a8acd02d848",
+      "source_sha256": "d0b782d10e89fa81a5056f16014e312ecdfb6824c1c17ed0f5c0add6c49338d9",
       "symbols": [
         "check_gemini_api_available",
         "check_short_video",
         "main",
+        "resolve_model",
         "validate_clip_window"
       ],
       "selected_symbols": [
@@ -2594,10 +2596,12 @@
         "DEFAULT_MAX_CALLS",
         "DEFAULT_MODEL",
         "MAX_CLIP_SEC",
+        "MAX_INLINE_CLIP_BYTES",
         "MODE_MAX_CALLS",
         "Path",
         "RESPONSE_SCHEMA",
         "SCHEMA",
+        "_extract_cli_output_text",
         "_ledger_path",
         "_unavailable_response",
         "annotations",
@@ -2613,14 +2617,16 @@
         "load_ledger",
         "main",
         "native_path",
+        "os",
         "resolve_max_calls",
+        "resolve_model",
         "shutil",
         "slice_short_clip",
         "subprocess",
         "time",
         "validate_clip_window"
       ],
-      "export_sha256": "ab2441027c98720b98bf8dc1757ecd3a720bbce01bc7f20b3e206706ae766f3a",
+      "export_sha256": "bd0595c78dffc30e3b8bbaf0b38357dde155ca5916a6a897fb119d2c75de038f",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -4137,7 +4143,7 @@
     {
       "module": "pipeline.loki_version_policy",
       "source_path": "pipeline/loki_version_policy.py",
-      "source_sha256": "25f303ef83553f5a78a9bead46f6b27d35bc7ff11e717056884ed04ec30c3d32",
+      "source_sha256": "09d6c9404a4f3bb4b7ca09d7b6ef689a3f972f9577b406a74e983e28e5bad4a7",
       "symbols": [
         "new_job_defaults",
         "normalize_pipeline",
@@ -4145,7 +4151,8 @@
         "pipeline_label",
         "pipelines_for",
         "select_new_pipeline",
-        "uses_loki_308_profile"
+        "uses_loki_308_profile",
+        "uses_loki_saved_html_presentation"
       ],
       "selected_symbols": [
         "POLICY_PATH",
@@ -4159,9 +4166,10 @@
         "pipeline_label",
         "pipelines_for",
         "select_new_pipeline",
-        "uses_loki_308_profile"
+        "uses_loki_308_profile",
+        "uses_loki_saved_html_presentation"
       ],
-      "export_sha256": "82f0f5b9fc4e43d3ad3a438a8ef204a6b476fe81e779d08b95e460c9d03b1916",
+      "export_sha256": "44a497c5bbf2943719c0f9cfdaa3a02f1a6ee7bc10affbc22ab061060efb0499",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -4803,7 +4811,7 @@
     {
       "module": "pipeline.report_artifact_family",
       "source_path": "pipeline/report_artifact_family.py",
-      "source_sha256": "614bce130bdd2b4402e1f3edce0df744a7443234a1408ce1bc41057a7f37b287",
+      "source_sha256": "1edce56cc7df26e671d88ef8365f1cf8472b7583d10dce1b7fdae2300dd28866",
       "symbols": [
         "ReportArtifactFamilyError",
         "_report_family_lock",
@@ -4856,7 +4864,7 @@
         "uuid4",
         "validate_report_artifact_family"
       ],
-      "export_sha256": "08d219b2a3b0b571950e4ac2056afe7cf9183a7d4210d78c8c41fef8a1bc2a36",
+      "export_sha256": "2d747052158d68a44fe6af72be2a3f0a2db86c2617ae98288177f59fa1b087fa",
       "overlay": false,
       "trimmed_imports": []
     },
@@ -7072,7 +7080,7 @@
     {
       "module": "pipeline.vod.process",
       "source_path": "pipeline/vod/process.py",
-      "source_sha256": "c1e5a4079da0392292c375cde855fb7e1d53fe6ad37b54360836a4e1888b36ee",
+      "source_sha256": "033d206873521d88683417d1d61fb2e0c5dbbac83903d4135fc5a905bb85d717",
       "symbols": [
         "_prepare_current_conversation_sources"
       ],
@@ -7081,7 +7089,7 @@
         "_load_user_clips_for_summary",
         "_prepare_current_conversation_sources"
       ],
-      "export_sha256": "969e92a261b1bad2e84ed77da9ff4b5895331f71b40b407934cd4995b07aa518",
+      "export_sha256": "cc0877334dc22bf170b12ef3c2cc380a08b37b033ca78140153a1bb1c46bca3f",
       "overlay": true,
       "trimmed_imports": [],
       "upstream_sha256": "cf8a7e94aa7914a7306f2a9e273511609d3f4d103809fa078b6c965b2ab69d6c"
@@ -7373,7 +7381,7 @@
     {
       "module": "publish.builder.loki_template",
       "source_path": "publish/builder/loki_template.py",
-      "source_sha256": "ec51dd9cee64d49807c1b7153301387de5e2fc96ff97ccd2a8878be9656ce0c5",
+      "source_sha256": "152bc3d172ab050556b07a8992ffb68024b262f9e425847fa8af4195cc609b2b",
       "symbols": [
         "THEME_BOOT_CSP",
         "entry_html",
@@ -7421,7 +7429,7 @@
         "supports_report",
         "urlsplit"
       ],
-      "export_sha256": "9cf3e46bce3c1a566b372628f74a0d285e83811a8129236b292f81788051efc5",
+      "export_sha256": "60377b9e646feb79dcd61c3a465d7cb150d28d8148f672b48ab5572133fe4068",
       "overlay": false,
       "trimmed_imports": [
         {
@@ -8092,7 +8100,7 @@
     },
     {
       "source_path": "vendor/chat-analyze-engine/config/loki_versions.json",
-      "source_sha256": "6165d40b7ff152e5253c279d0e0b05f3254bbec9de5adae7e3ac97cd62425ece"
+      "source_sha256": "87784238e8c0efd86b1534df54bb3e57efef2960099e8b88796d32ed01e41254"
     },
     {
       "source_path": "vendor/loki-page-template/provenance.json",
@@ -8336,7 +8344,7 @@
     "yt_dlp",
     "zlib"
   ],
-  "source_commit": "86e6109a9d05b2648120649926c04e5add8f165b",
+  "source_commit": "81ea54c732f000beb0800ac948eddefec3c77eb7",
   "asset_overlays": [
     {
       "source_path": "scripts/admin/static/report_lifecycle.js",

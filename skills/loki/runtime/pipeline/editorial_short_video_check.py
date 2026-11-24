@@ -10,6 +10,8 @@ import argparse
 
 import json
 
+import os
+
 from pathlib import Path
 
 import shutil
@@ -26,9 +28,11 @@ SCHEMA = "chzz.editorial_short_video_check.v1"
 
 MAX_CLIP_SEC = 60.0
 
+MAX_INLINE_CLIP_BYTES = 14 * 1024 * 1024
+
 CLOCK_TOLERANCE_SEC = 1.0
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL: str | None = None
 
 MODE_MAX_CALLS = {"lite": 2, "normal": 5, "full": 10}
 
@@ -52,7 +56,6 @@ RESPONSE_SCHEMA = {
         "start_offset_sec",
         "end_offset_sec",
     ],
-    "additionalProperties": False,
 }
 
 def resolve_max_calls(execution_mode: str | None = None) -> int:
@@ -155,10 +158,16 @@ def slice_short_clip(
         "veryfast",
         "-crf",
         "28",
+        "-maxrate",
+        "800k",
+        "-bufsize",
+        "1600k",
         "-c:a",
         "aac",
         "-b:a",
-        "64k",
+        "48k",
+        "-ac",
+        "1",
         "-movflags",
         "+faststart",
         str(out),
@@ -168,14 +177,21 @@ def slice_short_clip(
         raise RuntimeError(f"short_clip_slice_failed:{(proc.stderr or '').strip()[:300]}")
     return out
 
+def resolve_model(model: str | None = None) -> str | None:
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    env_model = os.environ.get("LOKI_SHORT_VIDEO_MODEL", "").strip()
+    return env_model or None
+
 def build_gemini_api_command(
     *,
     binary: str,
-    model: str,
+    model: str | None,
     clip_path: Path,
     question: str,
     start_sec: float,
     end_sec: float,
+    body_path: Path | None = None,
 ) -> tuple[list[str], dict]:
     prompt = (
         f"Inspect this short clip ({start_sec:.1f}s to {end_sec:.1f}s) to answer one specific "
@@ -183,32 +199,62 @@ def build_gemini_api_command(
         f"Question: {question}\n"
         f"Return ONLY valid JSON matching the required schema."
     )
-    payload_meta = {
-        "model": model,
+    resolved_model = resolve_model(model)
+    request_body = {
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "short_video_check",
+                "schema": RESPONSE_SCHEMA,
+            },
+        },
         "store": False,
-        "response_format": RESPONSE_SCHEMA,
+    }
+    payload_meta = {
+        "model": resolved_model or "default",
+        "store": False,
+        "response_format": request_body["response_format"],
         "prompt": prompt,
         "clip_path": str(clip_path),
     }
-    command = [
-        binary,
-        "generate",
-        "-m",
-        model,
+    body_arg = f"@{body_path}" if body_path is not None else json.dumps(
+        request_body, ensure_ascii=False, separators=(",", ":"),
+    )
+    command = [binary, "generate"]
+    if resolved_model:
+        command.extend(["-m", resolved_model])
+    command.extend([
+        "-i",
+        str(clip_path),
         "--stream=false",
         "--no-interactive",
         "-o",
         "json",
-        "--file",
-        str(clip_path),
-        "--response-schema",
-        json.dumps(RESPONSE_SCHEMA, ensure_ascii=False, separators=(",", ":")),
-        "--no-store",
+        "--body",
+        body_arg,
         prompt,
-    ]
-    return command, payload_meta
+    ])
+    return command, {"payload": payload_meta, "request_body": request_body}
 
-def _unavailable_response(*, reason: str, start_sec: float, end_sec: float, question: str, model: str, mode: str | None) -> dict:
+def _extract_cli_output_text(parsed: object) -> str | dict:
+    if isinstance(parsed, dict):
+        steps = parsed.get("steps")
+        if isinstance(steps, list):
+            parts: list[str] = []
+            for step in steps:
+                if isinstance(step, dict) and step.get("type") == "model_output":
+                    for item in step.get("content") or []:
+                        if isinstance(item, dict) and item.get("type", "text") == "text" and isinstance(item.get("text"), str):
+                            parts.append(item["text"])
+            if parts:
+                return "".join(parts)
+        if isinstance(parsed.get("text"), str):
+            return parsed["text"]
+        if "observed_action" in parsed:
+            return parsed
+    return ""
+
+def _unavailable_response(*, reason: str, start_sec: float, end_sec: float, question: str, model: str | None, mode: str | None) -> dict:
     return {
         "schema_version": SCHEMA,
         "status": "unavailable",
@@ -218,7 +264,7 @@ def _unavailable_response(*, reason: str, start_sec: float, end_sec: float, ques
         "authority": "advisory_short_video_perception; never_blocks_submit_or_replaces_ew_reads",
         "window_sec": [start_sec, end_sec],
         "question": question,
-        "model": model,
+        "model": model or "default",
         "execution_mode": mode,
         "store": False,
         "observation": None,
@@ -233,7 +279,7 @@ def check_short_video(
     question: str,
     execution_mode: str | None = None,
     vod_duration_sec: float | None = None,
-    model: str = DEFAULT_MODEL,
+    model: str | None = DEFAULT_MODEL,
     binary: str = "gemini-api",
     ffmpeg_path: str | None = None,
     dry_run: bool = False,
@@ -246,6 +292,7 @@ def check_short_video(
     if not isinstance(question, str) or not question.strip():
         raise ValueError("short_video_check_question_required")
     start, end, duration = validate_clip_window(start_sec, end_sec, vod_duration_sec=vod_duration_sec)
+    resolved_model = resolve_model(model)
     root = native_path(job_root).resolve()
     checks_dir = root / "short-video-checks"
     ledger = load_ledger(root)
@@ -256,16 +303,16 @@ def check_short_video(
             start_sec=start,
             end_sec=end,
             question=question.strip(),
-            model=model,
+            model=resolved_model,
             mode=execution_mode,
         )
-    clip_key = digest({"start": start, "end": end, "question": question.strip(), "model": model})[:16]
+    clip_key = digest({"start": start, "end": end, "question": question.strip(), "model": resolved_model or "default"})[:16]
     clip_path = checks_dir / "clips" / f"clip-{int(start)}-{int(end)}-{clip_key}.mp4"
 
     if dry_run:
-        command, payload_meta = build_gemini_api_command(
+        command, cmd_info = build_gemini_api_command(
             binary=binary,
-            model=model,
+            model=resolved_model,
             clip_path=clip_path,
             question=question.strip(),
             start_sec=start,
@@ -280,13 +327,13 @@ def check_short_video(
             "window_sec": [start, end],
             "duration_sec": duration,
             "question": question.strip(),
-            "model": model,
+            "model": resolved_model or "default",
             "execution_mode": execution_mode,
             "budget": {"used": len(ledger.get("calls", [])), "max_calls": max_calls},
             "store": False,
             "planned_clip_path": str(clip_path),
             "command": command,
-            "request_meta": payload_meta,
+            "request_meta": cmd_info["payload"],
             "observation": None,
         }
 
@@ -296,7 +343,7 @@ def check_short_video(
             start_sec=start,
             end_sec=end,
             question=question.strip(),
-            model=model,
+            model=resolved_model,
             mode=execution_mode,
         )
 
@@ -307,7 +354,7 @@ def check_short_video(
             start_sec=start,
             end_sec=end,
             question=question.strip(),
-            model=model,
+            model=resolved_model,
             mode=execution_mode,
         )
 
@@ -325,18 +372,31 @@ def check_short_video(
             start_sec=start,
             end_sec=end,
             question=question.strip(),
-            model=model,
+            model=resolved_model,
             mode=execution_mode,
         )
 
-    command, payload_meta = build_gemini_api_command(
+    if sliced.stat().st_size > MAX_INLINE_CLIP_BYTES:
+        return _unavailable_response(
+            reason="clip_exceeds_inline_limit",
+            start_sec=start,
+            end_sec=end,
+            question=question.strip(),
+            model=resolved_model,
+            mode=execution_mode,
+        )
+
+    body_path = checks_dir / "requests" / f"req-{clip_key}.json"
+    command, cmd_info = build_gemini_api_command(
         binary=avail["binary"],
-        model=model,
+        model=resolved_model,
         clip_path=sliced,
         question=question.strip(),
         start_sec=start,
         end_sec=end,
+        body_path=body_path,
     )
+    atomic_json(body_path, cmd_info["request_body"])
     started = time.time()
     try:
         proc = subprocess.run(
@@ -353,7 +413,16 @@ def check_short_video(
             start_sec=start,
             end_sec=end,
             question=question.strip(),
-            model=model,
+            model=resolved_model,
+            mode=execution_mode,
+        )
+    if proc.returncode == 3:
+        return _unavailable_response(
+            reason="gemini_api_auth_required",
+            start_sec=start,
+            end_sec=end,
+            question=question.strip(),
+            model=resolved_model,
             mode=execution_mode,
         )
     if proc.returncode != 0:
@@ -362,14 +431,32 @@ def check_short_video(
             start_sec=start,
             end_sec=end,
             question=question.strip(),
-            model=model,
+            model=resolved_model,
             mode=execution_mode,
         )
     raw_text = (proc.stdout or "").strip()
+    reported_model = resolved_model or "default"
     try:
         parsed = json.loads(raw_text)
-        if isinstance(parsed, dict) and isinstance(parsed.get("text"), str):
-            observation = json.loads(parsed["text"])
+        if isinstance(parsed, dict):
+            if isinstance(parsed.get("status"), str) and parsed["status"] and parsed["status"] != "completed":
+                return _unavailable_response(
+                    reason=f"gemini_api_status:{parsed['status']}",
+                    start_sec=start,
+                    end_sec=end,
+                    question=question.strip(),
+                    model=resolved_model,
+                    mode=execution_mode,
+                )
+            if isinstance(parsed.get("model"), str) and parsed["model"].strip():
+                reported_model = parsed["model"].strip()
+            extracted = _extract_cli_output_text(parsed)
+            if isinstance(extracted, dict):
+                observation = extracted
+            elif isinstance(extracted, str) and extracted.strip():
+                observation = json.loads(extracted)
+            else:
+                observation = parsed
         else:
             observation = parsed
     except Exception:
@@ -391,7 +478,7 @@ def check_short_video(
         "window_sec": [start, end],
         "duration_sec": duration,
         "question": question.strip(),
-        "model": model,
+        "model": reported_model,
         "execution_mode": execution_mode,
         "store": False,
         "clip_path": str(sliced),
@@ -406,7 +493,7 @@ def check_short_video(
         "receipt_id": receipt_id,
         "receipt_path": str(receipt_path),
         "window_sec": [start, end],
-        "model": model,
+        "model": reported_model,
         "created_at": time.time(),
     })
     atomic_json(_ledger_path(root), ledger)

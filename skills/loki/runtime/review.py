@@ -55,7 +55,7 @@ def handler(store, *, assets=HERE):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", (
-                "default-src 'none'; img-src data: 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; sandbox allow-scripts"
+                "default-src 'none'; img-src data: 'self' https: http:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; sandbox allow-scripts"
                 if report else
                 "default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; "
                 f"script-src 'self' '{THEME_BOOT_CSP}'; font-src 'self'; connect-src 'self'; "

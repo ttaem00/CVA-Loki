@@ -45,21 +45,32 @@ _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "me
 _THEME_BOOT = """
 (() => {
   const root = document.documentElement;
+  const EXPLICIT_KEY = 'loki-theme-explicit-v2';
+  const RUNTIME_KEY = 'loki-design-theme-v1';
   let theme = 'dark';
   try {
-    const saved = localStorage.getItem('loki-design-theme-v1');
+    const saved = localStorage.getItem(EXPLICIT_KEY);
     if (saved === 'light' || saved === 'dark') theme = saved;
-    else localStorage.setItem('loki-design-theme-v1', theme);
+    localStorage.setItem(RUNTIME_KEY, theme);
   } catch (_) {}
   root.dataset.theme = theme;
   const syncColor = () => {
-    document.querySelector('meta[name="theme-color"]').content = root.dataset.theme === 'dark' ? '#141D2B' : '#FAF5EB';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = root.dataset.theme === 'dark' ? '#141D2B' : '#FAF5EB';
   };
   syncColor();
   document.addEventListener('loki:report-ready', () => {
-    if (root.dataset.theme !== theme) document.getElementById('themeButton')?.click();
+    const btn = document.getElementById('themeButton');
+    if (root.dataset.theme !== theme) btn?.click();
     syncColor();
-    document.getElementById('themeButton')?.addEventListener('click', syncColor);
+    btn?.addEventListener('click', () => {
+      syncColor();
+      try {
+        if (root.dataset.theme === 'light' || root.dataset.theme === 'dark') {
+          localStorage.setItem(EXPLICIT_KEY, root.dataset.theme);
+        }
+      } catch (_) {}
+    });
   }, {once: true});
 })();
 """
@@ -85,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const view = window.LokiReportAdapter.create(packet, environment);
     root.dataset.lokiStatus = 'rendering';
+    if (main) main.style.visibility = 'hidden';
     // The standalone viewer has no editor server. Its original VOD links
     // still come from the verified source in the adapter.
     window.LokiApp.mount({...view, videoNo: ''}, environment);
@@ -100,7 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('reportStatusTitle').textContent = '저장된 보고서를 표시할 수 없습니다.';
     document.getElementById('reportStatusMessage').textContent = error.message;
   } finally {
-    main.setAttribute('aria-busy', 'false');
+    if (main) {
+      main.style.removeProperty('visibility');
+      main.setAttribute('aria-busy', 'false');
+    }
   }
 }, {once:true});
 """

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
-  <title id="title">CVA-Loki 3.0.9 — 치지직 방송을 읽고, 장면을 찾다.</title>
-  <desc id="desc">현재 코덱스가 치지직 다시보기 원문과 장면을 직접 읽어 보고서를 작성합니다. GPU 자동 감지, 코덱스 플러그인, 하이라이트 이미지 추출을 지원하는 비공식 프로젝트입니다.</desc>
+  <title id="title">CVA-Loki 3.0.9.1 — 치지직 방송을 읽고, 장면을 찾다.</title>
+  <desc id="desc">선택한 AI 호스트(Codex·Claude·Antigravity·Gemini CLI·Web AI·로컬 LLM)가 치지직 다시보기 원문과 장면을 직접 읽어 보고서를 작성합니다. GPU 자동 감지, LLM 플러그인·스킬, 하이라이트 이미지 추출을 지원하는 비공식 프로젝트입니다.</desc>
   <defs>
     <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#111a31"/><stop offset="1" stop-color="#211d3a"/></linearGradient>
     <linearGradient id="accent"><stop stop-color="#67e8f9"/><stop offset="1" stop-color="#b6a0ff"/></linearGradient>
@@ -11,14 +11,14 @@
   <path d="M0 337H1200" stroke="url(#accent)" stroke-width="6"/>
   <g font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif">
     <text x="48" y="64" fill="#e5e9fa" font-size="26" font-weight="700">CVA-Loki</text>
-    <rect x="251" y="42" width="67" height="27" rx="13.5" fill="#343653"/>
-    <text x="284.5" y="60" text-anchor="middle" fill="#c7c7f3" font-size="13" font-weight="600">3.0.9</text>
+    <rect x="251" y="42" width="78" height="27" rx="13.5" fill="#343653"/>
+    <text x="290" y="60" text-anchor="middle" fill="#c7c7f3" font-size="13" font-weight="600">3.0.9.1</text>
     <text x="48" y="137" fill="#ffffff" font-size="43" font-weight="750" letter-spacing="-1.7">방송을 읽고, 장면을 찾다.</text>
     <text x="50" y="174" fill="#b6c1d8" font-size="19">치지직 다시보기의 원문과 장면을 근거로 정리합니다.</text>
     <g font-size="13" font-weight="600" fill="#d8e4f8">
       <rect x="48" y="208" width="159" height="33" rx="16.5" fill="#25334b"/><circle cx="66" cy="224.5" r="4" fill="#67e8f9"/><text x="79" y="229">GPU 자동 감지</text>
-      <rect x="218" y="208" width="175" height="33" rx="16.5" fill="#30304d"/><circle cx="236" cy="224.5" r="4" fill="#b6a0ff"/><text x="249" y="229">코덱스 플러그인</text>
-      <rect x="404" y="208" width="181" height="33" rx="16.5" fill="#30304d"/><circle cx="422" cy="224.5" r="4" fill="#b6a0ff"/><text x="435" y="229">하이라이트 이미지</text>
+      <rect x="218" y="208" width="156" height="33" rx="16.5" fill="#30304d"/><circle cx="236" cy="224.5" r="4" fill="#b6a0ff"/><text x="249" y="229">LLM 플러그인</text>
+      <rect x="385" y="208" width="181" height="33" rx="16.5" fill="#30304d"/><circle cx="403" cy="224.5" r="4" fill="#b6a0ff"/><text x="416" y="229">하이라이트 이미지</text>
     </g>
     <text x="50" y="281" fill="#b6c1d8" font-size="15" font-weight="600">치지직 대상 비공식 프로젝트</text>
     <text x="50" y="307" fill="#8f9bb5" font-size="13">네이버·치지직과 제휴·후원·보증 관계가 없습니다.</text>
