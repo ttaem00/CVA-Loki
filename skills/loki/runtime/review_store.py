@@ -169,7 +169,8 @@ class ReviewStore:
         meta = validate_report_artifact_family(*map(native_path, paths))["metadata"]
         return dict(md=raws[0].decode("utf-8"), html=raws[1].decode("utf-8"), meta=meta,
             created_at=datetime.fromtimestamp(native_path(paths[0]).stat().st_mtime, timezone.utc).isoformat(),
-            base=paths[0].stem, source_sha=_hash(b"\0".join(raws)), revision_id="original", parent=None)
+            base=paths[0].stem, source_sha=_hash(b"\0".join(raws)), revision_id="original", parent=None,
+            metadata_path=native_path(paths[2]))
 
     def _context(self, job):
         source = self._source(job)
@@ -188,7 +189,8 @@ class ReviewStore:
         for path in paths:
             self._bytes(path)
         meta = _original_identity_defaults(validate_report_artifact_family(*map(native_path, paths))["metadata"], source["meta"])
-        return dict(state, md=self._bytes(paths[0]).decode(), html=self._bytes(paths[1]).decode(), meta=meta)
+        return dict(state, md=self._bytes(paths[0]).decode(), html=self._bytes(paths[1]).decode(), meta=meta,
+                    metadata_path=source["metadata_path"])
 
     def _view(self, report_id, context):
         meta = context["meta"]

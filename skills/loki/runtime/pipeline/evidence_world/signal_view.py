@@ -6,21 +6,45 @@ import json
 
 from itertools import zip_longest
 
+from math import isfinite
+
+from sqlite3 import DatabaseError
+
 from statistics import median
 
-from ..chat_analyzer import WINDOW_SEC, CHAT_PEAK_POLICY_REVISION
+from ..chat_analyzer import BOUNDED_CHAT_PEAK_POLICY_REVISION, CHAT_PEAK_POLICY_REVISION, WINDOW_SEC, _describe_intensity
 
-from .contracts import EvidenceError, canonical_json, digest, file_hash, native_path
+from .contracts import EvidenceError, canonical_json, digest, file_hash, native_path, overlaps
 
 from .index import atomic_json
+
+from .query import _ranges
 
 from .records import assert_asset_fresh, chat_analysis_rows
 
 PROFILE = "source_signal_orientation_v1"
 
+LOCAL_REACTION_PROFILE = "source_signal_orientation_v2"
+
+OBSERVED_DENSITY_PROFILE = "source_signal_orientation_v3"
+
 CATALOG_REVISION = f"records_native_clock_v10-{CHAT_PEAK_POLICY_REVISION}"
 
+OBSERVED_DENSITY_CATALOG_REVISION = f"records_native_clock_v11-{BOUNDED_CHAT_PEAK_POLICY_REVISION}"
+
 CLIP_PREVIEWS = {"location_v1", "title_time_duration_v1"}
+
+PEAK_CONTEXT_SEC = 20
+
+PEAK_CONTEXT_LIMIT = 3
+
+FIRST_DETAILS_RESERVE_BYTES = 1750
+
+REACTION_COUNTS = ("laughter_count", "surprise_count", "question_count")
+
+PEAK_COUNTS = (*REACTION_COUNTS, "count")
+
+PAIRED_REACTION_QUESTION = "author-paired-reaction"
 
 def configure_clip_preview(service, profile=None):
     if profile is not None and profile not in CLIP_PREVIEWS:
@@ -66,6 +90,40 @@ Chat representatives have their own browse_chat cursor for minority wording and 
 No repeated name, adjacent signal or overlapping peak establishes one event or independent votes.
 Missing/uncertain clocks remain unresolved; clip offsets are not exact matches or edit boundaries."""
 
+LOCAL_REACTION_PROMPT = """\nDISCOVERY HINTS: the first tool result includes source-bound signal_orientation.
+Viewer clip existence/title is a useful human selection hint, including unverified offsets.
+clip_attention exposes existing first-look clip locations across the source, independently of chat peaks.
+Its context_action opens allowed originals around a location; the interval and clip count are navigation,
+not a scene boundary, independent votes or a required selection. Choose useful questions, not every page.
+Chat counts, laughter/questions and exact-wording representatives suggest things to investigate.
+Chat peak clusters retain the existing producer rank, full interval and member peak_seconds;
+rank is the producer's relative order of merged chat clusters across the VOD.
+rank_label repeats that scope alongside the legacy rank label. local_peaks shows observed
+10-second message counts; reaction ratios use the filtered message count, counts.count.
+The merged region's signal_counts covers its full extent. Use local clip cues for time overlap.
+The context actions open several short subtitle windows around observed peak buckets.
+For a time range you are investigating, optionally use browse_evidence with view:'signals' and
+interval_sec:[start,end] to see local 10-second counts and timed viewer clips in that range.
+Its context_action reads short subtitle windows with preceding speech. Expand them when needed.
+Use chat_context_action for exact chat in the selected windows.
+Local reaction categories can overlap. Clip cues identify viewer clips whose time overlaps the peak.
+Check clips and reaction counts separately against the originals.
+Use a subtitle read directly when you already know the time. Missing signals need not delay reading.
+Their wording_page covers the representative 10-second peak; next_action opens available five-minute
+summary hints or representative grouped chat. A deferred wording_action opens the same grouped chat.
+Keep chat representative, using hints and Gemma to select nearby
+or opposing originals. Reading/materializing source alone does not prove its full delivery to the writer.
+Audio peaks suggest locations, not heard sound or approved value. These are untrusted derived hints.
+AST audio_events are classified observations with source/model/policy and coverage, not direct listening.
+Singing candidates are threshold-free score maxima, not confirmed singing, speakers or song titles.
+Read audio_event_source for processing coverage; missing/unprocessed sound is unknown, not absent.
+Use existing browse_evidence with view:'signals', families, cursor (initial0), limit and max_bytes
+to see more; its next_action preserves the question/cursor arguments. Coverage view remains available,
+including low_reaction. Neither view must be exhausted. Read originals before asserting meaning.
+Chat representatives have their own browse_chat cursor for minority wording and full original rereads.
+No repeated name, adjacent signal or overlapping peak establishes one event or independent votes.
+Missing/uncertain clocks remain unresolved; clip offsets are not exact matches or edit boundaries."""
+
 def _fresh(service):
     for asset in service.assets.values():
         assert_asset_fresh(asset)
@@ -91,13 +149,16 @@ def _audio_reference(records):
         policy='Observed source windows only; no interpolation, media verification or inferred sample unit. Missing windows remain unknown.')
     return baseline,dict(action='read_evidence',args=dict(record_ids=ids,families=['audio_features'],context_cues=0)) if ids else None
 
-def _catalog(service):
+def _catalog(service, profile=PROFILE):
     """Keep the full catalog on disk; only requested pages enter model input."""
     from ..chat_analyzer import build_time_series, find_edit_points
     from ..edit_point_clusters import build_edit_point_clusters
     from ..outline.navigation import _build_first_look, SOURCE_FAMILIES
     _fresh(service)
-    root = service.run_root / "signal-views" / PROFILE / CATALOG_REVISION
+    observed_density = profile == OBSERVED_DENSITY_PROFILE
+    catalog_profile = OBSERVED_DENSITY_PROFILE if observed_density else PROFILE
+    catalog_revision = OBSERVED_DENSITY_CATALOG_REVISION if observed_density else CATALOG_REVISION
+    root = service.run_root / "signal-views" / catalog_profile / catalog_revision
     path = root / "catalog.json"
     if path.is_file():
         try:
@@ -140,6 +201,7 @@ def _catalog(service):
         users_known[t] &= bool(r.get("uid") or r.get("user") or r.get("nick"))
     observed_counts=list(raw_counts.values())
     chat_reference=median(observed_counts) if observed_counts else None
+    density_buckets = {}
     for t,total in sorted(raw_counts.items()):
         stats = dict(series.get(t,{}))
         stats.pop("score",None)
@@ -159,11 +221,22 @@ def _catalog(service):
         if native:
             items[-1]['interval_utc_ms']=[t*1000,(t+10)*1000]
             items[-1]['uncertainties']=['vod_clock_unverified']
+        elif observed_density:
+            density_buckets[t] = stats
     if service.duration is not None:
 
 
-        for peak in find_edit_points(chats, top_n=len(series), duration_sec=service.duration):
+        for peak in find_edit_points(chats, top_n=len(series), duration_sec=service.duration,
+                                     bounded_clusters=profile == OBSERVED_DENSITY_PROFILE):
             start,end=peak['start_sec'],min(peak['end_sec'],service.duration)
+            if observed_density:
+
+                for member in peak.get('peak_members', ()):
+                    bucket = density_buckets.get(member['sec'])
+                    z_count = member.get('z_count')
+                    if (bucket is not None and bucket.get('count') == member.get('count')
+                            and type(z_count) in (int, float) and isfinite(z_count)):
+                        bucket['z_count'] = z_count
             stats=dict(peak)
             stats.pop('laughter_echo_text',None)
 
@@ -215,7 +288,7 @@ def _catalog(service):
 
     queues = [[r for r in items if r['family']==f] for f in ('clip','chat','audio_features','live_metadata')]
     items = [r for row in zip_longest(*queues) for r in row if r is not None]
-    catalog = dict(profile=PROFILE,reader_revision=CATALOG_REVISION,source_id=service.source_id,world_revision=service.world_revision,items=items,
+    catalog = dict(profile=catalog_profile,reader_revision=catalog_revision,source_id=service.source_id,world_revision=service.world_revision,items=items,
         family_status=service.family_status,first_look=first,
         chat_baseline=dict(total_originals=len(chats),duration_sec=service.duration,
                            mean_originals_per_10s=len(chats)/max(1,service.duration/10) if service.duration is not None else None,
@@ -225,7 +298,7 @@ def _catalog(service):
     atomic_json(path,dict(catalog=catalog,sha256=digest(catalog)))
     return root,catalog
 
-def _peak_attention(catalog, allowed):
+def _legacy_peak_attention(catalog, allowed):
     """Deliver existing merged peaks as exploration units, without re-clustering."""
     from ..outline.navigation import FIRST_LOOK_CONTEXT_SEC
     peaks = [r for r in catalog['items'] if r['kind']=='chat_peak_cluster' and r['family'] in allowed]
@@ -248,6 +321,333 @@ def _peak_attention(catalog, allowed):
                 intervals_sec=[[max(0,a-FIRST_LOOK_CONTEXT_SEC),min(duration,b+FIRST_LOOK_CONTEXT_SEC)]],
                 families=context_families,context_cues=0))))
     return result
+
+def _chat_buckets(catalog):
+    return {row['interval_sec'][0]: row for row in catalog['items']
+            if row['kind'] == 'chat_reaction' and row['interval_sec']}
+
+def _peak_seconds(peaks):
+    return {sec for peak in peaks for sec in peak['stats'].get('peak_seconds', ())}
+
+def _representative_peaks(seconds, buckets):
+    """Choose separated observed buckets by existing counts, one measure at a time."""
+    remaining = sorted(seconds & buckets.keys())
+    selected = []
+    for field in PEAK_COUNTS:
+        if not remaining or len(selected) == PEAK_CONTEXT_LIMIT:
+            break
+        sec = max(remaining, key=lambda t: buckets[t]['stats'].get(field, 0))
+        if not buckets[sec]['stats'].get(field, 0):
+            continue
+        selected.append(sec)
+        remaining = [t for t in remaining if abs(t - sec) >= 2 * PEAK_CONTEXT_SEC]
+    return sorted(selected)
+
+def _subtitle_action(seconds, duration, allowed):
+    if not seconds or 'stt' not in allowed:
+        return None
+    return dict(action='read_evidence', args=dict(
+        intervals_sec=[[max(0, t - PEAK_CONTEXT_SEC), min(duration, t + PEAK_CONTEXT_SEC)]
+                       for t in seconds], families=['stt'], context_cues=0))
+
+def _overlaps(span, interval):
+    if not span:
+        return False
+    if span[0] == span[1]:
+        return interval[0] <= span[0] < interval[1]
+    return span[0] < interval[1] and interval[0] < span[1]
+
+def _reaction_source_available(service):
+    return (getattr(service, "signal_view_profile", None) == OBSERVED_DENSITY_PROFILE
+            and service.duration is not None and service.duration > 0
+            and service.family_status.get("chat") in {"present", "partial"}
+            and "chat" in service.policy["allowed"])
+
+def _observed_reaction_buckets(service):
+    _, catalog = _catalog(service, OBSERVED_DENSITY_PROFILE)
+    buckets = _chat_buckets(catalog)
+    peaks = _peak_seconds(row for row in catalog["items"] if row["kind"] == "chat_peak_cluster")
+    return [buckets[second] for second in sorted(peaks & buckets.keys())
+            if "z_count" in buckets[second]["stats"]]
+
+def _reaction_key(bucket):
+    stats = bucket["stats"]
+    return (max(stats.get(field, 0) for field in REACTION_COUNTS),
+            stats.get("count", 0), -bucket["interval_sec"][0])
+
+def _short_stt_read_spans(service, action, original):
+    args = action.get("args", {})
+    if (action.get("action") != "read_evidence" or not args.get("intervals_sec")
+            or args.get("cursor") or set(args.get("families") or ()) != {"stt"}
+            or not original.get("read_id") or original.get("source_id") != service.source_id
+            or original.get("world_revision") != service.world_revision):
+        return []
+    timed_stt = [row["time_index"] for row in original.get("records", ())
+                 if row["family"] == "stt" and row.get("time_index") and row.get("raw_text")]
+    return [(start, end) for start, end in _ranges(args)
+            if end - start <= 2 * PEAK_CONTEXT_SEC * 1_000_000
+            and any(overlaps(clock, start, end) for clock in timed_stt)]
+
+def _reaction_counts(bucket):
+    return {field: bucket["stats"].get(field, 0) for field in (*PEAK_COUNTS, "z_count")}
+
+def _reaction_lookup_hint(bucket, duration, allowed):
+    interval = bucket["interval_sec"]
+    counts = _reaction_counts(bucket)
+    ratios = ({field: round(counts[field] / counts["count"], 4) for field in REACTION_COUNTS}
+              if counts["count"] else {})
+    return dict(interval_sec=interval, counts=counts, reaction_ratios=ratios,
+                context_action=_subtitle_action([interval[0]], duration, allowed),
+                chat_context_action=dict(action="read_evidence", args=dict(
+                    intervals_sec=[interval], families=["chat"], context_cues=0)))
+
+def chronological_reaction_hints(service, *, max_bytes=3_200):
+    """Bound optional lookup hints across the clock without rescoring the producer's data."""
+    if not _reaction_source_available(service):
+        return None
+    try:
+        buckets = _observed_reaction_buckets(service)
+    except (EvidenceError, OSError, DatabaseError, json.JSONDecodeError):
+        return None
+    if not buckets:
+        return None
+    for bands in (8, 4, 2, 1):
+        representatives = {}
+        for bucket in buckets:
+            band = min(bands - 1, int(bucket["interval_sec"][0] * bands / service.duration))
+            if band not in representatives or _reaction_key(bucket) > _reaction_key(representatives[band]):
+                representatives[band] = bucket
+        hint = dict(source_id=service.source_id, world_revision=service.world_revision, original_read=False,
+            local_peaks=[_reaction_lookup_hint(representatives[band], service.duration, service.policy["allowed"])
+                         for band in sorted(representatives)])
+        if len(canonical_json(hint).encode("utf-8")) <= max_bytes:
+            return hint
+    return None
+
+def near_end_reaction_hint(service, action, original, *, max_bytes=750):
+    """Offer one explicit lookup for an observed bucket just after a short STT read."""
+    if not _reaction_source_available(service):
+        return None
+    try:
+        spans = _short_stt_read_spans(service, action, original)
+        if not spans:
+            return None
+        candidates = []
+        for bucket in _observed_reaction_buckets(service):
+            start, end = (round(second * 1_000_000) for second in bucket["interval_sec"])
+            if any(start < right and left < end for left, right in spans):
+                continue
+            gaps = [start - right for _, right in spans if 0 <= start - right <= PEAK_CONTEXT_SEC * 1_000_000]
+            if gaps:
+                candidates.append((min(gaps), start, bucket))
+        if not candidates:
+            return None
+        gap, _, bucket = min(candidates, key=lambda candidate: candidate[:2])
+        hint = dict(source_id=service.source_id, world_revision=service.world_revision, original_read=False,
+                    after_read_gap_sec=float(gap / 1_000_000),
+                    **_reaction_lookup_hint(bucket, service.duration, service.policy["allowed"]))
+        if len(canonical_json(hint).encode("utf-8")) <= max_bytes:
+            return hint
+    except (EvidenceError, OSError, DatabaseError, json.JSONDecodeError):
+        return None
+    return None
+
+def read_nearby_reaction(service, action, original, delivered_refs, *, max_bytes):
+    """Open at most one exact chat page overlapping an already-read short STT window."""
+    if not _reaction_source_available(service):
+        return None
+    try:
+        spans = _short_stt_read_spans(service, action, original)
+        if not spans:
+            return None
+        choices = []
+        for bucket in _observed_reaction_buckets(service):
+            start, end = bucket["interval_sec"]
+            if any(start * 1_000_000 < right and left < end * 1_000_000 for left, right in spans):
+                choices.append(bucket)
+        if delivered_refs and choices:
+            with service.open() as db:
+                def unseen(bucket):
+                    start, end = bucket["interval_sec"]
+                    rows = db.execute("SELECT record_id FROM records WHERE family='chat' AND time_kind='instant' "
+                                      "AND start_us>=? AND start_us<?", (int(start * 1_000_000), int(end * 1_000_000)))
+                    return not any(row[0] in delivered_refs for row in rows)
+                choices = [bucket for bucket in choices if unseen(bucket)]
+        if not choices:
+            return None
+        peak = max(choices, key=_reaction_key)
+        interval = peak["interval_sec"]
+        page = service.read(question_id=PAIRED_REACTION_QUESTION,
+                            intervals_sec=[interval], families=["chat"], context_cues=0,
+                            max_bytes=min(8_000, max_bytes))
+    except (EvidenceError, OSError, DatabaseError, json.JSONDecodeError):
+        return None
+    if not any(row.get("raw_text") and row.get("fragment_complete") for row in page["records"]):
+        return None
+    return dict(read_id=page["read_id"], peak_sec=interval[0], interval_sec=interval,
+                counts=_reaction_counts(peak), partial_page=bool(page["next_cursor"]))
+
+def _peak_attention(catalog, allowed, buckets):
+    """Keep the producer's merged rank and use its member buckets for short reads."""
+    peaks = [r for r in catalog['items'] if r['kind']=='chat_peak_cluster' and r['family'] in allowed]
+    duration = catalog['chat_baseline']['duration_sec']
+    result = []
+    for peak in peaks:
+        a,b = peak['interval_sec']
+        counts = defaultdict(int)
+        for hint in catalog['items']:
+            span = hint['interval_sec']
+            if (hint['family'] in allowed and span and
+                hint['kind'] in {'chat_peak_cluster','viewer_clip','audio_peak','audio_events','singing_candidates'} and
+                _overlaps(span, (a, b))):
+                counts[hint['family']] += 1
+        region = dict(interval_sec=[a,b],
+            merged_peak_count=peak['stats'].get('cluster_count'),signal_counts=dict(counts),
+            source_hint_ref=peak['hint_ref'], original_read=False,
+            context_action=_subtitle_action(_representative_peaks(_peak_seconds([peak]), buckets),
+                                            duration, allowed))
+        rank = peak.get('rank')
+        if type(rank) is int and rank > 0:
+            region.update(rank=rank, rank_label=f"{rank}위 · 방송 내 채팅 클러스터 순위 ({_describe_intensity(peak)})")
+        result.append(region)
+    return sorted(result, key=lambda r: r.get('rank', float('inf')))
+
+def _reaction_valley(a, b, buckets):
+    """Separate nearby peaks when two observed buckets show a sustained drop."""
+    left, right = sorted((a, b))
+    floor = min(buckets[t]['stats']['count'] for t in (left, right)) / 2
+    return any(t in buckets and t + WINDOW_SEC in buckets
+               and buckets[t]['stats']['count'] < floor
+               and buckets[t + WINDOW_SEC]['stats']['count'] < floor
+               for t in range(left + WINDOW_SEC, right - WINDOW_SEC, WINDOW_SEC))
+
+def _reaction_focus(peak, buckets):
+    """Use neighboring observed counts for a local comparison and reaction extent."""
+    sec = peak['stats']['sec']
+    counts = _reaction_counts(buckets[sec])
+    nearby = [buckets[t]['stats'] for t in range(sec - 60, sec + 61, WINDOW_SEC)
+              if t != sec and t in buckets]
+    reference = ({field: round(median(b.get(field, 0) for b in nearby), 1)
+                  for field in PEAK_COUNTS} if len(nearby) >= 4 else {})
+    if not reference:
+        return reference, buckets[sec]['interval_sec']
+    field = max(PEAK_COUNTS, key=lambda k: counts[k] - reference[k])
+    threshold = (counts[field] + reference[field]) / 2
+    start, end = buckets[sec]['interval_sec']
+    lower, upper = peak['interval_sec']
+    while start - WINDOW_SEC >= lower and buckets.get(start - WINDOW_SEC, {}).get('stats', {}).get(field, -1) > threshold:
+        start -= WINDOW_SEC
+    while end < upper and buckets.get(end, {}).get('stats', {}).get(field, -1) > threshold:
+        end = buckets[end]['interval_sec'][1]
+    return reference, [start, end]
+
+def _first_reaction_scenes(catalog, allowed, buckets, limit):
+    """Keep one first-look entry per nearby reaction, without merging the catalog."""
+    if 'chat' not in allowed or 'stt' not in allowed:
+        return []
+    duration = catalog['chat_baseline']['duration_sec']
+    peaks = sorted((row for row in catalog['items'] if row['kind'] == 'chat_peak_cluster'),
+                   key=lambda row: row['rank'])
+    vicinity = PEAK_CONTEXT_SEC + WINDOW_SEC
+    distinct = []
+    for peak in peaks:
+        sec = peak['stats']['sec']
+        if sec not in buckets:
+            continue
+        reference, reaction_span = _reaction_focus(peak, buckets)
+        counts = _reaction_counts(buckets[sec])
+        if reference and not any(counts[field] > typical for field, typical in reference.items()):
+            continue
+        start, end = peak['interval_sec']
+        if any(abs(sec - other['stats']['sec']) <= 2 * vicinity
+               and (other['interval_sec'][0] - vicinity <= sec <= other['interval_sec'][1] + vicinity
+                    or start - vicinity <= other['stats']['sec'] <= end + vicinity)
+               and not _reaction_valley(sec, other['stats']['sec'], buckets)
+               for other in distinct):
+            continue
+        distinct.append(dict(peak, nearby_median_counts=reference, reaction_span=reaction_span))
+
+
+
+    strong_count = max(1, limit - 1)
+    selected = distinct[:strong_count]
+    covered = {int(4 * peak['stats']['sec'] / duration) for peak in selected}
+    for peak in distinct[strong_count:]:
+        if len(selected) >= limit:
+            break
+        band = int(4 * peak['stats']['sec'] / duration)
+        if band not in covered:
+            covered.add(band)
+            selected.append(peak)
+    selected_ranks = {peak['rank'] for peak in selected}
+    ordered = selected + [peak for peak in distinct if peak['rank'] not in selected_ranks]
+    result = []
+    for peak in ordered[:limit]:
+        sec = peak['stats']['sec']
+        bucket = buckets[sec]
+        start, end = bucket['interval_sec']
+        lead = max(0, start - 3 * PEAK_CONTEXT_SEC, peak['reaction_span'][0] - 2 * PEAK_CONTEXT_SEC)
+        scene = dict(
+            interval_sec=[start, end], counts=_reaction_counts(bucket),
+            nearby_median_counts=peak['nearby_median_counts'],
+            reaction_interval_sec=peak['reaction_span'],
+            rank=peak['rank'], rank_label=_describe_intensity(peak),
+            source_hint_ref=peak['hint_ref'],
+            context_action=dict(action='read_evidence', args=dict(
+                intervals_sec=[[lead, min(duration, end + PEAK_CONTEXT_SEC)]],
+                families=['stt'], context_cues=0, max_bytes=8_000)),
+        )
+        if 'clip' in allowed:
+            clip = min((row for row in catalog['items'] if row['kind'] == 'viewer_clip'
+                        and row['metadata'].get('offset_status') == 'ok'
+                        and _overlaps(row['interval_sec'], (start, end))
+                        and abs(row['interval_sec'][0] - sec) <= vicinity),
+                       key=lambda row: abs(row['interval_sec'][0] - sec), default=None)
+            if clip:
+                scene['clip_hint_refs'] = [clip['hint_ref']]
+        result.append(scene)
+    return result
+
+def _scoped_peak_attention(catalog, candidates, interval, allowed, buckets, preview):
+    if 'chat' not in allowed:
+        return None
+    clusters = [r for r in catalog['items'] if r['kind'] == 'chat_peak_cluster']
+    seconds = {t for t in _peak_seconds(clusters)
+               if t in buckets and _overlaps(buckets[t]['interval_sec'], interval)}
+    selected = _representative_peaks(seconds, buckets)
+    if not selected:
+        return None
+    clips = [r for r in candidates if r['kind'] == 'viewer_clip' and r['interval_sec']
+             and r['metadata'].get('offset_status') == 'ok']
+    peaks = []
+    clip_cues = {}
+    for t in selected:
+        bucket = buckets[t]
+        span = bucket['interval_sec']
+        matches = [r for r in clips if _overlaps(r['interval_sec'], span)]
+        matches.sort(key=lambda r: abs(t - r['interval_sec'][0]))
+        stats = bucket['stats']
+        ratios = {key: round(stats[key], 3) for key in ('laughter_ratio', 'surprise_ratio', 'question_ratio')
+                  if key in stats}
+        counts = {key: stats.get(key, 0) for key in PEAK_COUNTS}
+        if catalog['profile'] == OBSERVED_DENSITY_PROFILE and 'z_count' in stats:
+            counts['z_count'] = stats['z_count']
+        peaks.append(dict(interval_sec=span, counts=counts,
+                          ratios=ratios,
+                          all_original_occurrences=bucket['all_original_occurrences'],
+                          clip_hint_refs=[r['hint_ref'] for r in matches[:2]]))
+        if matches:
+            nearest = matches[0]
+            cue = dict(interval_sec=nearest['interval_sec'])
+            title = clip_preview(nearest, preview)['metadata'].get('title')
+            if title:
+                cue.update(title=str(title)[:48], title_truncated=len(str(title)) > 48)
+            clip_cues[nearest['hint_ref']] = cue
+    return dict(local_peaks=peaks, clip_cues=clip_cues, context_action=_subtitle_action(
+        selected, catalog['chat_baseline']['duration_sec'], allowed),
+        chat_context_action=dict(action='read_evidence', args=dict(
+            intervals_sec=[row['interval_sec'] for row in peaks], families=['chat'], context_cues=0)),
+        original_read=False)
 
 def _clip_attention(catalog, allowed):
     """Expose existing clip first-look intervals without another detector or rank."""
@@ -287,16 +687,32 @@ def _clip_attention(catalog, allowed):
                     intervals_sec=[[a, b]], families=context_families, context_cues=0))))
     return regions
 
-def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, max_bytes=12000):
+def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, max_bytes=12000,
+                   interval_sec=None):
+    profile = getattr(service, 'signal_view_profile', None) or PROFILE
+    if profile not in (PROFILE, LOCAL_REACTION_PROFILE, OBSERVED_DENSITY_PROFILE):
+        raise EvidenceError('unknown_signal_view_profile')
+    local_reactions = profile != PROFILE
+    if interval_sec is not None and not local_reactions:
+        raise EvidenceError('browse_scope_unsupported_for_view')
     if type(limit) is not int or not 1<=limit<=20 or type(max_bytes) is not int or not 3000<=max_bytes<=32000:
         raise EvidenceError("invalid_signal_page_budget")
     if families is not None and (not isinstance(families,list) or not all(isinstance(f,str) for f in families)):
         raise EvidenceError('invalid_signal_families')
     allowed = sorted(set(families if families is not None else service.policy["allowed"]))
     if not allowed or not set(allowed)<=set(service.policy["allowed"]):raise EvidenceError("excluded_by_policy")
-    root,catalog = _catalog(service)
-    identity = dict(profile=PROFILE,world_revision=service.world_revision,question_id=question_id,
-                    families=allowed,limit=limit,max_bytes=max_bytes,catalog_sha256=digest(catalog))
+    scope = {}
+    if interval_sec is not None:
+        if service.duration is None:
+            raise EvidenceError('source_clock_unverified_use_source_order')
+        if (not isinstance(interval_sec, list) or len(interval_sec) != 2
+                or any(type(t) not in (int, float) for t in interval_sec)
+                or not 0 <= interval_sec[0] < interval_sec[1] <= service.duration):
+            raise EvidenceError('invalid_time_filter')
+        scope['interval_sec'] = interval_sec
+    root,catalog = _catalog(service, profile)
+    identity = dict(profile=profile,world_revision=service.world_revision,question_id=question_id,
+                    families=allowed,limit=limit,max_bytes=max_bytes,catalog_sha256=digest(catalog),**scope)
     preview = getattr(service, "clip_preview_profile", None)
     if preview:
         identity["clip_preview"] = preview
@@ -311,14 +727,23 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
         if digest(saved)!=cursor or saved['identity']!=identity:raise EvidenceError('signal_cursor_changed')
         offset=saved['offset']
     candidates=[r for r in catalog['items'] if r['family'] in allowed]
-    page=dict(schema_version='ew.signal_page.v1',profile=PROFILE,source_id=service.source_id,
+    if scope:
+        candidates = [r for r in candidates
+                      if r['kind'] != 'chat_peak_cluster' and _overlaps(r['interval_sec'], interval_sec)]
+    buckets = _chat_buckets(catalog) if local_reactions else {}
+    page=dict(schema_version='ew.signal_page.v1',profile=profile,source_id=service.source_id,
         world_revision=service.world_revision,question_id=question_id,catalog_sha256=digest(catalog),
         query_sha256=digest(identity),page_offset=offset,
         family_status={f:service.family_status[f] for f in allowed},chat_baseline=catalog['chat_baseline'],
         hints=[],total_hints=len(candidates),next_cursor=None,original_read=False,meaning_complete=False,
         policy='Derived discovery hints, not original reads, consensus, listening, matching or editorial approval. '
-               'Overlapping signals are not independent votes. Quiet source regions remain accessible with coverage view.')
-    if not cursor:
+               'Overlapping signals are not independent votes. Quiet source regions remain accessible with coverage view.',
+        **scope)
+    if not cursor and scope:
+        attention = _scoped_peak_attention(catalog, candidates, interval_sec, allowed, buckets, preview)
+        if attention:
+            page['peak_attention'] = attention
+    if not cursor and not scope:
 
         orientation_base = dict(page)
         clip_regions = _clip_attention(catalog, allowed)
@@ -346,18 +771,42 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
                         location['clip_cues_omitted'] += 1
                         break
             page['clip_attention'] = clip_attention
-        regions = _peak_attention(catalog, allowed)
         retrieval = service.retrieval_contract()
         navigation = dict(search_modes=retrieval['modes'])
-        attention_preview = dict(total_regions=len(regions),regions=[],navigation=navigation,
-                                 original_read=False,meaning_complete=False)
+        scenes = (_first_reaction_scenes(catalog, allowed, buckets, min(8, limit))
+                  if profile == OBSERVED_DENSITY_PROFILE and service.duration else [])
+        regions = ([] if scenes else _peak_attention(catalog, allowed, buckets) if local_reactions
+                   else _legacy_peak_attention(catalog, allowed))
+        rank_preview = dict(total_regions=len(regions), regions=[], navigation=navigation,
+                            original_read=False, meaning_complete=False)
+        local = {}
+        detail_budget = max_bytes - FIRST_DETAILS_RESERVE_BYTES
+        if local_reactions:
+            rank_preview['rank_basis'] = 'producer rank of merged chat clusters across this VOD'
+        if scenes:
+            rank_preview['total_regions'] = sum(row['kind'] == 'chat_peak_cluster' for row in candidates)
+            rank_preview['selection'] = 'distinct_reaction_scenes'
+            rank_preview['chat_lookup'] = dict(action='browse_chat', interval_from='local_peaks[].interval_sec',
+                                                args=dict(order='discovery', limit=6))
+            for scene in scenes:
+                proposed = {**rank_preview, 'local_peaks': [*local.get('local_peaks', []), scene]}
+                if len(canonical_json(dict(page, peak_attention=proposed)).encode()) > detail_budget:
+                    break
+                local = {'local_peaks': proposed['local_peaks']}
+        elif local_reactions and regions:
+            observation = _scoped_peak_attention(catalog, candidates, [0, service.duration], allowed, buckets, preview)
+            if (observation and len(canonical_json(dict(
+                    page, peak_attention={**rank_preview, **observation})).encode()) <= detail_budget):
+                local = observation
         for region in regions[:limit]:
-            proposed = dict(attention_preview,regions=attention_preview['regions']+[region])
-            if len(canonical_json(dict(orientation_base,peak_attention=proposed)).encode()) > max_bytes//3:
+            proposed = dict(rank_preview, regions=rank_preview['regions'] + [region])
+            if (len(canonical_json(dict(orientation_base, peak_attention=proposed)).encode()) > max_bytes // 3
+                    or local_reactions and len(canonical_json(dict(
+                        page, peak_attention={**proposed, **local})).encode()) > detail_budget):
                 break
-            attention_preview = proposed
-        if attention_preview['regions']:
-            page['peak_attention'] = attention_preview
+            rank_preview = proposed
+        if rank_preview['regions'] or local:
+            page['peak_attention'] = {**rank_preview, **local}
     next_offset=offset
     for item in candidates[offset:offset+limit]:
         hint=clip_preview(dict(item), preview)
@@ -365,7 +814,6 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
             hint['metadata'] = dict(excerpt=canonical_json(hint['metadata'])[:240],
                                    truncated=True,full_metadata_requires_read=True)
         if hint['family']=='chat':
-            from .chat_view import browse_chat
             window = {'interval_utc_ms':hint['interval_utc_ms']} if hint.get('clock_domain')=='utc_epoch_ms' else {'interval_sec':hint['interval_sec']}
             if hint['kind']=='chat_peak_cluster':
                 sec=hint['stats']['sec']
@@ -373,10 +821,20 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
                 hint['next_action']=(dict(action='browse_evidence',args=dict(view='hints',limit=10))
                     if getattr(service,'summary_hints_config',None) else
                     dict(action='browse_chat',args=dict(**window,limit=3,max_bytes=6000)))
-                hint['content_context_action']=dict(action='read_evidence',args=dict(
-                    intervals_sec=[hint['interval_sec']],families=['stt'],context_cues=0))
+                if local_reactions:
+                    action = _subtitle_action(_representative_peaks(_peak_seconds([hint]), buckets),
+                                              service.duration, service.policy['allowed'])
+                    if action:
+                        hint['content_context_action'] = action
+                else:
+                    hint['content_context_action'] = dict(action='read_evidence', args=dict(
+                        intervals_sec=[hint['interval_sec']], families=['stt'], context_cues=0))
             wording_args = dict(**window, limit=3, max_bytes=6000)
-            hint['wording_page']=browse_chat(service,question_id=question_id,**wording_args)
+            if scope or profile == OBSERVED_DENSITY_PROFILE:
+                hint['wording_action'] = dict(action='browse_chat', args=wording_args)
+            else:
+                from .chat_view import browse_chat
+                hint['wording_page']=browse_chat(service,question_id=question_id,**wording_args)
         else:
             hint['next_action']=dict(action='read_evidence',args=dict(record_ids=hint.get('source_record_ids') or [hint['record_id']],families=[hint['family']],context_cues=0))
             if hint['family']=='live_metadata' and hint.get('interval_utc_ms'):
@@ -391,14 +849,15 @@ def browse_signals(service, *, question_id, families=None, cursor=0, limit=8, ma
             hint.pop('wording_page')
             hint['wording_action'] = dict(action='browse_chat', args=wording_args)
         if len(canonical_json(dict(page,hints=page['hints']+[hint])).encode())>max_bytes-850:
-            if not page['hints']:raise EvidenceError('signal_page_too_small')
+            if not page['hints'] and not (scope and page.get('peak_attention')):
+                raise EvidenceError('signal_page_too_small')
             break
         page['hints'].append(hint);next_offset+=1
     if next_offset<len(candidates):
         token=dict(identity=identity,offset=next_offset);page['next_cursor']=digest(token)
         atomic_json(root/'cursors'/(page['next_cursor']+'.json'),token)
         page['next_action']=dict(action='browse_evidence',question_id=question_id,args=dict(
-            view='signals',families=allowed,cursor=page['next_cursor'],limit=limit,max_bytes=max_bytes))
+            view='signals',families=allowed,cursor=page['next_cursor'],limit=limit,max_bytes=max_bytes,**scope))
     page['status']='partial_page' if page['next_cursor'] else 'complete_hints' if candidates else 'empty'
     if len(canonical_json(page).encode())>max_bytes:
         raise EvidenceError('signal_page_too_small')
@@ -434,10 +893,27 @@ def handoff(service, exploration_root):
         key=page['query_sha256']
         if key not in latest or page['page_offset']>=latest[key]['page_offset']:
             latest[key]=page
-    return dict(profile=PROFILE,first_page=pages[0],delivered_page_refs=deliveries,
+    return dict(profile=pages[0]['profile'],first_page=pages[0],delivered_page_refs=deliveries,
         remaining_cursors=[dict(question_id=p['question_id'],next_action=p['next_action']) for p in latest.values() if p.get('next_cursor')],
         original_read=False,meaning_complete=False)
 
 def request_view(orientation):
     """Keep delivery provenance on disk, with one bounded hint page in input."""
     return {k:orientation[k] for k in ('profile','first_page','remaining_cursors','original_read','meaning_complete')}
+
+def defer_chat_wording(orientation):
+    """Omit eager wording pages from a new writer's imported orientation."""
+    if not isinstance(orientation, dict):
+        return orientation
+    if isinstance(orientation.get('first_page'), dict):
+        return dict(orientation, first_page=defer_chat_wording(orientation['first_page']))
+    hints = []
+    for hint in orientation.get('hints', []):
+        if 'wording_page' in hint:
+            hint = dict(hint)
+            wording = hint.pop('wording_page')
+            scope = {key: wording[key] for key in ('interval_sec', 'interval_utc_ms') if wording.get(key)}
+            if scope:
+                hint['wording_action'] = dict(action='browse_chat', args=dict(**scope, order='discovery'))
+        hints.append(hint)
+    return dict(orientation, hints=hints) if 'hints' in orientation else orientation

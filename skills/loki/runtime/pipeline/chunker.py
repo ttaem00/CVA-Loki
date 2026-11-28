@@ -296,7 +296,7 @@ def chunk_srt(
     tokenizer_encoding: str = "cl100k_base",
     highlights: Optional[list[dict]] = None,
     highlight_radius_sec: int = 300,
-    cold_sample_sec: int = 30,
+    cold_sample_sec: Optional[int] = 30,
     promoted_anchors: Optional[list] = None,
     anchor_radius_sec: int = 60,
     anchor_silence_radius_sec: int = 5,
@@ -350,7 +350,7 @@ def chunk_srt(
         return flag
 
 
-    if highlights or anchors_norm:
+    if cold_sample_sec is not None and (highlights or anchors_norm):
         cues = filter_cues_by_highlights(
             cues, highlights or [],
             hot_radius_sec=highlight_radius_sec,

@@ -1,6 +1,6 @@
 {
   "name": "cva-loki",
-  "version": "3.0.9.1",
-  "description": "CVA-Loki 3.0.9.1 Gemini CLI extension for evidence-grounded VOD summaries, 3-tier modes (LITE/NORMAL/FULL), creator exports, and local review UI.",
+  "version": "3.0.9.2",
+  "description": "CVA-Loki 3.0.9.2 Gemini CLI extension for evidence-grounded VOD summaries, 3-tier modes (LITE/NORMAL/FULL), creator exports, and local review UI.",
   "contextFileName": "rules/GEMINI.md"
 }

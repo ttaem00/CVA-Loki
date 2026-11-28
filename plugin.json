@@ -1,7 +1,7 @@
 {
   "name": "loki",
   "displayName": "CVA-Loki",
-  "version": "3.0.9.1",
+  "version": "3.0.9.2",
   "description": "CHZZK·YouTube·SOOP 다시보기 원문과 프레임을 직접 읽고 요약·타임라인·Point·Story·Highlight를 작성하는 증거 기반 워크플로 플러그인입니다.",
   "logo": "docs/assets/cva-icon-512.png",
   "author": {

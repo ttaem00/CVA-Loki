@@ -13,6 +13,10 @@ Whisper는 전사, EmbeddingGemma 2는 근거 탐색, 스크립트는 준비·�
 로컬 LLM은 `--model auto`). 특정 시점 모델 버전에 고정하지 않으며,
 권장 능력 티어와 웹/로컬/Gemini CLI 가이드는 배포 루트의 `docs/llm-guides/`를 참고한다.
 
+## 공통 작성 원칙
+
+**목표와 수락 기준 및 탐사 → 이해 → 수립 → 연결**은 준비된 `author-input.json`의 `author_prompt.text`에서 확인한다. 전편 탐색부터 Point·Highlight 선택, Span 경계와 제목 대조까지 이 기준을 적용한다.
+
 ## 경로와 읽을 문서
 
 이 `SKILL.md`를 기준으로 `runtime/loki.py`의 실제 경로를 구한다. 플러그인·스킬의
@@ -26,10 +30,10 @@ Whisper는 전사, EmbeddingGemma 2는 근거 탐색, 스크립트는 준비·�
 | 보안 문제 보고·재배포 | [보안 안내](references/SECURITY.md), [제3자 고지](references/THIRD_PARTY_NOTICES.md), [이용허락](LICENSE) |
 | 외부 코드·문서 기여 | [기여 안내와 동의 문안](CONTRIBUTING.md) |
 
-배포·플러그인·스킬·요약 메커니즘은 3.0.9.1이며 `latest`도 Loki 3.0.9.1이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
+배포·플러그인·스킬·요약 메커니즘은 3.0.9.2이며 `latest`도 Loki 3.0.9.2이다. 새 작업의 실제 버전을 확인하고, 이미 준비한
 작업의 버전·원자료·응답·예산은 별칭 변경을 이유로 다시 쓰지 않는다.
 
-### 3.0.9.1 실행 모드·다중 호스트·내보내기
+### 3.0.9.2 실행 모드·다중 호스트·내보내기
 
 - **실행 모드 (`--mode lite|normal|full`)**: `source_acquire.py`와 `prepare`는 `lite`(360p 빠른 취득·Warm-Only 벡터·15분 작성 목표), `normal`(480p·전체 채팅·공개 클립·댓글·30분), `full`(720p·전체 사전 수집·결정론적 5분 구간 힌트·60분) 모드를 지원한다.
 - **준비 시간 vs 작성 시간 분리**: 다운로드·STT·임베딩 준비 시간(`prep_time_note`)은 사전 단계이며 작성 예산(`authoring_minutes`)에서 차감하지 않는다.

@@ -276,7 +276,7 @@ def prepare(spec):
             source_binding = dict(source_platform=reference.platform, source_native_id=reference.native_id)
         author_owner = current_conversation_author_owner(spec["author"])
         preparation_started = time.time()
-        from .loki_version_policy import new_job_defaults, select_new_pipeline
+        from .loki_version_policy import current_pipeline, new_job_defaults, select_new_pipeline
         selected_pipeline = select_new_pipeline(spec.get("summary_pipeline_version", "latest"))
         spec = dict(spec)
         requested_feature_profile = spec.get('feature_profile')
@@ -296,7 +296,8 @@ def prepare(spec):
                     or read_root.is_relative_to(root)):
                 raise ValueError('current_conversation_read_index_root_outside_source')
         from .highlight_prompt_assets import load_full_author_prompt
-        prompt_asset = load_full_author_prompt(spec.get('author_prompt_profile'))
+        prompt_asset = load_full_author_prompt(spec.get('author_prompt_profile'),
+            chronological_overview=selected_pipeline == current_pipeline())
         if spec.get('signal_priority_profile') is not None:
             from .editorial_context_author import SIGNAL_PRIORITY_PROFILE
             if spec['signal_priority_profile'] != SIGNAL_PRIORITY_PROFILE:
@@ -435,6 +436,12 @@ def prepare(spec):
             packet['signal_priority_profile'] = spec['signal_priority_profile']
         else:
             packet.pop('signal_priority_profile', None)
+        from .evidence_world.signal_view import defer_chat_wording
+
+        packet['chat_rows'] = []
+        navigation_reads = packet.get('navigation_source_reads') or {}
+        if 'signal_orientation' in navigation_reads:
+            navigation_reads['signal_orientation'] = defer_chat_wording(navigation_reads['signal_orientation'])
         view, source_evidence = full_source_context(source=source, packet=packet)
         prompt_root = Path(__file__).resolve().parents[1]
         prompt_path = prompt_root / prompt_asset.relative_path

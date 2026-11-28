@@ -20,6 +20,11 @@ PASS1_SCHEMA = {
     "properties": {
         "summary": {"type": "string"},
         "summary_evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "chat_lookups": {"type": "array", "maxItems": 3, "items": {
+            "type": "object", "properties": {
+                "start_sec": {"type": "number"}, "end_sec": {"type": "number"}, "text": {"type": "string"},
+            }, "required": ["start_sec", "end_sec", "text"],
+        }},
         "ranges": {
             "type": "array",
             "items": {
@@ -466,12 +471,10 @@ def _configure_workspace_env(config_path: Path | None) -> tuple[Path | None, dic
     return root, policy
 
 
-def _drain_continuations(current_mod, root: Path, initial_page: dict, *, expected_revision: str, excerpts: list[str], chat_excerpts: list[str], max_pages: int = 12) -> None:
+def _drain_continuations(current_mod, root: Path, initial_page: dict, *, expected_revision: str, excerpts: list[str], max_pages: int = 12) -> None:
     def record_rows(page: dict) -> None:
         for row in page.get("records") or []:
-            if row.get("family") == "chat":
-                chat_excerpts.append(f"chat-original:{row.get('record_id')}: {_single_line(row.get('raw_text'))[:140]}")
-            else:
+            if row.get("family") == "stt":
                 excerpts.append(f"e{row.get('ordinal', 0) + 1}: {_single_line(row.get('raw_text'))[:160]}")
 
     page = initial_page
@@ -490,6 +493,54 @@ def _drain_continuations(current_mod, root: Path, initial_page: dict, *, expecte
         pages_seen += 1
 
 
+def _requested_chat(current, root, prepared, requests, expected_revision):
+    """Open original chat only for explicit, scoped requests from Pass 1."""
+    from math import isfinite
+    from pipeline.evidence_world.index import normalize
+
+    result, seen = [], set()
+    duration = prepared['vod_info']['duration']
+    for index, request in enumerate(requests[:3] if isinstance(requests, list) else []):
+        if not isinstance(request, dict):
+            continue
+        start, end, text = (request.get(key) for key in ('start_sec', 'end_sec', 'text'))
+        if (type(start) not in (int, float) or type(end) not in (int, float)
+                or not isfinite(start) or not isfinite(end)
+                or not 0 <= start < end <= duration or end - start > 120
+                or not isinstance(text, str) or not 0 < len(text.strip()) <= 160):
+            continue
+        envelope = dict(schema_version='ew.tool.v1', source_id=prepared['source']['asset']['source_id'],
+                        world_revision=prepared['world_revision'], question_id=f'local-chat-{index}')
+        phrase = normalize(text)
+        if not phrase:
+            continue
+        found = current.read(root, dict(envelope, action='search_evidence', args=dict(
+            query=dict(text=text.strip(), mode='exact', families=['chat'], intervals_sec=[[start, end]]),
+            page=dict(limit=2, max_bytes=8_000))), expected_revision=expected_revision)
+        selected = 0
+        for hit in found.get('hits', [])[:2]:
+            target = hit.get('next_action') or {}
+            ids = (target.get('args') or {}).get('record_ids') or []
+            fresh = [ref for ref in ids[:32] if ref not in seen]
+            if not fresh:
+                continue
+            page = current.read(root, dict(envelope, action='read_evidence', args=dict(
+                record_ids=fresh, families=['chat'], context_cues=0, max_bytes=16_000)),
+                expected_revision=expected_revision)
+            for row in page.get('records', []):
+                if (row.get('family') == 'chat' and row.get('fragment_complete')
+                        and phrase in normalize(row.get('raw_text') or '')):
+                    ref = row['record_id']
+                    seen.add(ref)
+                    result.append(dict(ref=f'chat-original:{ref}', text=row['raw_text']))
+                    selected += 1
+                    if selected == 2:
+                        break
+            if selected == 2:
+                break
+    return result
+
+
 def run_local_author(
     *,
     job_root: Path,
@@ -502,6 +553,7 @@ def run_local_author(
 ) -> dict:
     _configure_workspace_env(config_path)
     from pipeline import editorial_current_conversation as current
+    from pipeline.evidence_world.signal_view import defer_chat_wording
 
     clean_endpoint = validate_endpoint(endpoint, allow_remote=allow_remote)
     if dry_run:
@@ -517,11 +569,18 @@ def run_local_author(
     selected_model = resolve_model(clean_endpoint, model)
     ollama_mode = _is_ollama_endpoint(clean_endpoint)
     author_input = json.loads((root / "author-input.json").read_text(encoding="utf-8-sig"))
+    frozen_prompt = (author_input.get("author_prompt") or {}).get("text") or ""
+    _, heading, remaining = frozen_prompt.partition("<IMPORTANT>\n## 목표와 수락 기준\n")
+    rules, closing, _ = remaining.partition("</IMPORTANT>")
+    shared_criteria = (f"{heading}{rules}{closing}\n\n"
+                       "Apply these criteria using the supplied evidence and this pass's output fields.\n\n"
+                       if heading and closing else "")
     intervals = _priority_intervals(prepared, author_input)
 
 
     excerpts: list[str] = []
-    chat_excerpts: list[str] = []
+    family_status = (author_input.get("availability") or {}).get("family_status") or {}
+    chat_available = family_status.get("chat") in {"present", "partial"}
     for idx, interval in enumerate(intervals):
         action = {
             "schema_version": "ew.tool.v1",
@@ -529,32 +588,36 @@ def run_local_author(
             "world_revision": prepared["world_revision"],
             "question_id": f"local-pass0-{idx}",
             "action": "read_evidence",
-            "args": {"intervals_sec": [interval], "families": ["stt", "chat"], "context_cues": 1, "max_bytes": 14000},
+            "args": {"intervals_sec": [interval], "families": ["stt"], "context_cues": 1, "max_bytes": 14000},
         }
         page = current.read(root, action, expected_revision=expected_revision)
-        _drain_continuations(current, root, page, expected_revision=expected_revision, excerpts=excerpts, chat_excerpts=chat_excerpts)
+        _drain_continuations(current, root, page, expected_revision=expected_revision, excerpts=excerpts)
 
     context_blob = json.dumps({
         "vod_info": prepared["vod_info"],
         "quick_contract": author_input.get("quick_contract"),
         "broadcast_flow_context": author_input.get("broadcast_flow_context"),
-        "signal_orientation": (prepared.get("packet") or {}).get("navigation_source_reads", {}).get("signal_orientation"),
+        "signal_orientation": defer_chat_wording(
+            (prepared.get("packet") or {}).get("navigation_source_reads", {}).get("signal_orientation")),
         "media_available": prepared.get("media_source") is not None,
         "read_excerpts": excerpts[:160],
-        "chat_excerpts": chat_excerpts[:80],
+        "chat_available_for_lookup": chat_available,
     }, ensure_ascii=False)
 
 
     pass1, reported_model = chat_completion(
         clean_endpoint, selected_model, [
-            {"role": "system", "content": "Author Loki D1/D2 summary and ranges strictly from read_excerpts. D1 omits parent_id; D2 requires parent_id and content. No newlines in text fields."},
+            {"role": "system", "content": shared_criteria + "Author Loki D1/D2 summary and ranges strictly from read_excerpts. D1 omits parent_id; D2 requires parent_id and content. No newlines in text fields. If available and a specific wording would clarify a scene, optionally provide chat_lookups with its exact phrase and short time range. Quiet moments may be selected from the subtitles."},
             {"role": "user", "content": context_blob},
         ], schema=PASS1_SCHEMA, ollama_mode=ollama_mode,
     )
+    chat_evidence = (_requested_chat(current, root, prepared, pass1.get("chat_lookups"), expected_revision)
+                     if chat_available else [])
     pass2, reported_model2 = chat_completion(
         clean_endpoint, selected_model, [
-            {"role": "system", "content": "Author Loki points, stories, proposals, group_outcomes preserving entertainment/tiki-taka, distant premises, and counterevidence. Keep story_beats inside source_spans and story used_evidence_ids."},
-            {"role": "user", "content": json.dumps({"context": context_blob, "pass1": pass1}, ensure_ascii=False)},
+            {"role": "system", "content": shared_criteria + "Author Loki points, stories, proposals, group_outcomes preserving entertainment/tiki-taka, distant premises, and counterevidence. Keep story_beats inside source_spans and story used_evidence_ids. Use the supplied ref for any selected_chat_evidence you cite."},
+            {"role": "user", "content": json.dumps({"context": context_blob, "pass1": pass1,
+                "selected_chat_evidence": chat_evidence}, ensure_ascii=False)},
         ], schema=PASS2_SCHEMA, ollama_mode=ollama_mode,
     )
     actual_model = reported_model2 or reported_model or selected_model

@@ -1,7 +1,7 @@
-"""Source roster names for replay lookup, never timed attendance declarations.
+"""Roster candidates and explicit source-backed collaboration periods.
 
-Only explicit roster syntax is projected. Prose mentions, voices and the host's
-own name do not authorize participant identity or a participation interval.
+Prose mentions, voices and the host's own name do not authorize a participant
+identity or a participation interval.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import json
 
 import logging
 
+import math
+
 from pathlib import Path
 
 import re
@@ -22,9 +24,19 @@ import unicodedata
 
 from .editor_comment_parser import EditorCommentParserError, parse_editor_documents
 
+_NAME = re.compile(r"[\w가-힣][\w가-힣.-]{0,63}\Z")
+
 _KINDS = {"viewer_comment", "manager_context", "vod_title"}
 
 _LOG = logging.getLogger(__name__)
+
+_LIVE_ROSTER_LABEL = re.compile(r"\((?:[\w.-]+[ \t]+)+합방[ \t]*[:：][ \t]*([^()\r\n]+)\)[ \t]*$", re.MULTILINE)
+
+_LIVE_ACTIVITY_START = re.compile(r"(.+?)\s+(?:시작|start)$", re.IGNORECASE)
+
+_LIVE_ACTIVITY_END = re.compile(r"(.+?)\s+(?:종료|끝|end)$", re.IGNORECASE)
+
+_LIVE_MEMBER_CHANGE = re.compile(r"(.+?)\s+(합류|이탈)$")
 
 def _collected_documents(video, directory):
     """Read preserved v3/v4 private bodies without migrating collector caches.
@@ -88,6 +100,11 @@ def comment_collaboration_periods(documents, video_no, duration_sec, *, host_nam
         except ValueError:
             continue
         intervals.append((item, priorities[row["document_id"]]))
+    return _merge_collaboration_periods(intervals, duration_sec)
+
+def _merge_collaboration_periods(intervals, duration_sec, *, overrides=None):
+    from .chatgpt_export.contract.collaboration_periods import validate_collaboration_periods
+
 
 
     boundaries = sorted({t for row, _ in intervals for t in (row["start_sec"], row["end_sec"])})
@@ -96,6 +113,9 @@ def comment_collaboration_periods(documents, video_no, duration_sec, *, host_nam
         covered = [(r, priority) for r, priority in intervals if r["start_sec"] <= start and end <= r["end_sec"]]
         priority = min((p for _, p in covered), default=1)
         active = [r for r, p in covered if p == priority]
+        if overrides:
+            overridden = {overrides.get(row["id"]) for row in active}
+            active = [row for row in active if row["id"] not in overridden]
         if not active or len({tuple(sorted(_key(n) for n in r["members"])) for r in active}) != 1:
             continue
         refs = sorted({ref for r in active for ref in r["evidence_refs"]})
@@ -108,6 +128,139 @@ def comment_collaboration_periods(documents, video_no, duration_sec, *, host_nam
         return []
     validate_collaboration_periods(result, duration_sec)
     return result
+
+def _live_activity_subject(title, pattern):
+    match = pattern.fullmatch(title.strip())
+    return _key(re.sub(r"\s+(?:게임|game)$", "", match[1], flags=re.IGNORECASE).strip()) if match else ""
+
+def _live_activity_end(entry, entries):
+    subject = _live_activity_subject(entry["title"], _LIVE_ACTIVITY_START)
+    if not subject:
+        return None
+    end_times = {
+        candidate["startSec"] for candidate in entries
+        if (candidate["parentId"] == entry["entryId"]
+            or candidate["entryId"] == entry.get("boundarySourceEntryId"))
+        and candidate.get("startSec") is not None
+        and _live_activity_subject(candidate["title"], _LIVE_ACTIVITY_END) == subject
+    }
+    return next(iter(end_times)) if len(end_times) == 1 else None
+
+def _live_roster_changes(entries, periods_by_entry, *, host_name, offset_sec):
+    declared = {entry["entryId"] for entry in entries if entry.get("participants")}
+    changes = {}
+    for entry in entries:
+        parent_id = entry.get("parentId")
+        if (parent_id not in declared or parent_id not in periods_by_entry or entry["role"] != "chapter"
+                or entry.get("participants") or entry.get("participantCandidates")
+                or entry.get("explicitEndSec") is not None or entry.get("startSec") is None):
+            continue
+        match = _LIVE_MEMBER_CHANGE.fullmatch(entry["title"])
+        if not match:
+            continue
+        name, action = match.groups()
+        parent, _ = periods_by_entry[parent_id]
+
+        if _key(name) == _key(host_name) or (not _NAME.fullmatch(name) and name not in parent["members"]):
+            continue
+        at = round(entry["startSec"] + offset_sec, 3)
+        if parent["start_sec"] <= at < parent["end_sec"]:
+            changes.setdefault(parent_id, []).append((at, name, action == "합류"))
+    return changes
+
+def _apply_live_roster_changes(period, changes):
+    if not changes:
+        yield period
+        return
+    members = {_key(name): name for name in period["members"]}
+    start = period["start_sec"]
+    for at, name, joined in sorted(changes):
+        if start < at and len(members) <= 32:
+            yield dict(period, start_sec=start, end_sec=at, members=list(members.values()))
+        if joined:
+            members.setdefault(_key(name), name)
+        else:
+            members.pop(_key(name), None)
+        start = at
+    if len(members) <= 32:
+        yield dict(period, start_sec=start, members=list(members.values()))
+
+def project_live_collaboration_notes(context, video_no, duration_sec, *, host_name, vod_origin_ms):
+    """Project the caller's verified, same-VOD ManagerCue snapshot after writing.
+
+    Channel profile text can describe other broadcasts. Use only current active,
+    manager-confirmed entries, then require an explicit scope or matching end.
+    The caller supplies the verified VOD start for the snapshot's broadcast clock.
+    """
+    from .chatgpt_export.contract.collaboration_periods import validate_collaboration_periods
+
+    video = str(video_no)
+    empty = {"periods": [], "candidates": []}
+    if not isinstance(context, dict) or not re.fullmatch(r"[1-9][0-9]{0,19}", video):
+        return empty
+    notes = list(dict.fromkeys(
+        row[text_key] for family, text_key in (("events", "text_raw"), ("directives", "text_raw"), ("scenes", "claim"))
+        for row in context.get(family, [])
+        if row.get("status") == "active" and row.get("author_kind") == "manager"
+        and row.get("confidence") == "manager_confirmed"
+        and isinstance(row.get(text_key), str) and row[text_key].strip()
+    ))
+    if not notes or len(notes) > 100 or sum(map(len, notes)) > 250000:
+        return empty
+    documents = [{"raw": _LIVE_ROSTER_LABEL.sub(r"(합방: \1)", note), "manager_context": True} for note in notes]
+    try:
+        parsed = parse_editor_documents(documents, video_no=video)
+    except EditorCommentParserError:
+        _LOG.warning("collaboration_live_notes_unavailable video_no=%s", video)
+        return empty
+    candidates = _roster_rows(parsed["roster_candidates"], source_kind="manager_context", host_name=host_name)
+    broadcast_start = context.get("broadcast_start_at_ms")
+    if (type(broadcast_start) is not int or broadcast_start <= 0
+            or type(vod_origin_ms) is not int or vod_origin_ms <= 0
+            or type(duration_sec) not in (int, float) or not math.isfinite(duration_sec) or duration_sec <= 0):
+        return {"periods": [], "candidates": candidates}
+    offset_sec = (broadcast_start - vod_origin_ms) / 1000
+    source_refs = {f"comment-{index}": "manager-context-" + hashlib.sha256(
+        (video + "\n" + note).encode("utf-8")).hexdigest()[:32] for index, note in enumerate(notes, 1)}
+
+
+    overlapping_documents = {doc["documentId"] for doc in parsed["documents"]
+                             if any(d["code"] == "explicit_overlap" for d in doc["diagnostics"])}
+    intervals_by_entry = {}
+    for index, entry in enumerate(parsed["entries"], 1):
+        roster = entry.get("participants") or entry.get("participantCandidates")
+        if (not roster or entry["documentId"] in overlapping_documents
+                or entry["geometry"] != "interval" or entry["startSec"] is None):
+            continue
+        end = entry.get("explicitEndSec")
+        if end is None and entry.get("participants"):
+            end = _live_activity_end(entry, parsed["entries"])
+        if end is None:
+            continue
+        names = list(dict((_key(name), name) for name in roster.get("names", []) if _key(name) != _key(host_name)).values())
+        if not names and roster.get("mode") != "none":
+            continue
+        item = dict(id=f"live-note-{index}", start_sec=round(entry["startSec"] + offset_sec, 3),
+                    end_sec=round(end + offset_sec, 3), members=names,
+                    source_kind="source_evidence", support_status="provisional",
+                    evidence_refs=[source_refs[entry["documentId"]]])
+        try:
+            validate_collaboration_periods([item], duration_sec)
+        except ValueError:
+            continue
+        intervals_by_entry[entry["entryId"]] = (item, entry.get("parentId") if entry.get("participants") else None)
+    overrides = {}
+    for child, parent_id in intervals_by_entry.values():
+        parent = intervals_by_entry.get(parent_id)
+        if parent is not None:
+            parent_period, _ = parent
+            if parent_period["start_sec"] <= child["start_sec"] and child["end_sec"] <= parent_period["end_sec"]:
+                overrides[child["id"]] = parent_period["id"]
+    changes = _live_roster_changes(parsed["entries"], intervals_by_entry, host_name=host_name, offset_sec=offset_sec)
+    intervals = [(period, 0) for entry_id, (item, _) in intervals_by_entry.items()
+                 for period in _apply_live_roster_changes(item, changes.get(entry_id, []))]
+    periods = _merge_collaboration_periods(intervals, duration_sec, overrides=overrides)
+    return {"periods": periods, "candidates": merge_period_roster_candidates(candidates, periods)}
 
 def load_comment_collaboration_periods(video_no, work_root, duration_sec, *, host_name=""):
     """Reuse the exact-VOD Loki comment cache and existing manager memo."""

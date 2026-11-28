@@ -8,6 +8,8 @@ import re
 
 from urllib.parse import quote
 
+from pipeline.collaboration_stage import read_report_collaboration
+
 from pipeline.report_artifact_family import _viewer_payload
 
 from pipeline.summary.parse import _parse_summary_sections
@@ -26,7 +28,7 @@ from scripts.admin.manager_outline import _accepted_qg1_packet
 
 PREFIX = "/api/report-view/"
 
-_PIN = r"[A-Za-z0-9_-]{1,128}\.[a-f0-9]{64}"
+_PIN = r"[A-Za-z0-9_-]{1,128}\.[a-f0-9]{64}(?:\.[a-f0-9]{64})?"
 
 _ASSET = r"(?:loki-page\.json|images/[a-f0-9]{64}\.(?:png|jpg|webp|gif|avif))"
 
@@ -40,6 +42,9 @@ def project_saved_report_context(ctx: dict, base: str, expected_pin: str | None 
     metadata = ctx["meta"]
     family = metadata["report_artifact_family"]
     pin = f"{family['generation_id']}.{family['metadata_payload_sha256']}"
+    collaboration = read_report_collaboration(ctx.get("metadata_path"), metadata)
+    if collaboration is not None:
+        pin = f"{pin}.{collaboration[2]}"
     if not re.fullmatch(_PIN, pin):
         raise ValueError("loki_reader_family_identity_invalid")
     if expected_pin is not None and expected_pin != pin:
@@ -83,6 +88,8 @@ def project_saved_report_context(ctx: dict, base: str, expected_pin: str | None 
                     row["image"] = deepcopy(authored[identifier]["image"])
                 rows.append(row)
         viewer["outline_projection"] = rows
+    if collaboration is not None:
+        viewer["collaboration_periods"], viewer["collaboration_candidates"], _ = collaboration
     viewer = _project_public_editorial_scene_images_payload(
         _sanitize_public_bundle_viewer_editor_payload(_strip_admin_only_timeline_comment_events(viewer)))
     vod = ctx["vod_info"]

@@ -140,17 +140,37 @@ def load_highlight_prompt_asset(relative_path: str) -> HighlightPromptAsset:
         body_sha256=hashlib.sha256(body.encode("utf-8")).hexdigest(),
     )
 
-def load_full_author_prompt(author_prompt_profile: str | None = None) -> HighlightPromptAsset:
+_CHRONOLOGICAL_AUTHOR_GUIDANCE = """
+장면을 고르기 전에 전편 원문 개요를 시작부터 끝까지 시간순으로 살펴, 조용한 구간과 방송 말미까지 큰 활동과 결과를 파악한다. 이전 관찰이나 지도가 있다면 탐색 자료로 활용하고, 지도가 없으면 같은 작성자가 원문에서 초안을 직접 만든다. 개요가 없으면 기존 시간순 원문 조회로 큰 흐름을 파악한다. 표본 사이의 내용은 실제 원문으로 확인한다.
+
+제출 전 전체 D1/D2를 전편 흐름과 대조한다. 방송 이해를 바꾸는 선택·이유·결과는 필요한 앞뒤 원문을 확인해 해당 활동에 남긴다. 반응 순위와 피크는 위치를 찾는 단서다. Point와 Highlight는 실제 장면의 앞말·응수·결과를 확인한 뒤 재미가 제목에서도 전달되게 쓴다. 판단이 달라지는 경우 실제 화면과 원음을 확인하고, 끝내 확인할 수 없는 부분은 기존 불확실성 필드에 남긴다. 대기·반복과 근거 없는 공백은 비워도 된다.
+""".strip()
+
+def load_full_author_prompt(author_prompt_profile: str | None = None, *,
+                            chronological_overview: bool = False) -> HighlightPromptAsset:
     """Share the bounded full-author selection without unrelated stage assets."""
-    if author_prompt_profile not in (None, 'evidence_retention_v1', 'evidence_retention_d2_v1'):
+    supplements = {
+        'evidence_retention_d2_v1': 'prompts/highlight/editorial_full_author_302_d2.md',
+        'evidence_retention_d2_v2': 'prompts/highlight/editorial_full_author_302_d2_outcomes.md',
+        'evidence_retention_d2_v3': 'prompts/highlight/editorial_full_author_302_d2_3092.md',
+    }
+    if author_prompt_profile not in (None, 'evidence_retention_v1', *supplements):
         raise ValueError('unknown_author_prompt_profile')
-    path = ('prompts/highlight/editorial_full_author_302_retention.md' if author_prompt_profile
-            else 'prompts/highlight/editorial_full_author_302.md')
+    if author_prompt_profile == 'evidence_retention_d2_v3':
+        path = 'prompts/highlight/editorial_full_author_302_retention_3092.md'
+    elif author_prompt_profile:
+        path = 'prompts/highlight/editorial_full_author_302_retention.md'
+    else:
+        path = 'prompts/highlight/editorial_full_author_302.md'
     asset = load_highlight_prompt_asset(path)
-    if author_prompt_profile != 'evidence_retention_d2_v1':
+    body = asset.body
+    supplement_path = supplements.get(author_prompt_profile)
+    if supplement_path:
+        supplement = _canonical_asset_path(supplement_path).read_text(encoding="utf-8")
+        body = body.rstrip("\n") + "\n\n" + supplement
+    if chronological_overview:
+        body = body.rstrip("\n") + "\n\n" + _CHRONOLOGICAL_AUTHOR_GUIDANCE + "\n"
+    if body == asset.body:
         return asset
-    supplement_path = 'prompts/highlight/editorial_full_author_302_d2.md'
-    supplement = _canonical_asset_path(supplement_path).read_text(encoding="utf-8")
-    body = asset.body.rstrip("\n") + "\n\n" + supplement
     return replace(asset, body=body, body_sha256=hashlib.sha256(body.encode("utf-8")).hexdigest(),
                    supplement_path=supplement_path)

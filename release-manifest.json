@@ -1,9 +1,9 @@
 {
   "schema_version": "loki.release.v1",
-  "version": "3.0.9.1",
-  "source_commit": "81ea54c732f000beb0800ac948eddefec3c77eb7",
+  "version": "3.0.9.2",
+  "source_commit": "a128f43fce11147edb6dc98505f73246be3589df",
   "source_recipe": "skills/loki/runtime/source-recipe.json",
-  "source_recipe_sha256": "43f8e0db608a7053f6a05f5b4a355d5ec3fc1d4fdb8d80c4659a25a49dcb3e6d",
+  "source_recipe_sha256": "3debe93dc1a4792e4539553afd4775de3f4a2bd43073d9dd7b44465ea80cfacf",
   "files": [
     {
       "path": ".agents/plugins/marketplace.json",
@@ -12,17 +12,17 @@
     },
     {
       "path": ".claude-plugin/marketplace.json",
-      "sha256": "6a6baa007cbc51333cdaea6e47475d0d2acec982507496beca201512f242ca54",
+      "sha256": "68836018688155f25e942f56d39a47a8521c85dd9fc63b82ae6012a1c58171cc",
       "bytes": 776
     },
     {
       "path": ".claude-plugin/plugin.json",
-      "sha256": "081b7187c75f02bd9a805fb808aad576276c849ad8c868247ee3574329c4a981",
+      "sha256": "c402a5c4b2b04bb11a23811252f9087db987171a7c166ba93c17dd05d908d94d",
       "bytes": 576
     },
     {
       "path": ".codex-plugin/plugin.json",
-      "sha256": "eaee8da3de904bba20bcbc519674568611a796b2716f1db748b9a77bbfc776ca",
+      "sha256": "ef4e0843d3796ada1150b452bf0f3752c443479ae9ad184e3aa4db5bb2e738a9",
       "bytes": 1481
     },
     {
@@ -47,8 +47,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2902c8856b724d7e642152c7a0aa200bde4acf32f8497049113cc29123cf6765",
-      "bytes": 7631
+      "sha256": "28d562c054deebd24fceeba05ecb38f69e5bdd086181d3dfa97083c80ac2a88b",
+      "bytes": 9030
     },
     {
       "path": "compose.cpu.yaml",
@@ -92,7 +92,7 @@
     },
     {
       "path": "docs/assets/readme-hero.svg",
-      "sha256": "3efc87039f0d130f93c5b3b861b4521b7ab294a8e45631d4a083ba030a716b82",
+      "sha256": "3d34cf81e1ea8ad67696ffc07c8f36ea0ce6c8cb48497930b09f47673ae6a474",
       "bytes": 4130
     },
     {
@@ -152,7 +152,7 @@
     },
     {
       "path": "gemini-extension.json",
-      "sha256": "769efe3c1f6fa0719a9b3867dd769bb1c973ec74796271602476dedca5ac8419",
+      "sha256": "a0173538cecd7e25ffb01572dc641fb1bef441abc7aef3f535b42d520cc5e409",
       "bytes": 255
     },
     {
@@ -167,7 +167,7 @@
     },
     {
       "path": "plugin.json",
-      "sha256": "86d3becfd5ea4e20e29df25bbde1813c7c72703bd256ee725c3e1f30334254c3",
+      "sha256": "cf1ceb41d74d1ebd9f260757d49ab18b63da6757b706e063c35f3330ebec5826",
       "bytes": 906
     },
     {
@@ -187,7 +187,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e6788442bc42ab393e6a14b1bbd6ee57e8c7bac3c0f5d0a8044c3856c4f5dfde",
+      "sha256": "55fc45a02d0ab875f1cf0b753d8ccaf5d3e7a24f529a500adb93e5166919d472",
       "bytes": 87073
     },
     {
@@ -322,8 +322,8 @@
     },
     {
       "path": "skills/loki/runtime/exporters.py",
-      "sha256": "ed7dbfa91d00c3731ecbfec5bfc28d87964f984aa07d56ff435f93a9b9af94fd",
-      "bytes": 43073
+      "sha256": "7470777703934347bc520bf3db9abcf7d7158be5161d3aa1e084438815c8056d",
+      "bytes": 43063
     },
     {
       "path": "skills/loki/runtime/install.py",
@@ -337,8 +337,8 @@
     },
     {
       "path": "skills/loki/runtime/local_llm_author.py",
-      "sha256": "5b820ae09767cb113bc362a7d7fac387c8322b853a2a9761758c5ca7c3e65070",
-      "bytes": 29523
+      "sha256": "bedd1817c6e5dcd68a97a4fc5ef1320e9be1762126ed3acbc9c988d15566e4d2",
+      "bytes": 33323
     },
     {
       "path": "skills/loki/runtime/local_tools.py",
@@ -427,8 +427,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/chat_analyzer.py",
-      "sha256": "67424836d9fa08520cf0e3cff0f087ba4bf27462613a4a7f9887cfa53bbd30e7",
-      "bytes": 21607
+      "sha256": "92ba820f4d22cc5004d8f03a9050c37e7bc6b70d90193a6d80f9a566c0c45680",
+      "bytes": 22823
     },
     {
       "path": "skills/loki/runtime/pipeline/chat_emoticons.py",
@@ -467,8 +467,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/chunker.py",
-      "sha256": "d3ac9bcd6ee73e7f9d39f14f154d5cc1619c1aa19c9e57225a4a2f26fcda17f1",
-      "bytes": 15097
+      "sha256": "8edf4603681dd79161dc4f78e8c88ac24af9b64eb7cf56be824ebcd6b5ad7116",
+      "bytes": 15141
     },
     {
       "path": "skills/loki/runtime/pipeline/chzzk_live_frames.py",
@@ -492,13 +492,18 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/collaboration_candidates.py",
-      "sha256": "d833a9826a7417afc027588f0108c7b247ccc515eb6882716f721f393ec5b716",
-      "bytes": 12331
+      "sha256": "bfc4b113dd308e5c70ad805d65bf2849b74ecedfd63bcf24091e886516a2dc26",
+      "bytes": 20172
     },
     {
       "path": "skills/loki/runtime/pipeline/collaboration_replays.py",
       "sha256": "05ea2a2593e49f69917b75af40241f8c612158aa7e1828b05faa7e7d71d49e5c",
       "bytes": 18884
+    },
+    {
+      "path": "skills/loki/runtime/pipeline/collaboration_stage.py",
+      "sha256": "a6d850b9a072beec47d26c4de2a59b7f1427dd8a0549ec38c030ac705a1d5d09",
+      "bytes": 7131
     },
     {
       "path": "skills/loki/runtime/pipeline/collected_vod_media.py",
@@ -607,8 +612,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_context_author.py",
-      "sha256": "5ed388340b3abb9bbe42f9fce8d37e4fa8a7b701b96809072da8f7d5a1bba8dd",
-      "bytes": 13402
+      "sha256": "bcf0bbc3297c395247fe2cf7ad2ab97e171dedbc4e38f929cc496fe633bc9acb",
+      "bytes": 29299
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_context_exploration.py",
@@ -622,8 +627,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_current_conversation.py",
-      "sha256": "22a665a4b5b55ccc04b7277f6b7237c055bc9aa145b9cb8a2da62d5d13ff4aaa",
-      "bytes": 83320
+      "sha256": "8587235378028c5eefb1d00e47e0eca19c88431646ed266a2123ef0a9fb87341",
+      "bytes": 83751
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_current_sources.py",
@@ -637,13 +642,13 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_execution.py",
-      "sha256": "f17aac56ae4e906dfe40b88981647d04b5f26f4852af58ef3c0ccd77ec09f286",
-      "bytes": 788
+      "sha256": "5e6c9b088ae184b9af6a78ddca14031153067778e3e6e51ea4a7ab4a0fa660c2",
+      "bytes": 1804
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_full_author.py",
-      "sha256": "ac5f6ea5480d9002cbcfca542451d6210c75de850dd14ebf5f4a8e9eef8b6784",
-      "bytes": 35532
+      "sha256": "461867d3a3612bf81dd3cafb0405f638a831f808373eca58e785f78dedb03720",
+      "bytes": 36023
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_highlight_candidate_discovery.py",
@@ -702,8 +707,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_production_job.py",
-      "sha256": "9a73ea1972ae5fca87c858ac5207428cad1e0424797ec9c0acbc89b91b46f2e9",
-      "bytes": 14633
+      "sha256": "6bf5e618ebce2f32af63d026fd1c66f98b9f0fda91f7bf43f57f4b578cc7f5ab",
+      "bytes": 15209
     },
     {
       "path": "skills/loki/runtime/pipeline/editorial_review_import.py",
@@ -782,8 +787,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/evidence_world/chat_view.py",
-      "sha256": "6539d165beb01d2bebadfd19607e23b9547f48d9922917fe24533b1156389bbb",
-      "bytes": 7803
+      "sha256": "72c2110e53e77c403659fd7a841d9301bd63428520ed204a148c9ba354a6af4e",
+      "bytes": 8274
     },
     {
       "path": "skills/loki/runtime/pipeline/evidence_world/cluster_navigation.py",
@@ -847,13 +852,13 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/evidence_world/service.py",
-      "sha256": "5b0a2fa699b7c9289eb06dbfa977ed13192cbe825da7378d635475c557e3c5fd",
-      "bytes": 37723
+      "sha256": "9e0b0f25ce889275e1c5fd5904cb83e649ebc50e162a865c5b65081fbb8e8b07",
+      "bytes": 39993
     },
     {
       "path": "skills/loki/runtime/pipeline/evidence_world/signal_view.py",
-      "sha256": "d437d1de5de6e0fc337cbbe3e3fcaba7d2a4e7da123666c165d4d9eaf861c767",
-      "bytes": 28198
+      "sha256": "25ad061f29bf5f77daa5fdf8d42e148239736aac1c588c8a0dae0d15849e6aa1",
+      "bytes": 54216
     },
     {
       "path": "skills/loki/runtime/pipeline/evidence_world/state.py",
@@ -882,8 +887,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/highlight_prompt_assets.py",
-      "sha256": "2d6823c070b8476bd39ce1eb9f1f6d9316b27f401719752df820e0764fbc1245",
-      "bytes": 5911
+      "sha256": "c08591230178a85c2f9cb8985ed8c04377b6bf95db62a46d8469a2502ed52b37",
+      "bytes": 7633
     },
     {
       "path": "skills/loki/runtime/pipeline/highlight_story_window.py",
@@ -917,8 +922,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/live_vod_finalize.py",
-      "sha256": "4ff37bde606e5570a6c1dd27623c417652b7ddd7ab6373dc24046501b4833222",
-      "bytes": 25944
+      "sha256": "628a051664cff55a27ed3fcf7d13796d7e196846cb6512bb9dca88245f76bb9a",
+      "bytes": 32135
     },
     {
       "path": "skills/loki/runtime/pipeline/live_vod_repair.py",
@@ -931,14 +936,19 @@
       "bytes": 6112
     },
     {
+      "path": "skills/loki/runtime/pipeline/llm_structured_output.py",
+      "sha256": "814e605c4e4cdfd4dba1eb29ea91b3d999c4abfdaddbb33435bf782f170f3e10",
+      "bytes": 7376
+    },
+    {
       "path": "skills/loki/runtime/pipeline/local_install.py",
       "sha256": "9c0cd59a151a5505d551d209c0db11a9ad6a0d4e63c24b8564b416d51abdabb6",
       "bytes": 1628
     },
     {
       "path": "skills/loki/runtime/pipeline/loki_version_policy.py",
-      "sha256": "44a497c5bbf2943719c0f9cfdaa3a02f1a6ee7bc10affbc22ab061060efb0499",
-      "bytes": 3677
+      "sha256": "8dfd5f3b0c51b7f6e7a61d9bbc1ba16f2dfebe8d61f1fb4f0dbba7fce1c11a5f",
+      "bytes": 3799
     },
     {
       "path": "skills/loki/runtime/pipeline/manager_outline.py",
@@ -1207,8 +1217,8 @@
     },
     {
       "path": "skills/loki/runtime/pipeline/summary/report_generation.py",
-      "sha256": "8ab9c85104e6d6268ea510e7f6f27fa1cc9036e7d83142e9433127fce7590f05",
-      "bytes": 46365
+      "sha256": "9befdf80424fb3e2811d828408cfe42bbf2fe1cfc1ccc7acb470e3e0c8c75238",
+      "bytes": 47004
     },
     {
       "path": "skills/loki/runtime/pipeline/summary/report_html.py",
@@ -1296,6 +1306,11 @@
       "bytes": 5171
     },
     {
+      "path": "skills/loki/runtime/pipeline/timeline_llm_provider.py",
+      "sha256": "8cb50c241f4dd58deac784f2cf9346aded583a6bb6dff46ae704f935729ee8ec",
+      "bytes": 3085
+    },
+    {
       "path": "skills/loki/runtime/pipeline/timeline_missing_card_adoption.py",
       "sha256": "c917a118c2e9168d344a1e0542db676aab0c1d7d6976c0056ae85554c0d27fe8",
       "bytes": 2651
@@ -1371,14 +1386,29 @@
       "bytes": 603
     },
     {
+      "path": "skills/loki/runtime/prompts/highlight/editorial_full_author_302_d2_3092.md",
+      "sha256": "f5579702f6d18f2dd73f8131708159dfa14405bd2ed57e7d9b7e64f6952a580e",
+      "bytes": 3004
+    },
+    {
+      "path": "skills/loki/runtime/prompts/highlight/editorial_full_author_302_d2_outcomes.md",
+      "sha256": "22ab4a63bbb7ab9d029b4fc0658205fb719035b9a37930b999a33e41be1e58d3",
+      "bytes": 2374
+    },
+    {
       "path": "skills/loki/runtime/prompts/highlight/editorial_full_author_302_retention.md",
       "sha256": "ec5adf6a52c31b4bba7dbf144b86b96205c0016c9415223faca908645ddb722e",
       "bytes": 31994
     },
     {
+      "path": "skills/loki/runtime/prompts/highlight/editorial_full_author_302_retention_3092.md",
+      "sha256": "a484100d683172d68e34f65e4507669568b0e97dbed6ebc2304d9e6c8b154f12",
+      "bytes": 32940
+    },
+    {
       "path": "skills/loki/runtime/public_ui.py",
-      "sha256": "6bf835da2a99b8691c38090093d9e4397c93f9716f72406b14e58a98d63f269f",
-      "bytes": 7771
+      "sha256": "cbd5692d0edfae28e940284e053efef8a10cf7deee00e7af5cdf45a539c17cd9",
+      "bytes": 7862
     },
     {
       "path": "skills/loki/runtime/publish/__init__.py",
@@ -1391,14 +1421,19 @@
       "bytes": 87
     },
     {
+      "path": "skills/loki/runtime/publish/builder/loki-collaboration-view.js",
+      "sha256": "d1e491d646cf981f9950a6fe4ac80f5b7af4d99a8d4ecc2d79656663b69b87c4",
+      "bytes": 22064
+    },
+    {
       "path": "skills/loki/runtime/publish/builder/loki_runtime.py",
-      "sha256": "ce4fee5c7b4ee326688750655301b04bc0894821572e2ab481cb66d792a68f87",
-      "bytes": 1104
+      "sha256": "2f2bde1c2c123c2e899697c41415d2219877af645d3b0fb3424731c263b9d483",
+      "bytes": 1927
     },
     {
       "path": "skills/loki/runtime/publish/builder/loki_template.py",
-      "sha256": "72b892586f044c808a5c888c2c46716507b8cc0cb7d703a91572a523f0dd3898",
-      "bytes": 19070
+      "sha256": "15bcbc5848e1b9c8b7ed41bccf5464ed030298c9cbca0f2729b8dd35e12dde65",
+      "bytes": 19073
     },
     {
       "path": "skills/loki/runtime/publish/builder/report_sanitizers.py",
@@ -1442,8 +1477,8 @@
     },
     {
       "path": "skills/loki/runtime/review_store.py",
-      "sha256": "ffb4fa18b0a5d120f112cae94d6c04c1705be4cae1faaee496953e708bece73f",
-      "bytes": 35787
+      "sha256": "fbbc600adddb03efdecf3a13a138ab37365dc0909d3ef6319da9f3ee6220d839",
+      "bytes": 35895
     },
     {
       "path": "skills/loki/runtime/scripts/admin/__init__.py",
@@ -1472,13 +1507,13 @@
     },
     {
       "path": "skills/loki/runtime/scripts/admin/report_reader.py",
-      "sha256": "8a719c64a0285c695d169a7be211c9f962164c53975dc2b92690d0c894fe4f36",
-      "bytes": 4613
+      "sha256": "61db357e04f0ee323b8ea8a56c293f53f6ebe2bbac15b3934f2c69415232b9e0",
+      "bytes": 4987
     },
     {
       "path": "skills/loki/runtime/scripts/admin/static/app_shell.css",
-      "sha256": "f7225fef4227280249ce8380f4743aa23f9e0f34158f01a92baed31ff1a92881",
-      "bytes": 28687
+      "sha256": "cecb2ad2b5e6b801b42b59c5985edfd17b9b449e8ae41e9200f21a8fcd3d3d2a",
+      "bytes": 31272
     },
     {
       "path": "skills/loki/runtime/scripts/admin/static/approval_state.js",
@@ -1492,8 +1527,8 @@
     },
     {
       "path": "skills/loki/runtime/scripts/admin/static/home.js",
-      "sha256": "5bf847535165b5416457165bde289cd91de0948a9530d81c97d109c653a8232e",
-      "bytes": 52396
+      "sha256": "578ac25ff475ed9584c15c0de806c4673f8190bb3682222a4a562669065aff24",
+      "bytes": 49584
     },
     {
       "path": "skills/loki/runtime/scripts/admin/static/report.css",
@@ -1637,13 +1672,13 @@
     },
     {
       "path": "skills/loki/runtime/source-manifest.json",
-      "sha256": "d1f631d0dfdd475753bf29cc55acbc5d885fdc2d7129b1dd0ff3c054edfdd5e7",
-      "bytes": 304490
+      "sha256": "ca57e8bffbdc2b8d2dfb86feeeee5b58c823399ab7f11ffa2669c9c151bd587f",
+      "bytes": 312038
     },
     {
       "path": "skills/loki/runtime/source-recipe.json",
-      "sha256": "43f8e0db608a7053f6a05f5b4a355d5ec3fc1d4fdb8d80c4659a25a49dcb3e6d",
-      "bytes": 268219
+      "sha256": "3debe93dc1a4792e4539553afd4775de3f4a2bd43073d9dd7b44465ea80cfacf",
+      "bytes": 275067
     },
     {
       "path": "skills/loki/runtime/source_acquire.py",
@@ -1707,8 +1742,8 @@
     },
     {
       "path": "skills/loki/runtime/vendor/chat-analyze-engine/config/loki_versions.json",
-      "sha256": "87784238e8c0efd86b1534df54bb3e57efef2960099e8b88796d32ed01e41254",
-      "bytes": 3889
+      "sha256": "38c5afbf6568b3f4f328a3c696e97eeae4d53bb6cdf7ee76f9c1d1c618810364",
+      "bytes": 4301
     },
     {
       "path": "skills/loki/runtime/vendor/loki-page-template/provenance.json",
@@ -1862,8 +1897,8 @@
     },
     {
       "path": "skills/loki/SKILL.md",
-      "sha256": "970dd0fdfb7df2e78f782d7e7b7a581316e92de51699a87bb2627bebc282dcd7",
-      "bytes": 10677
+      "sha256": "8f663100d92be97d9e938fce78a469e76cf30fb6d225153496413de25369dfdb",
+      "bytes": 10960
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",

@@ -1,6 +1,6 @@
 """Bind public report data to the manager-supplied Loki template.
 
-The supplied UI runtime is copied byte-for-byte; only hosting addresses are bound.
+The original reader is preserved alongside the version with D1 collaboration display.
 Report meaning comes from the existing public projection.
 """
 

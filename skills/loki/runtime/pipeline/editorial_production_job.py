@@ -163,8 +163,16 @@ def _source_scope(cfg):
     if distributed is not None:
         scope["distribution_vod"] = distributed
     author_budget = cfg.get(AUTHOR_BUDGET_KEY)
+    from .editorial_execution import LIVE_AUTOMATIC_WRITER_EFFORTS, LIVE_AUTOMATIC_WRITER_RECIPE
     from .live_vod_finalize import live_vod_codex_author_pin
 
+    recipe = cfg.get(LIVE_AUTOMATIC_WRITER_RECIPE)
+    if recipe is not None:
+        if (not isinstance(recipe, str) or recipe not in LIVE_AUTOMATIC_WRITER_EFFORTS
+                or cfg.get("summary_pipeline_version") not in FULL_AUTHOR_PIPELINES
+                or not cfg.get("live_finalize_archive") or cfg.get("summary_author_mode") != "api_direct"):
+            raise ValueError("live_automatic_writer_recipe_invalid")
+        scope[LIVE_AUTOMATIC_WRITER_RECIPE] = recipe
     live_writer = live_vod_codex_author_pin(cfg)
     if live_writer is not None:
         if author_budget is None:

@@ -21,7 +21,8 @@ PROFILE = "exact_chat_groups_v2"
 GROUP_COLUMNS = ["group_id", "excerpt", "excerpt_truncated", "occurrence_count", "first_sec", "last_sec",
                  "distribution_10s", "representative_sampler_hint", "reaction_hints", "original_record_id"]
 
-def browse_chat(service, *, question_id, interval_sec=None, interval_utc_ms=None, limit=8, cursor=None, max_bytes=12000):
+def browse_chat(service, *, question_id, interval_sec=None, interval_utc_ms=None, limit=8, cursor=None,
+                max_bytes=12000, order="chronological"):
     service._families(["chat"])
     native = interval_utc_ms is not None
     if native:
@@ -38,10 +39,14 @@ def browse_chat(service, *, question_id, interval_sec=None, interval_utc_ms=None
     if (type(limit) is not int or not 1<=limit<=20 or
             type(max_bytes) is not int or not 3000<=max_bytes<=32000):
         raise EvidenceError("invalid_chat_view_query")
+    if order not in ("chronological", "discovery"):
+        raise EvidenceError("invalid_chat_view_order")
     identity=dict(profile=PROFILE,world_revision=service.world_revision,question_id=question_id,
                   interval_sec=interval_sec,limit=limit,max_bytes=max_bytes)
     if native:
         identity['interval_utc_ms'] = interval_utc_ms
+    if order == 'discovery':
+        identity['order'] = order
     root=service.run_root/'chat-views'/digest(identity)
     offset=0
     if cursor is not None:
@@ -91,6 +96,9 @@ def browse_chat(service, *, question_id, interval_sec=None, interval_utc_ms=None
             row['last_utc_ms']=row.pop('last_sec')
             row.pop('distribution_10s')
             row['distribution_10s_utc_ms']=[[t,n] for t,n in sorted(Counter(int(t//10000)*10000 for t in times).items())]
+    if order == 'discovery':
+        start_key = 'first_utc_ms' if native else 'first_sec'
+        rows.sort(key=lambda r: (not r['representative_sampler_hint'], -r['occurrence_count'], r[start_key]))
     columns=[{'first_sec':'first_utc_ms','last_sec':'last_utc_ms','distribution_10s':'distribution_10s_utc_ms'}.get(k,k)
              for k in GROUP_COLUMNS] if native else GROUP_COLUMNS
     result=dict(schema_version='ew.chat_view.v1',profile=PROFILE,source_id=service.source_id,
@@ -104,6 +112,8 @@ def browse_chat(service, *, question_id, interval_sec=None, interval_utc_ms=None
         all_occurrences_action=dict(action='read_evidence',args=dict(
             **({'intervals_utc_ms':[interval_utc_ms]} if native else {'intervals_sec':[interval_sec]}),families=['chat'],context_cues=0)))
     result['clock_domain']='utc_epoch_ms' if native else 'vod_relative_ms'
+    if order == 'discovery':
+        result['order'] = order
     if native:
         result['interval_utc_ms']=interval_utc_ms
     atomic_json(root/'stored-groups.json',dict(identity=identity,groups=rows,sampler_stats=sampled.stats))
