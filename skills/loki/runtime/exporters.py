@@ -411,7 +411,7 @@ def export_web_pack(job_root: Path, output_zip: Path, *, expected_revision: str)
         "- **Claude Web (Projects):** 200K 컨텍스트 한도를 넘지 않도록 분할된 `transcript_part*.md`와 `evidence_clusters.json`을 함께 올려 작성하세요.",
         "- **Gemini Web (Gems):** ZIP 대신 평면 폴더 `<name>_files/`의 전체 파일(≤8파일)을 그대로 첨부하세요.",
         "",
-        "## 핵심 원칙 (Loki 3.0.9.1)",
+        "## Loki 작성 원칙",
         "1. `evidence_clusters.json`의 `phrase_view`·피크·전체 군집·클립·댓글·저반응 구간과 자막의 `e<N>` 원문을 함께 확인합니다.",
         "2. 길이와 무관하게 재미·티키타카·흐름 전환을 보존하고, 큰 관계 가설을 기각해도 성립하는 작은 티키타카는 남깁니다.",
         "3. 먼 전제, 활동 목적, 반례를 `summary`, `ranges`, `points`, `stories`, `proposals` 본문까지 남깁니다.",

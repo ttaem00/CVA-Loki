@@ -14,9 +14,13 @@ WINDOW_SEC = 10
 
 PEAK_MERGE_SEC = 30
 
+REACTION_PEAK_MERGE_SEC = 45
+
 Z_THRESHOLD = 2.0
 
 CHAT_PEAK_POLICY_REVISION = "chat-peaks.v2-known-identities-family-members"
+
+BOUNDED_CHAT_PEAK_POLICY_REVISION = "chat-peaks.v3-bounded-reaction-clusters"
 
 _COMMAND_PREFIX_PATTERN = re.compile(r'^!\s*[\w가-힣]')
 
@@ -378,7 +382,8 @@ def z_score_peaks(
             })
     return peaks
 
-def merge_peaks(peaks: list[dict], merge_sec: int = PEAK_MERGE_SEC) -> list[dict]:
+def merge_peaks(peaks: list[dict], merge_sec: int = PEAK_MERGE_SEC, *, bounded: bool = False) -> list[dict]:
+    """Group nearby reaction buckets, optionally limiting each scene-local extent."""
     if not peaks:
         return []
 
@@ -443,19 +448,24 @@ def merge_peaks(peaks: list[dict], merge_sec: int = PEAK_MERGE_SEC) -> list[dict
     sorted_peaks = sorted(peaks, key=lambda p: p["sec"])
     merged = []
     group = [sorted_peaks[0]]
+    max_cluster_span = 2 * max(merge_sec, REACTION_PEAK_MERGE_SEC)
+    has_group_reaction = bool(group[0].get("laughter_burst") or group[0].get("reaction_families"))
 
     for peak in sorted_peaks[1:]:
-        has_reaction_cluster = peak.get("reaction_families") or any(p.get("reaction_families") for p in group)
-        effective_merge_sec = 45 if (
-            peak.get("laughter_burst")
-            or any(p.get("laughter_burst") for p in group)
-            or has_reaction_cluster
-        ) else merge_sec
-        if peak["sec"] - group[-1]["sec"] <= effective_merge_sec:
+        previous = group[-1]
+        has_reaction = bool(peak.get("laughter_burst") or peak.get("reaction_families"))
+        has_link_reaction = (previous.get("laughter_burst") or previous.get("reaction_families")
+                             if bounded else has_group_reaction)
+        effective_merge_sec = REACTION_PEAK_MERGE_SEC if has_reaction or has_link_reaction else merge_sec
+        gap = peak["sec"] - previous["sec"]
+        span = peak["sec"] + WINDOW_SEC - group[0]["sec"]
+        if gap <= effective_merge_sec and (not bounded or span <= max_cluster_span):
             group.append(peak)
+            has_group_reaction |= has_reaction
         else:
             merged.append(finalize(group))
             group = [peak]
+            has_group_reaction = has_reaction
 
     merged.append(finalize(group))
 
@@ -491,6 +501,7 @@ def find_edit_points(
     min_count: int = 8,
     max_count: int = 20,
     donation_ranking: bool = False,
+    bounded_clusters: bool = False,
 ) -> list[dict]:
     """메인 분석 파이프라인. composite 내림차순 정렬된 하이라이트 리스트 반환.
 
@@ -530,7 +541,7 @@ def find_edit_points(
     raw_peaks = z_score_peaks(ts["buckets"], Z_THRESHOLD, donation_ranking=donation_ranking)
     logger.info(f"  Z-score 피크 탐지: {len(raw_peaks)}개")
 
-    merged = merge_peaks(raw_peaks, PEAK_MERGE_SEC)
+    merged = merge_peaks(raw_peaks, PEAK_MERGE_SEC, bounded=bounded_clusters)
     merged.sort(key=lambda p: p["composite"], reverse=True)
 
     for rank, p in enumerate(merged, 1):
@@ -538,3 +549,19 @@ def find_edit_points(
 
     logger.info(f"  최종 하이라이트: {len(merged)}개 (상위 {min(top_n, len(merged))}개 사용)")
     return merged[:top_n]
+
+def _describe_intensity(h: dict) -> str:
+    """하이라이트의 순위/강도를 설명적 표현으로 변환.
+
+    내부 메트릭(composite, count)을 직접 노출하지 않고
+    Claude가 맥락적으로 판단할 수 있는 상대 표현을 사용한다.
+    """
+    rank = h.get("rank", 99)
+    if rank <= 3:
+        return "폭발 🔥"
+    elif rank <= 7:
+        return "활발"
+    elif rank <= 12:
+        return "보통"
+    else:
+        return "소폭"

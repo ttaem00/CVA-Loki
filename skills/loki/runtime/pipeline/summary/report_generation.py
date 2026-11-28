@@ -10,7 +10,7 @@ import re
 
 from pathlib import Path
 
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from datetime import datetime, timedelta, timezone
 
@@ -334,6 +334,7 @@ def _commit_generated_report_artifacts(
     summary_local_vector_index: Optional[dict] = None,
     work_dir: str | Path | None = None,
     announce_proposal_source: bool = True,
+    collaboration_evidence: Callable[[], tuple[dict | None, int | None]] | None = None,
 ) -> tuple[str, str, str]:
     """Commit the generated report family and its best-effort side records."""
 
@@ -392,6 +393,11 @@ def _commit_generated_report_artifacts(
         authority_revision_id=authority_revision_id,
         assert_current=assert_unretained_source,
     )
+    from ..collaboration_stage import VERSION as collaboration_version, finish_report_collaboration
+
+    if (metadata.get("summary_pipeline") or {}).get("actual_version") == collaboration_version:
+        finish_report_collaboration(md_path, html_path, meta_path,
+            generation_id=generation_id, live_evidence=collaboration_evidence)
     logger.info(
         "리포트 산출물 세대 저장 완료: generation_id=%s md=%s html=%s metadata=%s",
         generation_id,
@@ -489,6 +495,18 @@ def _highlight_peak_evidence_metadata(highlight: dict[str, Any]) -> dict[str, An
                            for row in highlight[key] if isinstance(row, dict)]
     return result
 
+def vod_report_run_id(vod_info, *, artifact_discriminator: str = "") -> str:
+    from ..utils import stable_artifact_key
+
+    if not isinstance(artifact_discriminator, str):
+        raise ValueError("report_artifact_discriminator_invalid")
+    try:
+        date = datetime.fromisoformat((getattr(vod_info, "publish_date", None) or "").replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        date = datetime.now(KST)
+    return stable_artifact_key(str(vod_info.video_no), date.strftime("%Y%m%d"),
+                               discriminator=artifact_discriminator)
+
 def generate_reports(
     summary: str,
     vod_info: VODInfo,
@@ -525,6 +543,7 @@ def generate_reports(
     work_dir: str | Path | None = None,
     artifact_discriminator: str = "",
     announce_proposal_source: bool = True,
+    collaboration_evidence: Callable[[], tuple[dict | None, int | None]] | None = None,
     live_report_owner: dict[str, str] | None = None,
 ) -> tuple[str, str, str]:
     """Markdown + HTML + metadata JSON 저장"""
@@ -628,25 +647,12 @@ def generate_reports(
             safe_timeline_comment_context["collaboration_periods"] = public_collaboration_periods(
                 timeline_comment_context["collaboration_periods"], vod_info.duration)
             safe_timeline_comment_context["collaboration_video_no"] = str(vod_info.video_no)
-    from ..utils import stable_artifact_key, validate_artifact_path_budget
-
-    date_str = ""
-    if vod_info.publish_date:
-        try:
-            dt = datetime.fromisoformat(vod_info.publish_date.replace("Z", "+00:00"))
-            date_str = dt.strftime("%Y%m%d")
-        except (ValueError, TypeError):
-            date_str = datetime.now(KST).strftime("%Y%m%d")
-    else:
-        date_str = datetime.now(KST).strftime("%Y%m%d")
+    from ..utils import validate_artifact_path_budget
 
 
 
 
-    if not isinstance(artifact_discriminator, str):
-        raise ValueError("report_artifact_discriminator_invalid")
-    base = stable_artifact_key(str(vod_info.video_no), date_str,
-        discriminator=artifact_discriminator)
+    base = vod_report_run_id(vod_info, artifact_discriminator=artifact_discriminator)
     validate_artifact_path_budget(
         output_dir,
         base,
@@ -1074,4 +1080,5 @@ def generate_reports(
         summary_local_vector_index=summary_local_vector_index,
         work_dir=work_dir,
         announce_proposal_source=announce_proposal_source,
+        collaboration_evidence=collaboration_evidence,
     )

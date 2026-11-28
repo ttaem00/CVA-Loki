@@ -28,17 +28,20 @@ def load_loki_version_policy() -> dict:
             raise ValueError("loki_version_policy_invalid")
     return policy
 
+def current_pipeline() -> str:
+    return load_loki_version_policy()["current_pipeline"]
+
 def pipelines_for(*kinds: str) -> frozenset[str]:
     return frozenset(name for name, row in load_loki_version_policy()["pipelines"].items()
                      if not kinds or row["kind"] in kinds)
 
 def uses_loki_308_profile(value: object) -> bool:
     """Share reviewed execution behavior without changing concrete job identity."""
-    return isinstance(value, str) and value in {"loki_3_0_8", "loki_3_0_8_1", "loki_3_0_8_2", "loki_3_0_9", "loki_3_0_9_1"}
+    return isinstance(value, str) and value in {"loki_3_0_8", "loki_3_0_8_1", "loki_3_0_8_2", "loki_3_0_9", "loki_3_0_9_1", "loki_3_0_9_2"}
 
 def uses_loki_saved_html_presentation(value: object) -> bool:
     """Apply standalone saved HTML presentation for 3.0.9-family revisions."""
-    return isinstance(value, str) and value in {"loki_3_0_9", "loki_3_0_9_1"}
+    return isinstance(value, str) and value in {"loki_3_0_9", "loki_3_0_9_1", "loki_3_0_9_2"}
 
 def normalize_pipeline(value: str) -> str:
     policy = load_loki_version_policy()

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-import hashlib
-import json
 import re
+
+from publish.builder.loki_runtime import COLLABORATION_VIEW_SOURCE, ORIGINAL_RUNTIME_PREFIX, RUNTIME_PREFIXES, runtime_asset
 
 
 UI_ASSETS = (
@@ -126,17 +126,19 @@ def response(runtime, path):
         return render_page(runtime, PAGES[path]).encode("utf-8"), "text/html; charset=utf-8"
     relative = STATIC.get(path)
     if relative is None and path.startswith("/loki/"):
-        provenance = json.loads(_file(runtime, "vendor/loki-page-template/provenance.json").read_text(encoding="utf-8"))
-        prefix = f"/loki/{provenance['runtime_version']}/shared/loki/v1/"
-        if not path.startswith(prefix):
+        prefix = next((value for value in RUNTIME_PREFIXES if path.startswith(value)), "")
+        if not prefix:
             return None
-        name = "shared/loki/v1/" + path.removeprefix(prefix)
-        relative = "vendor/loki-page-template/v1/" + name
+        name = path.removeprefix(prefix)
+        source = "vendor/loki-page-template/v1"
+        relative = source + "/shared/loki/v1/" + name
         if relative not in TEMPLATE_ASSETS:
             return None
-        raw = _file(runtime, relative).read_bytes()
-        if hashlib.sha256(raw).hexdigest() != provenance["files"][name]["sha256"]:
-            raise ValueError("loki_template_source_changed")
+        _file(runtime, relative)
+        original = prefix == ORIGINAL_RUNTIME_PREFIX
+        if name == "collaboration-view.js" and not original:
+            _file(runtime, COLLABORATION_VIEW_SOURCE)
+        raw = runtime_asset(name, original=original, source=Path(runtime) / source)
         kind = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                 ".html": "text/html; charset=utf-8", ".md": "text/plain; charset=utf-8",
                 ".svg": "image/svg+xml", ".woff2": "font/woff2"}[Path(relative).suffix]

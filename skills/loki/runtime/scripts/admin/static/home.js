@@ -1,6 +1,5 @@
 
     const searchEl = document.getElementById('search');
-    const focusSearchBtn = document.getElementById('focusSearchBtn');
     const listEl = document.getElementById('list');
     const metaEl = document.getElementById('meta');
     const errorEl = document.getElementById('error');
@@ -14,7 +13,6 @@
     const bundleModeBtn = document.getElementById('bundleModeBtn');
     const bundlePanelEl = document.querySelector('[data-testid="existing-summary-bundle-panel"]');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
-    const operationsDetails = document.getElementById('operationsDetails');
     let reports = [];
     const initialParams = new URLSearchParams(window.location.search);
     let activeStreamer = initialParams.get('streamer') || '__all__';
@@ -23,7 +21,6 @@
     let nextOffset = 0;
     let hasMore = false;
     let bundleMode = false;
-    let operationsLoaded = false;
     let searchTimer = null;
     let catalogGeneration = 0;
     let catalogController = null;
@@ -43,13 +40,6 @@
         if (searchEl) { e.preventDefault(); searchEl.focus(); searchEl.select(); }
       }
     });
-    if (focusSearchBtn) {
-      focusSearchBtn.addEventListener('click', () => {
-        setTimeout(() => {
-          if (searchEl) { searchEl.focus(); searchEl.select(); }
-        }, 0);
-      });
-    }
 
     async function api(path, options = undefined) {
       const res = await fetch(path, options);
@@ -59,27 +49,6 @@
       if (!res.ok) throw new Error(data.error || data.raw || `HTTP ${res.status}`);
       return data;
     }
-    document.querySelectorAll('[data-open-manager-entry]').forEach(button => {
-      button.addEventListener('click', async () => {
-        const status = button.parentElement.querySelector('.journey-status');
-        button.disabled = true;
-        status.textContent = '창을 여는 중입니다…';
-        try {
-          const data = await api('/api/manager-entry/open', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({entry:button.dataset.openManagerEntry})
-          });
-          status.textContent = data.entry === 'chzzk'
-            ? 'CHZZK 수집 창을 열었습니다. 등록 스트리머 감지가 자동으로 시작됩니다.'
-            : 'YouTube 요약 창을 열었습니다. CHZZK 수집은 시작하거나 멈추지 않았습니다.';
-        } catch (error) {
-          status.textContent = `창을 열지 못했습니다. ${error.message}`;
-        } finally {
-          button.disabled = false;
-        }
-      });
-    });
 
     function streamerKey(report) {
       return report.streamer_id || report.channel_id || report.channel || '__unknown__';
@@ -450,21 +419,6 @@
         renderGeneratedReviewInboxHome({status: 'ERROR'});
       }
     }
-    async function updateLiveCollector(action) {
-      const btn = action === 'start' ? document.getElementById('liveCollectorStartBtn') : document.getElementById('liveCollectorStopBtn');
-      if (btn) btn.disabled = true;
-      try {
-        renderLiveCollectorHomeStatus(await api(`/api/live-context-collector/${action}`, {method: 'POST', body: JSON.stringify({})}));
-      } catch (err) {
-        renderLiveCollectorHomeStatus({status: 'ERROR'});
-      } finally {
-        if (btn) btn.disabled = false;
-      }
-    }
-    const liveCollectorStartBtn = document.getElementById('liveCollectorStartBtn');
-    const liveCollectorStopBtn = document.getElementById('liveCollectorStopBtn');
-    if (liveCollectorStartBtn) liveCollectorStartBtn.addEventListener('click', () => updateLiveCollector('start'));
-    if (liveCollectorStopBtn) liveCollectorStopBtn.addEventListener('click', () => updateLiveCollector('stop'));
 
     function editPatternReadyRecord(data) {
       const rows = Array.isArray(data.records) ? data.records : [];
@@ -951,18 +905,5 @@
     document.getElementById('reloadBtn').addEventListener('click', () => {
       loadReports().catch(showCatalogError);
     });
-
-    if (operationsDetails) {
-      operationsDetails.addEventListener('toggle', () => {
-        if (!operationsDetails.open || operationsLoaded) return;
-        operationsLoaded = true;
-        loadLlmCallHomeStatus();
-        loadLiveCollectorHomeStatus();
-        loadServerRoleHomeStatus();
-        api('/api/runtime-data-guard')
-          .then((data) => renderRuntimeDataGuard(data.runtime_data_guard || null))
-          .catch(() => renderRuntimeDataGuard(null));
-      });
-    }
 
     loadReports().catch(showCatalogError);

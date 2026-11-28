@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.9.1 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 LLM 플러그인·스킬" />
+  <img src="docs/assets/readme-hero.svg" width="1200" alt="CVA-Loki 3.0.9.2 — 치지직 방송을 읽고, 장면을 찾고, 보고서를 편집하는 비공식 LLM 플러그인·스킬" />
 </p>
 
-<h1 align="center">CVA-Loki 3.0.9.1</h1>
-<p align="center">정식 요약 메커니즘 Loki 3.0.9.1</p>
+<h1 align="center">CVA-Loki 3.0.9.2</h1>
+<p align="center">정식 요약 메커니즘 Loki 3.0.9.2</p>
 <p align="center"><strong>치지직 다시보기를 읽고, 장면을 찾고, 보고서를 다듬는 멀티 LLM 플러그인·스킬</strong></p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="plugin.json"><img alt="버전 3.0.9.1" src="https://img.shields.io/badge/버전-3.0.9.1-8B5CF6?style=flat-square" /></a>
+  <a href="plugin.json"><img alt="버전 3.0.9.2" src="https://img.shields.io/badge/버전-3.0.9.2-8B5CF6?style=flat-square" /></a>
   <a href="#requirements"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square" /></a>
   <a href="#multi-llm-workflows"><img alt="멀티 LLM 지원" src="https://img.shields.io/badge/멀티%20LLM-플러그인%20%2B%20스킬-20805D?style=flat-square" /></a>
   <a href="#execution-modes"><img alt="실행 모드 LITE NORMAL FULL" src="https://img.shields.io/badge/실행%20모드-LITE%20·%20NORMAL%20·%20FULL-0891B2?style=flat-square" /></a>
@@ -79,9 +79,9 @@ YouTube·SOOP 로고도 공식 원본의 형태·색상·비율을 유지합니�
 
 ### 1. 배포 폴더를 준비하세요
 
-[CVA-Loki-3.0.9.1.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9.1/CVA-Loki-3.0.9.1.zip) ([SHA256SUMS](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9.1/SHA256SUMS.txt)) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
+[CVA-Loki-3.0.9.2.zip 다운로드](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9.2/CVA-Loki-3.0.9.2.zip) ([SHA256SUMS](https://github.com/ttaem00/CVA-Loki/releases/download/v3.0.9.2/SHA256SUMS.txt)) 후 압축을 풀고 그 폴더에서 시작하세요. 설치 전 [이용·배포 정책](#policy)을 확인하세요.
 
-이 배포본의 배포·플러그인·스킬·요약 메커니즘은 **3.0.9.1**이며, 새 작업의 `latest`도 **Loki 3.0.9.1**을 선택합니다. (`3.0.9`의 작성 프롬프트와 근거 세계 메커니즘을 그대로 유지한 다크모드·4대 CLI·멀티 LLM 보완판입니다.) 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
+이 배포본의 배포·플러그인·스킬·요약 메커니즘은 **3.0.9.2**이며, 새 작업의 `latest`도 **Loki 3.0.9.2**을 선택합니다. (`3.0.9`의 작성 프롬프트와 근거 세계 메커니즘을 그대로 유지한 다크모드·4대 CLI·멀티 LLM 보완판입니다.) 기존 작업은 원래 버전과 결과 이력을 유지합니다. 업그레이드는 새 배포본을 별도의 작업공간에 설치하세요.
 
 ### 2. 사용 환경에 맞게 설치하세요
 
@@ -159,7 +159,7 @@ docker compose run --build --rm loki
 
 ### 2. 모델 권장 기준 (가변형 최신 티어 안내 · 상세 가이드)
 
-CVA-Loki 3.0.9.1은 특정 모델 버전을 코드나 매니페스트에 고정하지 않고 **역할별 권장 능력 티어**로 안내합니다. 각 호스트에서 **현재 제공되는 최신 상위 추론 모델**을 선택하세요. (세부 가이드는 [모델 권장 기준](docs/llm-guides/MODEL_RECOMMENDATIONS.md) · [웹 AI 팩 가이드](docs/llm-guides/WEB_PACK_WORKFLOW.md) · [로컬 LLM 가이드](docs/llm-guides/LOCAL_LLM_GUIDE.md) · [Gemini CLI 설정](docs/llm-guides/GEMINI_CLI_SETUP.md)을 참고하세요.)
+CVA-Loki 3.0.9.2은 특정 모델 버전을 코드나 매니페스트에 고정하지 않고 **역할별 권장 능력 티어**로 안내합니다. 각 호스트에서 **현재 제공되는 최신 상위 추론 모델**을 선택하세요. (세부 가이드는 [모델 권장 기준](docs/llm-guides/MODEL_RECOMMENDATIONS.md) · [웹 AI 팩 가이드](docs/llm-guides/WEB_PACK_WORKFLOW.md) · [로컬 LLM 가이드](docs/llm-guides/LOCAL_LLM_GUIDE.md) · [Gemini CLI 설정](docs/llm-guides/GEMINI_CLI_SETUP.md)을 참고하세요.)
 
 - **에이전트 / CLI (`Codex`, `Claude Code`, `Antigravity`, `Gemini CLI`)**:
   - 최종 D1/D2 구조화·인과/반례 검토·Highlight 선정: 각 호스트의 **최신 상위 추론/플래그십 모델**(장문맥·도구 호출·이미지 직접 판독 지원) 권장.
@@ -178,7 +178,7 @@ CVA-Loki 3.0.9.1은 특정 모델 버전을 코드나 매니페스트에 고정�
 
 이 배포 폴더 경로와 작업공간을 열어 둔 AI 세션(Codex·Claude Code·Antigravity·Gemini CLI)에 다음처럼 요청하세요.
 
-> 이 폴더의 `README.md`와 `skills/loki/SKILL.md`를 읽고, 내 환경(`--author-mode`)에 맞는 기본 전체 기능을 배포 폴더 밖의 새 작업공간에 설치해줘. GPU 감지·실행 결과를 확인한 뒤, 내가 준 VOD를 준비하고 네가 Loki의 원문과 반환 이미지를 직접 읽어 새 3.0.9.1 보고서를 작성·제출해줘. 마지막으로 결과 HTML 또는 검토 UI를 열어줘. 외부 게시는 하지 마.
+> 이 폴더의 `README.md`와 `skills/loki/SKILL.md`를 읽고, 내 환경(`--author-mode`)에 맞는 기본 전체 기능을 배포 폴더 밖의 새 작업공간에 설치해줘. GPU 감지·실행 결과를 확인한 뒤, 내가 준 VOD를 준비하고 네가 Loki의 원문과 반환 이미지를 직접 읽어 새 3.0.9.2 보고서를 작성·제출해줘. 마지막으로 결과 HTML 또는 검토 UI를 열어줘. 외부 게시는 하지 마.
 
 실제 요청할 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD의 단일 URL(또는 기존 SRT 경로와 확인된 VOD 정보)을 함께 전달하세요.
 
@@ -228,7 +228,7 @@ python ../web-pack_files/verify_result.py ../web-reply.json ../web-pack_files/ev
 <a id="features"></a>
 ## 할 수 있는 일
 
-| 기능 | 요약 메커니즘 3.0.9.1 동작 |
+| 기능 | 요약 메커니즘 3.0.9.2 동작 |
 | --- | --- |
 | 공개 VOD 준비 | 익명 접근 가능한 치지직 VOD, YouTube Live 다시보기 또는 SOOP VOD 한 개의 영상·메타데이터와 사용 가능한 공개 채팅을 준비합니다. |
 | 3단계 실행 모드 | `lite`(15분 목표·Warm-Only 색인·빠른 채팅 스캔), `normal`(30분 목표·표준), `full`(60분 목표·결정론적 5분 구간 힌트)을 선택합니다. |
@@ -239,7 +239,7 @@ python ../web-pack_files/verify_result.py ../web-reply.json ../web-pack_files/ev
 | Point 중요도 & D2 흐름 | 중요도 색·라벨과 함께 D2 설명에 주요 답변·판단이 바뀐 이유·실제 결과를 남기고 발화 전환 경계에 맞춥니다. |
 | 멀티 LLM 보고서 작성 | 선택한 AI 호스트(Codex·Claude·Antigravity·Gemini CLI·ChatGPT·Web AI·로컬 LLM)가 요약·D1/D2·Point·Story·Highlight를 작성합니다. |
 | 이미지 추출 · 짧은 영상 보조 | 같은 VOD의 로컬 영상에서 제한된 구간의 실제 프레임을 추출하고, 필요 시 선택적 `gemini-api` 짧은 영상 보조 확인을 연결합니다. |
-| 최신 HTML 저장 & 검토 UI | 새 3.0.9.1 보고서를 단독으로 바로 열 수 있는 **다크모드 기본 적용** `.html`로 저장하고, 검토 UI에서 편집·미리보기·저장·이력 복원을 수행합니다. |
+| 최신 HTML 저장 & 검토 UI | 새 3.0.9.2 보고서를 단독으로 바로 열 수 있는 **다크모드 기본 적용** `.html`로 저장하고, 검토 UI에서 편집·미리보기·저장·이력 복원을 수행합니다. |
 | 웹 팩 · 편집자 내보내기 | `export-pack`/`import-draft`와 타임라인 댓글(`comment`), Premiere/Resolve 마커(`markers-csv`), `fcpxml` 내보내기를 제공합니다. |
 | 결과 보존 | 원자료·읽기 기록·응답·Markdown/HTML·메타데이터·수동 수정 이력을 작업공간에 보존합니다. |
 
@@ -344,7 +344,7 @@ AMD/ROCm 등 이 설치기가 자동 선택하지 않는 GPU backend가 감지�
 <a id="native-install"></a>
 ## 로컬 설치
 
-3.0.9.1 배포 폴더를 준비해 설치합니다. 공개 배포 파일은 위 빠른 시작의 다운로드 링크에서 확인합니다.
+3.0.9.2 배포 폴더를 준비해 설치합니다. 공개 배포 파일은 위 빠른 시작의 다운로드 링크에서 확인합니다.
 
 ```sh
 python install.py --workspace ../loki-workspace --mode skill --author-mode current_codex
@@ -428,8 +428,8 @@ Codex `plugin` 모드에서는 사용 가능한 Codex CLI가 있으면 사용하
 | 식별자 | 값 |
 | --- | --- |
 | 원본 저장소 | [`ttaem00/CVA-Loki`](https://github.com/ttaem00/CVA-Loki) · 공개 소스 저장소 |
-| 배포 버전 | `3.0.9.1` |
-| 요약 메커니즘 | `3.0.9.1` · `latest`는 `loki_3_0_9_1` 선택 |
+| 배포 버전 | `3.0.9.2` |
+| 요약 메커니즘 | `3.0.9.2` · `latest`는 `loki_3_0_9_2` 선택 |
 | marketplace | `cva-loki` |
 | plugin | `loki` / 설치 ID `loki@cva-loki` |
 | skill / extension | `loki` (`$loki` / Gemini CLI `cva-loki`) |
@@ -639,7 +639,7 @@ CPU Docker 설치에서는 이 명령에도 `-f compose.yaml -f compose.cpu.yaml
 <a id="images"></a>
 ## 이미지 추출과 멀티모달 검색
 
-**3.0.9.1은 실제 하이라이트 프레임 추출·멀티모달 탐색과 선택적 짧은 영상 확인을 지원합니다.** 로컬 EmbeddingGemma 2는 text/image/audio/video 근거 후보를 찾고, 움직임·음향 단서가 부족한 60초 이내 구간만 `short_video_check.py`(`editorial_short_video_check`, 기본 모델 `None` · 미설치/미인증 비차단)가 보조 확인을 제공하며, 최종 장면 선택과 보고서 작성은 선택한 작성자 AI가 맡습니다.
+**3.0.9.2은 실제 하이라이트 프레임 추출·멀티모달 탐색과 선택적 짧은 영상 확인을 지원합니다.** 로컬 EmbeddingGemma 2는 text/image/audio/video 근거 후보를 찾고, 움직임·음향 단서가 부족한 60초 이내 구간만 `short_video_check.py`(`editorial_short_video_check`, 기본 모델 `None` · 미설치/미인증 비차단)가 보조 확인을 제공하며, 최종 장면 선택과 보고서 작성은 선택한 작성자 AI가 맡습니다.
 
 <details>
 <summary><strong>이미지 추출·선택·멀티모달 탐색 명령과 역할 보기</strong></summary>
@@ -683,7 +683,7 @@ read_frames → 실제 반환 이미지 확인 → 필요한 다음 페이지 �
 <a id="review-ui"></a>
 ## 보고서 열람·검토·편집·복원
 
-**Loki 3.0.9.1이 생성한 새 보고서 `.html` 파일은 다크모드 기본 적용과 최신 결과 화면을 내장해 브라우저에서 단독으로 바로 열 수 있습니다.** 이전 세션의 자동 저장 라이트 키나 로컬 스토리지 제한 환경에서도 다크모드로 먼저 시작하며(사용자가 직접 바꾼 테마 선택은 기억), 파일만 열어도 원본 시각, 대표 장면, 요약, 타임라인과 클립을 확인할 수 있습니다. 수정·미리보기·이력 복원은 동봉 Report Admin의 **목록·영상 작업실·상세 편집 UI**를 사용합니다. 별도 간이 편집 화면으로 대체하지 않습니다.
+**Loki 3.0.9.2이 생성한 새 보고서 `.html` 파일은 다크모드 기본 적용과 최신 결과 화면을 내장해 브라우저에서 단독으로 바로 열 수 있습니다.** 이전 세션의 자동 저장 라이트 키나 로컬 스토리지 제한 환경에서도 다크모드로 먼저 시작하며(사용자가 직접 바꾼 테마 선택은 기억), 파일만 열어도 원본 시각, 대표 장면, 요약, 타임라인과 클립을 확인할 수 있습니다. 수정·미리보기·이력 복원은 동봉 Report Admin의 **목록·영상 작업실·상세 편집 UI**를 사용합니다. 별도 간이 편집 화면으로 대체하지 않습니다.
 
 설치 결과의 `review.command`를 사용하거나 다음을 실행합니다.
 
@@ -766,9 +766,9 @@ Whisper·Silero·F2 runtime 참조는 `.loki-speech.json`에 별도로 기록합
 <a id="release-version-policy"></a>
 ### 버전 정책
 
-현재 배포본은 **3.0.9.1**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 이 배포본의 버전을 씁니다. 공개 다운로드는 **v3.0.9.1**의 ZIP을 가리킵니다. 공개한 태그·ZIP(`v3.0.9` 포함)과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
+현재 배포본은 **3.0.9.2**입니다. 제품·배포·플러그인·스킬·새 작업의 `latest`가 이 배포본의 버전을 씁니다. 공개 다운로드는 **v3.0.9.2**의 ZIP을 가리킵니다. 공개한 태그·ZIP(`v3.0.9` 포함)과 과거 릴리스는 보존합니다. 기존 작업의 버전·원자료·응답·보고서는 새 버전을 설치해도 바뀌지 않습니다. 업그레이드는 새 배포본을 별도의 새 작업공간에 설치해 시작하세요.
 
-### 3.0.9.1의 주요 변경 (3.0.9 보완 패치)
+### 3.0.9.2의 주요 변경 (3.0.9 보완 패치)
 
 - **HTML 다크모드 기본 표시**: 단독 저장 `.html`·공용 웹 화면·검토 UI가 이전 자동 저장 라이트 키나 로컬 스토리지 차단 환경에서도 항상 다크모드로 먼저 열리고, 사용자가 `#themeButton`으로 바꾼 선택만 기억하도록 보정했습니다. 내장 글꼴/썸네일을 위한 `review.py` CSP도 함께 보강했습니다.
 - **4대 CLI 네이티브 매니페스트 & 멀티 LLM 가이드·배너 정비**: `plugin.json`(Antigravity), `.claude-plugin/`(Claude Code), `gemini-extension.json` + `rules/GEMINI.md`(Gemini CLI), `.codex-plugin/`(Codex), `rules/AGENTS.md` 및 `docs/llm-guides/` 4종 가이드를 번들에 정식 포함하고 히어로 배너와 README를 LLM 플러그인 기준으로 개선했습니다.
@@ -966,7 +966,7 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 <summary><strong>다중 AI·모델 선택·모드·이미지·GPU·VOD·검토 UI에 관한 자주 묻는 질문</strong></summary>
 
 **Codex 없이 Claude Code, Antigravity, Gemini CLI, ChatGPT, Web AI, 로컬 LLM에서도 쓸 수 있나요?**  
-네. 3.0.9.1은 번들 루트의 4대 CLI 네이티브 매니페스트(`.codex-plugin`, `plugin.json`, `.claude-plugin`, `gemini-extension.json`)와 `install.py --mode skill --author-mode <호스트>`를 통해 8종 `author_mode`(`current_codex`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`, `current_gemini_web`, `current_claude_web`, `current_local_llm`)를 지원합니다. Web AI는 `export-pack`/`import-draft`로, Ollama/vLLM/LM Studio 로컬 모델은 `local_llm_author.py --model auto`로 실행할 수 있습니다.
+네. 3.0.9.2은 번들 루트의 4대 CLI 네이티브 매니페스트(`.codex-plugin`, `plugin.json`, `.claude-plugin`, `gemini-extension.json`)와 `install.py --mode skill --author-mode <호스트>`를 통해 8종 `author_mode`(`current_codex`, `current_claude`, `current_antigravity`, `current_gemini_cli`, `current_chatgpt`, `current_gemini_web`, `current_claude_web`, `current_local_llm`)를 지원합니다. Web AI는 `export-pack`/`import-draft`로, Ollama/vLLM/LM Studio 로컬 모델은 `local_llm_author.py --model auto`로 실행할 수 있습니다.
 
 **어떤 모델 버전을 써야 하나요?**  
 특정 모델 버전을 고정하지 않습니다. 각 AI 호스트가 현재 제공하는 **최신 상위 추론·장문맥·멀티모달 지원 모델**을 사용하시고, 로컬 LLM은 **32K 이상 컨텍스트와 JSON Schema 출력**을 안정 지원하는 모델을 권장합니다. (세부 티어는 [MODEL_RECOMMENDATIONS.md](docs/llm-guides/MODEL_RECOMMENDATIONS.md) 참고)
@@ -975,7 +975,7 @@ plugin 모드의 설치 runtime은 Codex의 실제 반환 cache 경로를 사용
 작성 목표 시간(`15분`·`30분`·`60분`)과 사전 탐색 범위의 차이입니다. `LITE`는 기존 캐시 중심 Warm-Only 벡터 색인과 빠른 채팅 스캔으로 속도를 높이고, `NORMAL`은 기본 전체 수집, `FULL`은 전체 사전 수집과 결정론적 5분 구간 힌트까지 준비합니다. 원자료 다운로드·로컬 전사 시간은 별도입니다.
 
 **하이라이트 이미지 추출을 지원하나요?**  
-네. 3.0.9.1의 `media`·`multimodal` 프로필에서 같은 VOD 로컬 영상으로 프레임을 추출하고, 작성자 AI가 실제 이미지를 확인해 선택하면 보고서에 연결합니다. Highlight 영상 컷 편집이나 UI에서 선택 이미지·캡션을 교체하는 기능과는 다릅니다.
+네. 3.0.9.2의 `media`·`multimodal` 프로필에서 같은 VOD 로컬 영상으로 프레임을 추출하고, 작성자 AI가 실제 이미지를 확인해 선택하면 보고서에 연결합니다. Highlight 영상 컷 편집이나 UI에서 선택 이미지·캡션을 교체하는 기능과는 다릅니다.
 
 **EmbeddingGemma 2가 보고서를 쓰나요?**  
 아닙니다. 로컬 검색 encoder입니다. 선택한 작성자 AI가 원문·이미지를 직접 읽고 판단·작성합니다.
@@ -993,7 +993,7 @@ Codex CLI의 native plugin 관리에 연결하려면 `--mode plugin`, Claude Cod
 아닙니다. 상시 종료 감지·자동 수집 스케줄러는 포함하지 않습니다. 요청한 VOD 또는 준비된 자료에서 실행합니다.
 
 **보고서를 수정하고 이전 버전으로 돌아갈 수 있나요?**  
-네. 생성된 3.0.9.1 `.html` 파일 자체를 브라우저에서 바로 **다크모드 기본 화면**으로 열어 볼 수 있으며(테마 버튼으로 라이트/다크 전환 기억), 수정은 동봉 Report Admin UI(`review.py`)의 편집·미리보기·로컬 저장·재열기·이력 비교/복원을 사용합니다. 최초 작성 제출과 원문·이미지 근거는 보존합니다.
+네. 생성된 3.0.9.2 `.html` 파일 자체를 브라우저에서 바로 **다크모드 기본 화면**으로 열어 볼 수 있으며(테마 버튼으로 라이트/다크 전환 기억), 수정은 동봉 Report Admin UI(`review.py`)의 편집·미리보기·로컬 저장·재열기·이력 비교/복원을 사용합니다. 최초 작성 제출과 원문·이미지 근거는 보존합니다.
 
 
 </details>

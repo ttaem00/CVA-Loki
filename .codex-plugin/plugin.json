@@ -1,6 +1,6 @@
 {
   "name": "loki",
-  "version": "3.0.9.1",
+  "version": "3.0.9.2",
   "description": "선택한 AI 호스트(Codex·Claude·Antigravity·Gemini CLI·Web AI·로컬 LLM)가 치지직·YouTube·SOOP 다시보기 원문과 장면을 직접 읽고 요약·타임라인·하이라이트를 작성하는 비공식 도구입니다.",
   "author": {
     "name": "CVA contributors"

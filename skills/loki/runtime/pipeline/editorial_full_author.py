@@ -19,6 +19,8 @@ from .evidence_world.records import assert_asset_fresh
 
 from .editorial_contract import full_author_completion_state
 
+from .editorial_execution import canonical_author_range_level
+
 PROFILE = "full_broadcast_v302"
 
 CONTRACT = "editorial.full-author.v302"
@@ -294,6 +296,17 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
     for key in ("ranges", "points", "stories", "proposals", "group_outcomes", "unresolved_questions"):
         if not isinstance(payload[key], list):
             raise ValueError("full_author_response_shape")
+
+
+    ranges_for_validation = []
+    for row in payload["ranges"]:
+        if isinstance(row, dict):
+            level = row.get("level")
+            canonical_level = canonical_author_range_level(level)
+            if canonical_level != level:
+                row = {**row, "level": canonical_level}
+        ranges_for_validation.append(row)
+    payload = {**payload, "ranges": ranges_for_validation}
     if any(not isinstance(row, dict) for row in payload["stories"]):
         raise ValueError("full_author_story_invalid")
     if any(not isinstance(row, dict) for row in payload["group_outcomes"]):
@@ -508,8 +521,9 @@ def validate_response(payload, *, base_revision, source, packet, duration_sec, h
 
 
 
+
                 pending_refs = [ref for ref in flow_refs
-                                if state not in {"no_editorial_value", "relation_broken"}
+                                if state not in {"no_editorial_value", "relation_broken", "no_broadcast_activity"}
                                 or ref not in represented]
                 if pending_refs:
                     flow_pending.append({**row, "flow_refs": pending_refs})

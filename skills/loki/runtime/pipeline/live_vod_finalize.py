@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 
 import errno
 
+import hashlib
+
 import json
 
 import os
@@ -47,6 +49,70 @@ _LIVE_VOD_CODEX_PIN = "_" + LIVE_VOD_CODEX_PIN_SCOPE
 _STANDING_CODEX_APPROVALS = "unattended_vod_codex_approvals"
 
 _AUTHOR_PIN_OWNER = object()
+
+_QUEUED_GENERATION = "_live_queued_summary_generation"
+
+_QUEUED_GENERATION_FIELDS = (
+    "id", "archive", "videoNo", "parentVersion", "targetVersion", "parentGenerationId",
+    "parentPageSha256", "sourceRevision", "sourceSha256", "requestedAtMs",
+)
+
+@dataclass(frozen=True, slots=True)
+class _QueuedSummaryGeneration:
+    id: str
+    archive: str
+    video_no: str
+    parent_version: str
+    target_version: str
+    parent_generation_id: str
+    parent_page_sha256: str
+    source_revision: str
+    source_sha256: str
+    requested_at_ms: int
+
+def _queued_summary_generation(folder, generation_id, *, read_committed=False):
+    if not isinstance(generation_id, str) or not re.fullmatch(r"[a-f0-9]{32}", generation_id):
+        raise ValueError("finalize_queued_generation_invalid")
+    path = local_file(folder, "vod-summary-queue.json")
+    if not path.is_file() or path.stat().st_size > 2_000_000:
+        raise ValueError("finalize_queued_generation_invalid")
+    queue = json.loads(path.read_bytes())
+    if (not isinstance(queue, dict) or type(queue.get("version")) is not int or queue["version"] != 1
+            or not isinstance(queue.get("jobs"), list)):
+        raise ValueError("finalize_queued_generation_invalid")
+    matches = [job for job in queue["jobs"] if isinstance(job, dict) and job.get("id") == generation_id]
+    if len(matches) != 1:
+        raise ValueError("finalize_queued_generation_invalid")
+    job = matches[0]
+    if (job.get("state") != "running" or job.get("archive") != folder.name
+            or not all(isinstance(job.get(key), str) for key in _QUEUED_GENERATION_FIELDS[:-1])
+            or not re.fullmatch(r"[1-9]\d{0,11}", job["videoNo"])
+            or job["parentVersion"] not in SUMMARY_VERSIONS or job["targetVersion"] not in FULL_AUTHOR_PIPELINES
+            or job["parentVersion"] == job["targetVersion"]
+            or not re.fullmatch(r"\d{8}T\d{12}Z-[a-f0-9]{12}", job["parentGenerationId"])
+            or any(not re.fullmatch(r"[a-f0-9]{64}", job[key])
+                   for key in ("parentPageSha256", "sourceRevision", "sourceSha256"))
+            or type(job.get("requestedAtMs")) is not int or not 0 < job["requestedAtMs"] < 2**53):
+        raise ValueError("finalize_queued_generation_invalid")
+    identity = "\n".join((job["archive"], job["parentPageSha256"], job["targetVersion"]))
+    if hashlib.sha256(identity.encode("ascii")).hexdigest()[:32] != generation_id:
+        raise ValueError("finalize_queued_generation_invalid")
+    if "stopRequestedAtMs" in job:
+        stopped = job["stopRequestedAtMs"]
+        if type(stopped) is not int or not job["requestedAtMs"] <= stopped < 2**53:
+            raise ValueError("finalize_queued_generation_invalid")
+        if not read_committed:
+            raise ValueError("finalize_manager_stopped")
+    return _QueuedSummaryGeneration(*(job[key] for key in _QUEUED_GENERATION_FIELDS))
+
+def _queued_summary_from_config(cfg):
+    generation = cfg.get(_QUEUED_GENERATION)
+    if generation is not None and (
+            type(generation) is not _QueuedSummaryGeneration
+            or generation.archive != cfg.get("live_finalize_archive")
+            or generation.target_version != cfg.get("summary_pipeline_version")):
+        raise ValueError("finalize_queued_generation_invalid")
+    return generation
 
 @dataclass(frozen=True, slots=True)
 class _LiveVODCodexAuthorPin:
@@ -285,13 +351,48 @@ def _approved_summary_intent(folder, broadcast, settings):
         return intent
     return None
 
+def _reapproved_summary_matches(folder, broadcast, intent, recovery, selected_version):
+    """Read proof of a later final-only approval without modifying capture consent."""
+    if (not intent or intent.get("finalSummaryEnabled") is not True
+            or not isinstance(recovery, dict) or recovery.get("archive") != folder.name
+            or recovery.get("summaryPipelineVersion") != selected_version):
+        return False
+    chain = recovery.get("summaryVersionReapprovals")
+    previous = intent.get("summaryPipelineVersion")
+    if not isinstance(chain, list) or not chain or not isinstance(previous, str) or previous not in SUMMARY_VERSIONS:
+        return False
+    approved_at = broadcast["ended_at_ms"]
+    fields = {"archive", "previousVersion", "targetVersion", "intentStartedAtMs", "approvedAtMs"}
+    for approval in chain:
+        if not isinstance(approval, dict) or set(approval) != fields:
+            return False
+        target, when = approval["targetVersion"], approval["approvedAtMs"]
+        if (approval["archive"] != folder.name or approval["previousVersion"] != previous
+                or type(approval["intentStartedAtMs"]) is not int
+                or approval["intentStartedAtMs"] != intent["startedAtMs"]
+                or not isinstance(target, str) or target not in SUMMARY_VERSIONS or target == previous
+                or type(when) is not int or not approved_at <= when < 2**53):
+            return False
+        previous, approved_at = target, when
+    return previous == selected_version
+
 def _summary_consent(folder, broadcast, settings, *, selected_version=None):
     recorded = settings.get("analysisIntent")
     if isinstance(recorded, dict) and "finalSummaryEnabled" in recorded:
         intent = _approved_summary_intent(folder, broadcast, settings)
         version = (intent or {}).get("summaryPipelineVersion")
-        return (isinstance(version, str) and version in SUMMARY_VERSIONS
-                and (selected_version is None or version == selected_version))
+        if not isinstance(version, str) or version not in SUMMARY_VERSIONS:
+            return False
+        if selected_version is None or version == selected_version:
+            return True
+        try:
+            path = local_file(folder, "vod-recovery-state.json")
+            if not path.is_file() or path.stat().st_size > 2_000_000:
+                return False
+            recovery = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        return _reapproved_summary_matches(folder, broadcast, intent, recovery, selected_version)
     if settings.get("aiConsent") is True:
         return True
 
@@ -320,7 +421,7 @@ def _summary_consent(folder, broadcast, settings, *, selected_version=None):
     return pending.get("basis") == json.dumps(basis, ensure_ascii=False, separators=(",", ":"))
 
 def guard(folder, *, codex_resume_revision=None, selected_version=None, read_natural_summary_intent=False,
-          verify_end=True):
+          verify_end=True, queued_generation=None, read_committed=False):
     'Keep manual STOP, consent and both original end proofs authoritative.\n\n    The end proof is an admission fact: an ended broadcast stays ended, so per-send checks\n    (``verify_end=False``) keep STOP, exclusion, grant, consent and approval but do not reread\n    status/replay pages that may legitimately change mid-run.\n    '
     stop = local_file(folder, "STOP").read_text(encoding="utf-8").strip()
     models = local_file(folder, "MODELS_STOP").read_text(encoding="utf-8").strip()
@@ -335,6 +436,13 @@ def guard(folder, *, codex_resume_revision=None, selected_version=None, read_nat
         _codex_resume_grant(folder, codex_resume_revision, choice)
     elif choice.get("excluded"):
         raise ValueError("finalize_manager_stopped")
+    if queued_generation is not None:
+        if (selected_version != queued_generation.target_version
+                or _queued_summary_generation(folder, queued_generation.id,
+                                               read_committed=read_committed) != queued_generation
+                or sha(local_file(folder, "vod-final-page.json")) != queued_generation.parent_page_sha256):
+            raise ValueError("finalize_queued_generation_changed")
+        selected_version = queued_generation.parent_version
     with closing(sqlite3.connect(local_file(folder, "session.sqlite").as_uri() + "?mode=ro", uri=True)) as db:
         db.row_factory = sqlite3.Row
         rows = db.execute("SELECT * FROM broadcasts").fetchall()
@@ -344,6 +452,8 @@ def guard(folder, *, codex_resume_revision=None, selected_version=None, read_nat
         settings = json.loads(db.execute("SELECT value FROM meta WHERE name='settings'").fetchone()[0])
         if not _summary_consent(folder, broadcast, settings, selected_version=selected_version):
             raise ValueError("finalize_consent_required")
+        if queued_generation is not None and queued_generation.requested_at_ms < broadcast["ended_at_ms"]:
+            raise ValueError("finalize_queued_generation_invalid")
         if verify_end:
             collector_end = True
             for source in ("chat", "metadata"):
@@ -366,12 +476,14 @@ def check_dispatch(cfg, *, verify_author_approval=True):
         return
     revision = cfg.get("_live_finalize_codex_revision") if cfg.get("_live_finalize_codex_only") is True else None
     folder = archive_folder(archive)
+    queued_generation = _queued_summary_from_config(cfg)
     pin = live_vod_codex_author_pin(cfg)
     if pin is None or not verify_author_approval:
         guard(folder, codex_resume_revision=revision, selected_version=cfg.get("summary_pipeline_version"),
-              verify_end=False)
+              verify_end=False, queued_generation=queued_generation)
         return
-    if not guard(folder, selected_version=pin.pipeline_version, read_natural_summary_intent=True, verify_end=False):
+    if not guard(folder, selected_version=pin.pipeline_version, read_natural_summary_intent=True,
+                 verify_end=False, queued_generation=queued_generation):
         raise ValueError("finalize_codex_approval_changed")
     if pin.not_after is not None and datetime.now(timezone.utc) >= pin.not_after:
         raise ValueError("finalize_codex_approval_expired")

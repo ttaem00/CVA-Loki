@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from decimal import Decimal
+
 import json
 
 import math
 
 from pathlib import Path
 
-from .contracts import AssetBinding, EvidenceError, FAMILIES, SourcePolicy, canonical_json, digest, native_path
+from .contracts import (AssetBinding, EvidenceError, FAMILIES, SourcePolicy, canonical_json,
+                        digest, native_path, overlaps)
 
 from .index import atomic_json, build_snapshot, open_snapshot
 
@@ -377,6 +380,21 @@ class EvidenceWorldService:
                                       fragments=[{k: r[k] for k in ("record_id", "family", "raw_char_start", "raw_char_end")} for r in rows]))
         return result
 
+    @staticmethod
+    def _overview_bands(start_sec, end_sec):
+        edges = [start_sec, *(start_sec + (end_sec - start_sec) * i / 12 for i in range(1, 12)), end_sec]
+        return [dict(start_sec=left, end_sec=right) for left, right in zip(edges, edges[1:])]
+
+    def chronological_stt_navigation(self):
+        """Expose the source clock without running an original read or browse."""
+        bands = self._overview_bands(0, self.duration)
+        for band in bands:
+            band["next_action"] = dict(action="browse_evidence", args=dict(
+                families=["stt"], order="chronological",
+                interval_sec=[band["start_sec"], band["end_sec"]], limit=8))
+        return dict(source_id=self.source_id, world_revision=self.world_revision,
+                    duration_sec=self.duration, overview_bands=bands)
+
     def browse(self, *, question_id, families=None, order="chronological", cursor=0, limit=20,
                view="coverage", max_bytes=12000, interval_sec=None, interval_utc_ms=None, record_ids=None,
                report_id=None, report_revision=None, query=None, search_id=None, anchor_unit_id=None):
@@ -409,7 +427,15 @@ class EvidenceWorldService:
             from .phrase_view import browse_phrases
             return browse_phrases(self,question_id=question_id,families=families,cursor=cursor,limit=limit,
                 max_bytes=max_bytes,interval_sec=interval_sec,interval_utc_ms=interval_utc_ms,record_ids=record_ids)
-        if any(x is not None for x in (interval_sec,interval_utc_ms,record_ids)):
+        if view == "signals":
+            if interval_utc_ms is not None or record_ids is not None:
+                raise EvidenceError("browse_scope_unsupported_for_view")
+            from .signal_view import browse_signals
+            return browse_signals(self, question_id=question_id, families=families,
+                                  cursor=cursor, limit=limit, max_bytes=max_bytes,
+                                  interval_sec=interval_sec)
+        if (interval_utc_ms is not None or record_ids is not None
+                or interval_sec is not None and (view != "coverage" or order != "chronological")):
             raise EvidenceError('browse_scope_unsupported_for_view')
         if view == "source_order":
             return self.browse_source_order(question_id=question_id, families=families,
@@ -418,10 +444,6 @@ class EvidenceWorldService:
             from .pageindex_tree import browse_hierarchy
             return browse_hierarchy(self, question_id=question_id, families=families,
                                     cursor=cursor, limit=limit, max_bytes=max_bytes)
-        if view == "signals":
-            from .signal_view import browse_signals
-            return browse_signals(self, question_id=question_id, families=families,
-                                  cursor=cursor, limit=limit, max_bytes=max_bytes)
         if view != "coverage":
             raise EvidenceError("unknown_browse_view")
         if self.duration is None:
@@ -433,16 +455,30 @@ class EvidenceWorldService:
             raise EvidenceError("unknown_browse_cursor")
         if order == "low_reaction" and ("chat" not in self.family_status or self.family_status["chat"] not in {"present", "partial"}):
             raise EvidenceError("reaction_data_unavailable")
-        cells = [dict(index=i, start_sec=i * 60, end_sec=min((i + 1) * 60, self.duration),
+        scope = None
+        start_sec, end_sec = 0, self.duration
+        if interval_sec is not None:
+            if (not isinstance(interval_sec, (list, tuple)) or len(interval_sec) != 2
+                    or any(type(value) not in (int, float) for value in interval_sec)):
+                raise EvidenceError("invalid_time_filter")
+            [(start_us, end_us)] = _ranges({"intervals_sec": [interval_sec]})
+            if end_us > Decimal(str(self.duration)) * 1_000_000 or int(start_us) >= int(end_us):
+                raise EvidenceError("invalid_time_filter")
+            scope = (int(start_us), int(end_us))
+            start_sec, end_sec = interval_sec
+        first_index, stop_index = int(start_sec // 60), math.ceil(end_sec / 60)
+        cells = [dict(index=i, start_sec=max(i * 60, start_sec), end_sec=min((i + 1) * 60, end_sec),
                       families={f: dict(record_count=0, raw_delivered=False) for f in families},
-                      meaning_complete=False) for i in range(math.ceil(self.duration / 60))]
+                      meaning_complete=False) for i in range(first_index, stop_index)]
         with self.open() as db:
             for family in families:
                 for r in db.execute("SELECT ordinal,start_us,end_us,time_kind FROM records WHERE family=? AND start_us IS NOT NULL", (family,)):
-                    lo = min(int(r[1] // 60000000), len(cells) - 1)
-                    hi = min(int(max(r[1], r[2] - 1) // 60000000), len(cells) - 1)
+                    if scope is not None and not overlaps(dict(start_us=r[1], end_us=r[2], kind=r[3]), *scope):
+                        continue
+                    lo = max(first_index, min(int(r[1] // 60000000), stop_index - 1))
+                    hi = min(int(max(r[1], r[2] - 1) // 60000000), stop_index - 1)
                     for i in range(lo, hi + 1):
-                        cells[i]["families"][family]["record_count"] += 1
+                        cells[i - first_index]["families"][family]["record_count"] += 1
             chat_counts = defaultdict(int)
             if order == "low_reaction":
                 for row in db.execute("SELECT start_us FROM records WHERE family='chat' AND start_us IS NOT NULL"):
@@ -459,15 +495,18 @@ class EvidenceWorldService:
             for record in result["records"]:
                 clock = record["time_index"]
                 family = record["family"]
-                if clock and family in families:
-                    i = min(int(clock["start_us"] // 60000000), len(cells) - 1)
+                if clock and family in families and (scope is None or overlaps(clock, *scope)):
+                    i = max(first_index, min(int(clock["start_us"] // 60000000), stop_index - 1))
 
-                    cells[i]["families"][family]["raw_delivered"] = True
+                    cells[i - first_index]["families"][family]["raw_delivered"] = True
         if order == "unread":
             cells.sort(key=lambda c: (any(f["raw_delivered"] for f in c["families"].values()), c["index"]))
         elif order == "low_reaction":
             cells.sort(key=lambda c: (c["chat_count"], c["index"]))
-        browse_id = digest([self.world_revision, question_id, families, order, limit])
+        selector = [self.world_revision, question_id, families, order, limit]
+        if scope is not None:
+            selector.append(list(interval_sec))
+        browse_id = digest(selector)
         browse_root = self.run_root / "browse" / browse_id
         offset = 0
         if cursor:
@@ -488,7 +527,7 @@ class EvidenceWorldService:
 
         selected = [dict(cell, **({"next_action": original_read_action(
             families=[f for f, data in cell["families"].items() if data["record_count"]],
-            intervals_sec=[[cell["start_sec"], cell["end_sec"]]], context_cues=2)}
+            intervals_sec=[[cell["start_sec"], cell["end_sec"]]], context_cues=0 if scope is not None else 2)}
             if any(data["record_count"] for data in cell["families"].values()) else {})) for cell in selected]
         next_cursor = None
         if offset + len(selected) < len(cells):
@@ -498,7 +537,7 @@ class EvidenceWorldService:
         return dict(schema_version="ew.browse_result.v1", source_id=self.source_id,
                     world_revision=self.world_revision, question_id=question_id,
                     duration_sec=self.duration, total_cells=len(cells), cell_seconds=60,
-                    overview_bands=[dict(start_sec=self.duration * i / 12, end_sec=self.duration * (i + 1) / 12) for i in range(12)],
+                    overview_bands=self._overview_bands(start_sec, end_sec),
                     cells=selected, order=order, next_cursor=next_cursor,
                     coverage_snapshot_revision=snapshot["state_revision"],
                     status="partial_page" if next_cursor else "complete", family_status=self.family_status,
